@@ -4,6 +4,7 @@ import {
   Edit2,
   HelpCircle,
   MessageCircle,
+  MoreHorizontal,
   Plus,
   Printer,
   Search,
@@ -120,6 +121,18 @@ function ActionButton({ title, children, onClick }: { title: string; children: R
   );
 }
 
+function CompactEmptyState() {
+  return (
+    <div className="rounded-lg border border-[#F3E3D3] bg-white px-4 py-6 text-center shadow-[0_10px_24px_rgba(58,43,39,0.04)] sm:hidden">
+      <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3E3D3] text-[#7A6F6B]">
+        <Users size={19} />
+      </span>
+      <h3 className="mt-2 font-semibold text-[#2F2926]">Nenhum convidado encontrado</h3>
+      <p className="mt-1 text-sm text-[#7A6F6B]">Adicione convidados ou ajuste os filtros.</p>
+    </div>
+  );
+}
+
 export default function Guests() {
   const guests = useWeddingTable<Guest>('guests', 'full_name');
   const groups = useWeddingTable<GuestGroup>('guest_groups', 'name');
@@ -133,6 +146,7 @@ export default function Guests() {
   const [type, setType] = useState('');
   const [group, setGroup] = useState('');
   const [table, setTable] = useState('');
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
 
   const groupById = useMemo(() => new Map(groups.rows.map((item) => [item.id, item.name])), [groups.rows]);
   const tableById = useMemo(() => new Map(tables.rows.map((item) => [item.id, item.name])), [tables.rows]);
@@ -259,14 +273,22 @@ export default function Guests() {
     );
   }
 
+  const summaryChips = [
+    { label: 'Todos', value: 'total' as SummaryFilter, count: summary.total },
+    { label: 'Confirmados', value: 'confirmed' as SummaryFilter, count: summary.confirmed },
+    { label: 'Pendentes', value: 'pending' as SummaryFilter, count: summary.pending },
+    { label: 'Recusados', value: 'refused' as SummaryFilter, count: summary.refused }
+  ];
+
   return (
-    <div className="min-h-screen space-y-6 bg-[#FFF8F6] text-[#2F2926]">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-h-screen space-y-4 bg-[#FFF8F6] text-[#2F2926] sm:space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="min-w-0">
           <h1 className="page-title text-[#2F2926]">Convidados</h1>
           <p className="mt-1 text-sm text-[#7A6F6B]">Lista com RSVP, acompanhantes, restrições e mesas.</p>
         </div>
-        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
+
+        <div className="hidden sm:flex sm:w-auto sm:flex-wrap sm:justify-end sm:gap-2">
           <button className="btn-secondary min-w-0 border-[#F3E3D3] bg-white px-3 text-[#3A2B27] sm:px-4" onClick={exportCsv}>
             <Download size={16} /> CSV
           </button>
@@ -277,9 +299,51 @@ export default function Guests() {
             <Plus size={16} /> Convidado
           </button>
         </div>
+
+        <div className="relative grid grid-cols-[1fr_auto] gap-2 sm:hidden">
+          <button className="btn-primary min-w-0 bg-[#3A2B27] px-3" onClick={() => start()}>
+            <Plus size={16} /> Convidado
+          </button>
+          <button
+            type="button"
+            className="btn-secondary aspect-square border-[#F3E3D3] bg-white px-3 text-[#3A2B27]"
+            aria-label="Mais ações"
+            aria-expanded={mobileActionsOpen}
+            onClick={() => setMobileActionsOpen((open) => !open)}
+          >
+            <MoreHorizontal size={18} />
+          </button>
+          {mobileActionsOpen && (
+            <div className="absolute right-0 top-[calc(100%+0.5rem)] z-10 w-44 rounded-lg border border-[#F3E3D3] bg-white p-1.5 shadow-[0_16px_34px_rgba(58,43,39,0.12)]">
+              <button type="button" className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[#3A2B27] hover:bg-[#FFF8F6]" onClick={() => { exportCsv(); setMobileActionsOpen(false); }}>
+                <Download size={15} /> Exportar CSV
+              </button>
+              <button type="button" className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[#3A2B27] hover:bg-[#FFF8F6]" onClick={() => { window.print(); setMobileActionsOpen(false); }}>
+                <Printer size={15} /> Imprimir lista
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden">
+        {summaryChips.map((chip) => (
+          <button
+            key={chip.value}
+            type="button"
+            className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
+              summaryFilter === chip.value
+                ? 'border-[#3A2B27] bg-[#3A2B27] text-white'
+                : 'border-[#F3E3D3] bg-white text-[#3A2B27]'
+            }`}
+            onClick={() => setSummaryFilter(chip.value)}
+          >
+            {chip.label} <span className={summaryFilter === chip.value ? 'text-white/75' : 'text-[#7A6F6B]'}>{chip.count}</span>
+          </button>
+        ))}
+      </section>
+
+      <section className="hidden gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           label="Total de convidados"
           value={summary.total}
@@ -317,8 +381,9 @@ export default function Guests() {
       <ResponsiveFilters
         activeFiltersCount={activeFilterCount}
         onClearFilters={clearFilters}
+        className="p-3 sm:p-4"
         gridClassName="md:grid-cols-2 xl:grid-cols-[1.6fr_1fr_1fr_1fr_auto]"
-        footer={<p className="mt-4 text-sm text-[#7A6F6B]">{resultText}</p>}
+        footer={<p className="mt-2 text-sm text-[#7A6F6B] sm:mt-4">{resultText}</p>}
       >
           <label className="block">
             <span className="label text-[#7A6F6B]">Buscar</span>
@@ -430,7 +495,12 @@ export default function Guests() {
           </div>
         </>
       ) : (
-        <EmptyState icon={Users} title="Nenhum convidado encontrado" text="Adicione convidados ou ajuste os filtros da lista." />
+        <>
+          <CompactEmptyState />
+          <div className="hidden sm:block">
+            <EmptyState icon={Users} title="Nenhum convidado encontrado" text="Adicione convidados ou ajuste os filtros da lista." />
+          </div>
+        </>
       )}
 
       <Modal open={open} title={editing ? 'Editar convidado' : 'Novo convidado'} onClose={() => setOpen(false)}>
