@@ -1,6 +1,6 @@
 import { AlertTriangle, ArrowLeft, CalendarClock, CheckCircle2, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
 import FormSelect from '../components/FormSelect';
 import ResponsiveFilters from '../components/ResponsiveFilters';
@@ -36,10 +36,11 @@ function dueFilterMatch(item: BudgetItem, filter: string) {
 
 export default function BudgetDueDates() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const items = useWeddingTable<BudgetItem>('budget_items', 'due_date');
   const vendors = useWeddingTable<Vendor>('vendors', 'name');
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('next30');
+  const [filter, setFilter] = useState(() => (searchParams.get('filter') === 'overdue' ? 'overdue' : 'next30'));
 
   const vendorById = useMemo(() => new Map(vendors.rows.map((vendor) => [vendor.id, vendor.name])), [vendors.rows]);
 

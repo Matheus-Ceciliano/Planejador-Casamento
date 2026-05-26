@@ -1,6 +1,6 @@
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Clock3, Edit2, ExternalLink, Plus, Search, Trash2, X } from 'lucide-react';
 import { FormEvent, ReactNode, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
 import FormInput from '../components/FormInput';
 import FormSelect from '../components/FormSelect';
@@ -141,6 +141,7 @@ function taskPayload(form: typeof blank): Partial<Task> {
 
 export default function Tasks() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const tasks = useWeddingTable<Task>('tasks', 'due_date');
   const checklist = useWeddingTable<TaskChecklistItem>('task_checklist_items', 'created_at');
   const vendors = useWeddingTable<Vendor>('vendors', 'name');
@@ -153,7 +154,7 @@ export default function Tasks() {
   const [checklistDraft, setChecklistDraft] = useState<DraftChecklistItem[]>([]);
   const [deletedChecklistIds, setDeletedChecklistIds] = useState<string[]>([]);
   const [newChecklistTitle, setNewChecklistTitle] = useState('');
-  const [mainFilter, setMainFilter] = useState<MainTaskFilter>('pending');
+  const [mainFilter, setMainFilter] = useState<MainTaskFilter>(() => (searchParams.get('filter') === 'late' ? 'late' : 'pending'));
   const [search, setSearch] = useState('');
   const [responsible, setResponsible] = useState('');
   const [category, setCategory] = useState('');

@@ -10,11 +10,11 @@ import {
   Search,
   Trash2,
   Users,
+  UserPlus,
   XCircle
 } from 'lucide-react';
 import { FormEvent, ReactNode, useMemo, useState } from 'react';
 import ConfirmDialog from '../components/ConfirmDialog';
-import EmptyState from '../components/EmptyState';
 import FormInput from '../components/FormInput';
 import FormSelect from '../components/FormSelect';
 import FormTextarea from '../components/FormTextarea';
@@ -76,32 +76,54 @@ function isPendingStatus(status: string) {
 function SummaryCard({
   label,
   value,
+  subtitle,
   icon,
-  tone,
+  tone = 'neutral',
   active,
   onClick
 }: {
   label: string;
   value: number;
+  subtitle: string;
   icon: ReactNode;
-  tone: string;
+  tone?: 'neutral' | 'success' | 'warning' | 'danger';
   active: boolean;
   onClick: () => void;
 }) {
+  const tones = {
+    neutral: {
+      value: 'text-[#2F2926]',
+      icon: 'bg-[#F3E3D3] text-[#7A6F6B]'
+    },
+    success: {
+      value: 'text-[#5f7f4d]',
+      icon: 'bg-[#8FA87A]/15 text-[#5f7f4d]'
+    },
+    warning: {
+      value: 'text-[#8a5a12]',
+      icon: 'bg-[#D5A65A]/15 text-[#8a5a12]'
+    },
+    danger: {
+      value: 'text-[#a95757]',
+      icon: 'bg-[#C97C7C]/15 text-[#a95757]'
+    }
+  }[tone];
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-[112px] rounded-lg border p-4 text-left shadow-[0_16px_38px_rgba(58,43,39,0.06)] transition hover:-translate-y-0.5 hover:border-[#D8A7A0] ${
+      className={`min-h-[112px] rounded-lg border p-4 text-left shadow-[0_14px_32px_rgba(58,43,39,0.06)] transition hover:-translate-y-0.5 hover:border-[#D8A7A0] ${
         active ? 'border-[#3A2B27] bg-[#3A2B27] text-white' : 'border-[#F3E3D3] bg-white text-[#2F2926]'
       }`}
     >
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className={`text-xs font-semibold uppercase tracking-wide ${active ? 'text-white/70' : 'text-[#7A6F6B]'}`}>{label}</p>
-          <p className={`mt-2 text-2xl font-semibold ${active ? 'text-white' : 'text-[#2F2926]'}`}>{value}</p>
+          <p className={`mt-2 text-3xl font-semibold ${active ? 'text-white' : tones.value}`}>{value}</p>
+          <p className={`mt-1 text-sm ${active ? 'text-white/75' : 'text-[#7A6F6B]'}`}>{subtitle}</p>
         </div>
-        <span className={`rounded-lg p-2 ${active ? 'bg-white/12 text-white' : tone}`}>{icon}</span>
+        <span className={`rounded-lg p-2 ${active ? 'bg-white/12 text-white' : tones.icon}`}>{icon}</span>
       </div>
     </button>
   );
@@ -121,14 +143,17 @@ function ActionButton({ title, children, onClick }: { title: string; children: R
   );
 }
 
-function CompactEmptyState() {
+function GuestEmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="rounded-lg border border-[#F3E3D3] bg-white px-4 py-6 text-center shadow-[0_10px_24px_rgba(58,43,39,0.04)] sm:hidden">
-      <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3E3D3] text-[#7A6F6B]">
-        <Users size={19} />
+    <div className="rounded-lg border border-[#F3E3D3] bg-white px-4 py-7 text-center shadow-[0_12px_28px_rgba(58,43,39,0.05)] sm:px-6 sm:py-12">
+      <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-[#F3E3D3] text-[#7A6F6B] sm:h-12 sm:w-12">
+        <UserPlus size={20} />
       </span>
-      <h3 className="mt-2 font-semibold text-[#2F2926]">Nenhum convidado encontrado</h3>
-      <p className="mt-1 text-sm text-[#7A6F6B]">Adicione convidados ou ajuste os filtros.</p>
+      <h3 className="mt-3 text-base font-semibold text-[#2F2926] sm:text-lg">Nenhum convidado ainda</h3>
+      <p className="mx-auto mt-1 max-w-md text-sm text-[#7A6F6B] sm:text-base">Comece adicionando seus convidados para acompanhar confirmações e mesas.</p>
+      <button type="button" className="btn-primary mt-4 bg-[#3A2B27]" onClick={onAdd}>
+        <Plus size={16} /> Adicionar primeiro convidado
+      </button>
     </div>
   );
 }
@@ -178,7 +203,9 @@ export default function Guests() {
       total: countPeople(guests.rows),
       confirmed: countPeople(guests.rows.filter((guest) => guest.invite_status === 'confirmado')),
       pending: countPeople(guests.rows.filter((guest) => isPendingStatus(guest.invite_status))),
-      refused: countPeople(guests.rows.filter((guest) => guest.invite_status === 'recusado'))
+      refused: countPeople(guests.rows.filter((guest) => guest.invite_status === 'recusado')),
+      adults: guests.rows.filter((guest) => guest.guest_type === 'adulto').length,
+      children: guests.rows.filter((guest) => guest.guest_type === 'criança').length
     };
   }, [guests.rows]);
 
@@ -186,8 +213,10 @@ export default function Guests() {
     if (summaryFilter === 'confirmed') return `Mostrando ${filtered.length} convidados confirmados`;
     if (summaryFilter === 'pending') return `Mostrando ${filtered.length} convidados pendentes`;
     if (summaryFilter === 'refused') return `Mostrando ${filtered.length} convidados recusados`;
-    return `Mostrando ${filtered.length} de ${guests.rows.length} convidados`;
-  }, [filtered.length, guests.rows.length, summaryFilter]);
+    return `Mostrando ${filtered.length} convidados`;
+  }, [filtered.length, summaryFilter]);
+
+  const confirmationPercent = summary.total ? Math.round((summary.confirmed / summary.total) * 100) : 0;
 
   const activeFilterCount = useMemo(
     () => [search.trim(), type, group, table].filter(Boolean).length,
@@ -343,36 +372,50 @@ export default function Guests() {
         ))}
       </section>
 
+      <section className="rounded-lg border border-[#F3E3D3] bg-white p-3 shadow-[0_10px_24px_rgba(58,43,39,0.04)] sm:p-4">
+        <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+          <span className="font-medium text-[#7A6F6B]">Confirmações recebidas</span>
+          <strong className="text-[#2F2926]">{summary.confirmed} de {summary.total} ({confirmationPercent}%)</strong>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-[#F3E3D3]">
+          <div className="h-full rounded-full bg-[#8FA87A] transition-all" style={{ width: `${confirmationPercent}%` }} />
+        </div>
+      </section>
+
       <section className="hidden gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
-          label="Total de convidados"
+          label="Todos"
           value={summary.total}
+          subtitle={`Lista geral • ${summary.adults} adultos • ${summary.children} crianças`}
           icon={<Users size={18} />}
-          tone="bg-[#F3E3D3] text-[#3A2B27]"
+          tone="neutral"
           active={summaryFilter === 'total'}
           onClick={() => setSummaryFilter('total')}
         />
         <SummaryCard
           label="Confirmados"
           value={summary.confirmed}
+          subtitle={`${confirmationPercent}% do total`}
           icon={<CheckCircle2 size={18} />}
-          tone="bg-[#8FA87A]/15 text-[#5f7f4d]"
+          tone="success"
           active={summaryFilter === 'confirmed'}
           onClick={() => setSummaryFilter('confirmed')}
         />
         <SummaryCard
           label="Pendentes"
           value={summary.pending}
+          subtitle="Aguardando resposta"
           icon={<HelpCircle size={18} />}
-          tone="bg-[#F3E3D3] text-[#7A6F6B]"
+          tone="warning"
           active={summaryFilter === 'pending'}
           onClick={() => setSummaryFilter('pending')}
         />
         <SummaryCard
           label="Recusados"
           value={summary.refused}
+          subtitle="Não comparecerão"
           icon={<XCircle size={18} />}
-          tone="bg-[#C97C7C]/15 text-[#a95757]"
+          tone="danger"
           active={summaryFilter === 'refused'}
           onClick={() => setSummaryFilter('refused')}
         />
@@ -495,12 +538,7 @@ export default function Guests() {
           </div>
         </>
       ) : (
-        <>
-          <CompactEmptyState />
-          <div className="hidden sm:block">
-            <EmptyState icon={Users} title="Nenhum convidado encontrado" text="Adicione convidados ou ajuste os filtros da lista." />
-          </div>
-        </>
+        <GuestEmptyState onAdd={() => start()} />
       )}
 
       <Modal open={open} title={editing ? 'Editar convidado' : 'Novo convidado'} onClose={() => setOpen(false)}>
