@@ -73,6 +73,14 @@ function isPendingStatus(status: string) {
   return !['confirmado', 'recusado'].includes(status);
 }
 
+function maskPhone(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
 function SummaryCard({
   label,
   value,
@@ -545,13 +553,13 @@ export default function Guests() {
       )}
 
       <Modal open={open} title={editing ? 'Editar convidado' : 'Novo convidado'} onClose={() => setOpen(false)}>
-        <form className="-m-4 flex max-h-[calc(96vh-57px)] flex-col sm:-m-5 sm:max-h-[calc(92vh-73px)]" onSubmit={submit}>
-          <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:space-y-5 sm:p-5">
+        <form className="-m-4 flex min-h-full flex-col sm:-m-5 sm:min-h-0" onSubmit={submit}>
+          <div className="flex-1 space-y-3 overflow-y-auto p-4 pb-24 sm:space-y-5 sm:p-5">
             <section className="rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] p-3 sm:p-4">
               <h3 className="text-sm font-semibold text-[#2F2926]">Dados principais</h3>
-              <div className="mt-4 grid gap-3 md:grid-cols-2 md:gap-4">
+              <div className="mt-3 grid gap-3 md:grid-cols-2 md:gap-4">
                 <FormInput label="Nome completo" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required />
-                <FormInput label="Telefone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                <FormInput label="Telefone" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: maskPhone(e.target.value) })} />
                 <FormSelect label="Família/grupo" value={form.group_id} onChange={(e) => setForm({ ...form, group_id: e.target.value })} options={[{ label: 'Sem família', value: '' }, ...groups.rows.map((g) => ({ label: g.name, value: g.id }))]} />
                 <FormSelect label="Tipo" value={form.guest_type} onChange={(e) => setForm({ ...form, guest_type: e.target.value })} options={typeOptions.map((v) => ({ label: v, value: v }))} />
               </div>
@@ -559,16 +567,16 @@ export default function Guests() {
 
             <section className="rounded-lg border border-[#F3E3D3] bg-white p-3 sm:p-4">
               <h3 className="text-sm font-semibold text-[#2F2926]">Detalhes do convite</h3>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-4">
+              <div className="mt-3 grid gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-4">
                 <FormSelect label="Status do convite" value={form.invite_status} onChange={(e) => setForm({ ...form, invite_status: e.target.value })} options={statusOptions.map((v) => ({ label: v, value: v }))} />
                 <FormInput label="Acompanhantes" type="number" min={0} value={form.companions} onChange={(e) => setForm({ ...form, companions: Number(e.target.value) })} />
                 <FormSelect label="Mesa" value={form.table_id} onChange={(e) => setForm({ ...form, table_id: e.target.value })} options={[{ label: 'Sem mesa', value: '' }, ...tables.rows.map((t) => ({ label: t.name, value: t.id }))]} />
               </div>
             </section>
 
-            <section className="rounded-lg border border-[#F3E3D3] bg-white p-3 sm:p-4">
-              <h3 className="text-sm font-semibold text-[#2F2926]">Informações extras</h3>
-              <div className="mt-4 grid gap-3 md:grid-cols-2 md:gap-4">
+            <details className="rounded-lg border border-[#F3E3D3] bg-white p-3 sm:open:block sm:p-4" open={Boolean(editing)}>
+              <summary className="cursor-pointer list-none text-sm font-semibold text-[#2F2926]">Mais detalhes</summary>
+              <div className="mt-3 grid gap-3 md:grid-cols-2 md:gap-4">
                 <FormInput label="Restrição alimentar" value={form.food_restriction} onChange={(e) => setForm({ ...form, food_restriction: e.target.value })} />
                 <label className="flex items-center gap-2 self-end rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] px-3 py-2 text-sm text-[#2F2926]">
                   <input type="checkbox" checked={form.gift_received} onChange={(e) => setForm({ ...form, gift_received: e.target.checked })} />
@@ -578,10 +586,10 @@ export default function Guests() {
               <div className="mt-4">
                 <FormTextarea label="Observações" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
               </div>
-            </section>
+            </details>
           </div>
 
-          <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-[#F3E3D3] bg-white px-4 py-3 sm:flex sm:flex-wrap sm:justify-end sm:px-5 sm:py-4">
+          <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-[#F3E3D3] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 sm:flex sm:flex-wrap sm:justify-end sm:px-5 sm:py-4">
             <button type="button" className="btn-secondary border-[#F3E3D3] bg-white px-3 text-[#3A2B27] sm:px-4" onClick={() => setOpen(false)}>
               Cancelar
             </button>

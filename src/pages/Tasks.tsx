@@ -541,44 +541,45 @@ export default function Tasks() {
       )}
 
       <Modal open={open} title={editing ? 'Editar tarefa' : 'Nova tarefa'} onClose={() => setOpen(false)}>
-        <form className="space-y-5" onSubmit={submit}>
-          <section className="rounded-[1.5rem] border border-[#F3E3D3] bg-[#FFF8F6] p-4">
-            <h3 className="mb-4 text-sm font-semibold text-[#2F2926]">Dados da tarefa</h3>
-            <div className="grid gap-4 md:grid-cols-2">
-              <FormInput label="Título" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required />
-              <FormSelect label="Categoria" value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} options={taskCategories.map((value) => ({ label: value, value }))} />
-              <FormSelect label="Responsável" value={form.responsible} onChange={(event) => setForm({ ...form, responsible: event.target.value })} options={responsibleOptions.map((value) => ({ label: value, value }))} />
-              <FormInput label="Data limite" type="date" value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} />
-              <FormSelect label="Prioridade" value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })} options={priorities.map((value) => ({ label: value, value }))} />
-              <FormSelect label="Status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} options={statuses.map((value) => ({ label: value, value }))} />
-            </div>
-            <div className="mt-4">
-              <FormTextarea label="Descrição" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
-            </div>
-          </section>
+        <form className="-m-4 flex min-h-full flex-col sm:-m-5 sm:min-h-0" onSubmit={submit}>
+          <div className="flex-1 space-y-3 overflow-y-auto p-4 pb-24 sm:space-y-5 sm:p-5">
+            <section className="rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] p-3 sm:rounded-[1.5rem] sm:p-4">
+              <h3 className="text-sm font-semibold text-[#2F2926]">Dados da tarefa</h3>
+              <div className="mt-3 grid gap-3 md:grid-cols-2 md:gap-4">
+                <FormInput label="Título" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required />
+                <FormSelect label="Categoria" value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} options={taskCategories.map((value) => ({ label: value, value }))} />
+                <FormSelect label="Responsável" value={form.responsible} onChange={(event) => setForm({ ...form, responsible: event.target.value })} options={responsibleOptions.map((value) => ({ label: value, value }))} />
+                <FormInput label="Data limite" type="date" value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} />
+                <FormSelect label="Prioridade" value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })} options={priorities.map((value) => ({ label: value, value }))} />
+                <FormSelect label="Status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} options={statuses.map((value) => ({ label: value, value }))} />
+              </div>
+            </section>
 
-          <section className="rounded-[1.5rem] border border-[#F3E3D3] bg-white p-4">
-            <h3 className="mb-4 text-sm font-semibold text-[#2F2926]">Vínculos opcionais</h3>
-            <div className="grid gap-4 md:grid-cols-2">
-              <FormSelect
-                label="Fornecedor relacionado"
-                value={form.vendor_id}
-                onChange={(event) => setForm({ ...form, vendor_id: event.target.value })}
-                options={[{ label: 'Nenhum fornecedor', value: '' }, ...vendors.rows.map((vendor) => ({ label: `${vendor.name} - ${vendor.category}`, value: vendor.id }))]}
-              />
-              <FormSelect
-                label="Item financeiro relacionado"
-                value={form.budget_item_id}
-                onChange={(event) => setForm({ ...form, budget_item_id: event.target.value })}
-                options={[{ label: 'Nenhum item financeiro', value: '' }, ...budgetItems.rows.map((item) => ({ label: `${item.name} - ${item.category}`, value: item.id }))]}
-              />
-            </div>
-          </section>
+            <details className="rounded-lg border border-[#F3E3D3] bg-white p-3 sm:rounded-[1.5rem] sm:p-4" open={Boolean(editing)}>
+              <summary className="cursor-pointer list-none text-sm font-semibold text-[#2F2926]">Mais detalhes</summary>
+              <div className="mt-3">
+                <FormTextarea label="Descrição" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-2 md:gap-4">
+                <FormSelect
+                  label="Fornecedor relacionado"
+                  value={form.vendor_id}
+                  onChange={(event) => setForm({ ...form, vendor_id: event.target.value })}
+                  options={[{ label: 'Nenhum fornecedor', value: '' }, ...vendors.rows.map((vendor) => ({ label: `${vendor.name} - ${vendor.category}`, value: vendor.id }))]}
+                />
+                <FormSelect
+                  label="Item financeiro relacionado"
+                  value={form.budget_item_id}
+                  onChange={(event) => setForm({ ...form, budget_item_id: event.target.value })}
+                  options={[{ label: 'Nenhum item financeiro', value: '' }, ...budgetItems.rows.map((item) => ({ label: `${item.name} - ${item.category}`, value: item.id }))]}
+                />
+              </div>
+            </details>
 
-          <section className="rounded-[1.5rem] border border-[#F3E3D3] bg-white p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <details className="rounded-lg border border-[#F3E3D3] bg-white p-3 sm:rounded-[1.5rem] sm:p-4" open={Boolean(editing && checklistDraft.length)}>
+              <summary className="cursor-pointer list-none text-sm font-semibold text-[#2F2926]">Checklist interno</summary>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h3 className="text-sm font-semibold text-[#2F2926]">Checklist interno</h3>
                 <p className="mt-1 text-xs text-[#7A6F6B]">Adicione etapas menores para acompanhar esta tarefa.</p>
               </div>
               <span className="rounded-full bg-[#FFF8F6] px-3 py-1 text-xs font-semibold text-[#7A6F6B]">{checklistDraft.filter((item) => item.is_completed).length} de {checklistDraft.length} concluídas</span>
@@ -624,9 +625,10 @@ export default function Tasks() {
             ) : (
               <p className="mt-4 rounded-2xl border border-dashed border-[#F3E3D3] bg-[#FFF8F6] px-3 py-3 text-sm text-[#7A6F6B]">Nenhuma subtarefa adicionada.</p>
             )}
-          </section>
+            </details>
+          </div>
 
-          <div className="sticky bottom-0 -mx-6 -mb-6 flex justify-end gap-2 border-t border-[#F3E3D3] bg-white px-6 py-4">
+          <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-[#F3E3D3] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 sm:flex sm:justify-end sm:px-5 sm:py-4">
             <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Cancelar</button>
             <button className="btn-primary bg-[#3A2B27]">Salvar tarefa</button>
           </div>

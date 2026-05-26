@@ -59,6 +59,14 @@ function isVendorOverdue(vendor: Vendor) {
   return Boolean(vendor.due_date && getPendingValue(vendor.contracted_value, vendor.paid_value) > 0 && new Date(`${vendor.due_date}T23:59:59`) < new Date());
 }
 
+function maskPhone(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
 export default function Vendors() {
   const navigate = useNavigate();
   const vendors = useWeddingTable<Vendor>('vendors', 'name');
@@ -252,26 +260,42 @@ export default function Vendors() {
       </section>
 
       <Modal open={open} title={editing ? 'Editar fornecedor' : 'Novo fornecedor'} onClose={() => setOpen(false)}>
-        <form className="space-y-4" onSubmit={submit}>
-          <div className="grid gap-4 md:grid-cols-2">
-            <FormInput label="Nome do fornecedor" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-            <FormSelect label="Categoria" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} options={categoryOptions.map((value) => ({ label: value, value }))} />
-            <FormInput label="Nome do contato" value={form.contact_name} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} />
-            <FormInput label="Telefone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
-            <FormInput label="E-mail" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            <FormInput label="Instagram" value={form.instagram} onChange={(e) => setForm({ ...form, instagram: e.target.value })} />
-            <FormInput label="Site" value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} />
-            <CurrencyInput label="Valor contratado" value={form.contracted_value} onValueChange={(value) => setForm({ ...form, contracted_value: value })} />
-            <CurrencyInput label="Valor pago" value={form.paid_value} onValueChange={(value) => setForm({ ...form, paid_value: value })} />
-            <FormInput label="Data de vencimento" type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
-            <FormSelect label="Status" value={form.status === 'contratado' ? 'em negociação' : form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={editableVendorStatuses.map((value) => ({ label: value, value }))} />
+        <form className="-m-4 flex min-h-full flex-col sm:-m-5 sm:min-h-0" onSubmit={submit}>
+          <div className="flex-1 space-y-3 overflow-y-auto p-4 pb-24 sm:space-y-4 sm:p-5">
+            <section className="rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] p-3 sm:p-4">
+              <h3 className="text-sm font-semibold text-[#2F2926]">Dados principais</h3>
+              <div className="mt-3 grid gap-3 md:grid-cols-2 md:gap-4">
+                <FormInput label="Nome do fornecedor" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+                <FormSelect label="Categoria" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} options={categoryOptions.map((value) => ({ label: value, value }))} />
+                <FormInput label="Nome do contato" value={form.contact_name} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} />
+                <FormInput label="Telefone" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: maskPhone(e.target.value) })} />
+                <CurrencyInput label="Valor contratado" value={form.contracted_value} onValueChange={(value) => setForm({ ...form, contracted_value: value })} />
+                <FormSelect label="Status" value={form.status === 'contratado' ? 'em negociação' : form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={editableVendorStatuses.map((value) => ({ label: value, value }))} />
+              </div>
+            </section>
+
+            <details className="rounded-lg border border-[#F3E3D3] bg-white p-3 sm:p-4" open={Boolean(editing)}>
+              <summary className="cursor-pointer list-none text-sm font-semibold text-[#2F2926]">Mais detalhes</summary>
+              <div className="mt-3 grid gap-3 md:grid-cols-2 md:gap-4">
+                <FormInput label="E-mail" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                <FormInput label="Instagram" value={form.instagram} onChange={(e) => setForm({ ...form, instagram: e.target.value })} />
+                <FormInput label="Site" value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} />
+                <CurrencyInput label="Valor pago" value={form.paid_value} onValueChange={(value) => setForm({ ...form, paid_value: value })} />
+                <FormInput label="Data de vencimento" type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
+              </div>
+              <div className="mt-4 flex items-center gap-3">
+                <FileUpload folder="contratos" onUploaded={(url) => setForm({ ...form, contract_url: url })} />
+                {form.contract_url && <a className="text-sm text-rosew-500" href={form.contract_url} target="_blank" rel="noreferrer">Ver contrato</a>}
+              </div>
+              <div className="mt-4">
+                <FormTextarea label="Observações" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              </div>
+            </details>
           </div>
-          <div className="flex items-center gap-3">
-            <FileUpload folder="contratos" onUploaded={(url) => setForm({ ...form, contract_url: url })} />
-            {form.contract_url && <a className="text-sm text-rosew-500" href={form.contract_url} target="_blank" rel="noreferrer">Ver contrato</a>}
+          <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-[#F3E3D3] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 sm:flex sm:justify-end sm:px-5 sm:py-4">
+            <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Cancelar</button>
+            <button className="btn-primary bg-[#3A2B27]">Salvar fornecedor</button>
           </div>
-          <FormTextarea label="Observações" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-          <button className="btn-primary bg-[#3A2B27]">Salvar fornecedor</button>
         </form>
       </Modal>
 
