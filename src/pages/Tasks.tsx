@@ -541,9 +541,9 @@ export default function Tasks() {
       )}
 
       <Modal open={open} title={editing ? 'Editar tarefa' : 'Nova tarefa'} onClose={() => setOpen(false)}>
-        <form className="-m-4 flex min-h-full flex-col sm:-m-5 sm:min-h-0" onSubmit={submit}>
+        <form className="-m-4 flex min-h-full flex-col [&_.input]:text-sm [&_.label]:mb-0.5 [&_.label]:text-[10px] [&_input.input]:h-9 [&_select.input]:h-9 [&_textarea.input]:min-h-20 sm:-m-5 sm:min-h-0 sm:[&_.label]:mb-1 sm:[&_.label]:text-xs sm:[&_input.input]:h-auto sm:[&_select.input]:h-auto sm:[&_textarea.input]:min-h-24" onSubmit={submit}>
           <div className="flex-1 space-y-3 overflow-y-auto p-4 pb-24 sm:space-y-5 sm:p-5">
-            <section className="rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] p-3 sm:rounded-[1.5rem] sm:p-4">
+            <section className="rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] p-2.5 sm:rounded-[1.5rem] sm:p-4">
               <h3 className="text-sm font-semibold text-[#2F2926]">Dados da tarefa</h3>
               <div className="mt-3 grid gap-3 md:grid-cols-2 md:gap-4">
                 <FormInput label="Título" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required />
@@ -555,8 +555,11 @@ export default function Tasks() {
               </div>
             </section>
 
-            <details className="rounded-lg border border-[#F3E3D3] bg-white p-3 sm:rounded-[1.5rem] sm:p-4" open={Boolean(editing)}>
-              <summary className="cursor-pointer list-none text-sm font-semibold text-[#2F2926]">Mais detalhes</summary>
+            <details className="group rounded-lg border border-[#F3E3D3] bg-white p-2.5 sm:rounded-[1.5rem] sm:p-4" open={Boolean(editing)}>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-[#2F2926]">
+                Mais detalhes
+                <ChevronDown size={16} className="text-[#7A6F6B] transition group-open:rotate-180" />
+              </summary>
               <div className="mt-3">
                 <FormTextarea label="Descrição" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
               </div>
@@ -576,8 +579,11 @@ export default function Tasks() {
               </div>
             </details>
 
-            <details className="rounded-lg border border-[#F3E3D3] bg-white p-3 sm:rounded-[1.5rem] sm:p-4" open={Boolean(editing && checklistDraft.length)}>
-              <summary className="cursor-pointer list-none text-sm font-semibold text-[#2F2926]">Checklist interno</summary>
+            <details className="group rounded-lg border border-[#F3E3D3] bg-white p-2.5 sm:rounded-[1.5rem] sm:p-4" open={Boolean(editing && checklistDraft.length)}>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-[#2F2926]">
+                Checklist interno
+                <ChevronDown size={16} className="text-[#7A6F6B] transition group-open:rotate-180" />
+              </summary>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="mt-1 text-xs text-[#7A6F6B]">Adicione etapas menores para acompanhar esta tarefa.</p>
@@ -628,9 +634,9 @@ export default function Tasks() {
             </details>
           </div>
 
-          <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-[#F3E3D3] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 sm:flex sm:justify-end sm:px-5 sm:py-4">
-            <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Cancelar</button>
-            <button className="btn-primary bg-[#3A2B27]">Salvar tarefa</button>
+          <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-[#F3E3D3] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] pt-2.5 sm:flex sm:justify-end sm:px-5 sm:py-4">
+            <button type="button" className="btn-secondary h-9 sm:h-auto" onClick={() => setOpen(false)}>Cancelar</button>
+            <button className="btn-primary h-9 bg-[#3A2B27] sm:h-auto">Salvar tarefa</button>
           </div>
         </form>
       </Modal>

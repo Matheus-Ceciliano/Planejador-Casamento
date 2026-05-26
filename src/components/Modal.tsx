@@ -13,9 +13,9 @@ export default function Modal({ open, title, children, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-stone-950/35 p-0 sm:items-center sm:p-4">
       <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-soft sm:h-auto sm:max-h-[92vh] sm:max-w-3xl sm:rounded-lg">
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-rosew-100 bg-white px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:px-5 sm:py-4">
-          <h2 className="min-w-0 text-base font-semibold leading-tight text-ink sm:text-lg">{title}</h2>
-          <button className="rounded-lg p-2 text-ink hover:bg-rosew-50" onClick={onClose} aria-label="Fechar">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-rosew-100 bg-white px-4 pb-2.5 pt-[calc(env(safe-area-inset-top)+0.65rem)] sm:px-5 sm:py-4">
+          <h2 className="min-w-0 text-sm font-semibold leading-tight text-ink sm:text-lg">{title}</h2>
+          <button className="rounded-lg p-1.5 text-ink hover:bg-rosew-50 sm:p-2" onClick={onClose} aria-label="Fechar">
             <X size={18} />
           </button>
         </div>

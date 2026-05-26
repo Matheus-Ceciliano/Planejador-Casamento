@@ -1,5 +1,6 @@
 import {
   CheckCircle2,
+  ChevronDown,
   Download,
   Edit2,
   HelpCircle,
@@ -553,9 +554,9 @@ export default function Guests() {
       )}
 
       <Modal open={open} title={editing ? 'Editar convidado' : 'Novo convidado'} onClose={() => setOpen(false)}>
-        <form className="-m-4 flex min-h-full flex-col sm:-m-5 sm:min-h-0" onSubmit={submit}>
+        <form className="-m-4 flex min-h-full flex-col [&_.input]:text-sm [&_.label]:mb-0.5 [&_.label]:text-[10px] [&_input.input]:h-9 [&_select.input]:h-9 [&_textarea.input]:min-h-20 sm:-m-5 sm:min-h-0 sm:[&_.label]:mb-1 sm:[&_.label]:text-xs sm:[&_input.input]:h-auto sm:[&_select.input]:h-auto sm:[&_textarea.input]:min-h-24" onSubmit={submit}>
           <div className="flex-1 space-y-3 overflow-y-auto p-4 pb-24 sm:space-y-5 sm:p-5">
-            <section className="rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] p-3 sm:p-4">
+            <section className="rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] p-2.5 sm:p-4">
               <h3 className="text-sm font-semibold text-[#2F2926]">Dados principais</h3>
               <div className="mt-3 grid gap-3 md:grid-cols-2 md:gap-4">
                 <FormInput label="Nome completo" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required />
@@ -565,7 +566,7 @@ export default function Guests() {
               </div>
             </section>
 
-            <section className="rounded-lg border border-[#F3E3D3] bg-white p-3 sm:p-4">
+            <section className="rounded-lg border border-[#F3E3D3] bg-white p-2.5 sm:p-4">
               <h3 className="text-sm font-semibold text-[#2F2926]">Detalhes do convite</h3>
               <div className="mt-3 grid gap-3 sm:grid-cols-2 md:grid-cols-3 md:gap-4">
                 <FormSelect label="Status do convite" value={form.invite_status} onChange={(e) => setForm({ ...form, invite_status: e.target.value })} options={statusOptions.map((v) => ({ label: v, value: v }))} />
@@ -574,8 +575,11 @@ export default function Guests() {
               </div>
             </section>
 
-            <details className="rounded-lg border border-[#F3E3D3] bg-white p-3 sm:open:block sm:p-4" open={Boolean(editing)}>
-              <summary className="cursor-pointer list-none text-sm font-semibold text-[#2F2926]">Mais detalhes</summary>
+            <details className="group rounded-lg border border-[#F3E3D3] bg-white p-2.5 sm:open:block sm:p-4" open={Boolean(editing)}>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-[#2F2926]">
+                Mais detalhes
+                <ChevronDown size={16} className="text-[#7A6F6B] transition group-open:rotate-180" />
+              </summary>
               <div className="mt-3 grid gap-3 md:grid-cols-2 md:gap-4">
                 <FormInput label="Restrição alimentar" value={form.food_restriction} onChange={(e) => setForm({ ...form, food_restriction: e.target.value })} />
                 <label className="flex items-center gap-2 self-end rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] px-3 py-2 text-sm text-[#2F2926]">
@@ -589,11 +593,11 @@ export default function Guests() {
             </details>
           </div>
 
-          <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-[#F3E3D3] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 sm:flex sm:flex-wrap sm:justify-end sm:px-5 sm:py-4">
-            <button type="button" className="btn-secondary border-[#F3E3D3] bg-white px-3 text-[#3A2B27] sm:px-4" onClick={() => setOpen(false)}>
+          <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-[#F3E3D3] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] pt-2.5 sm:flex sm:flex-wrap sm:justify-end sm:px-5 sm:py-4">
+            <button type="button" className="btn-secondary h-9 border-[#F3E3D3] bg-white px-3 text-[#3A2B27] sm:h-auto sm:px-4" onClick={() => setOpen(false)}>
               Cancelar
             </button>
-            <button className="btn-primary bg-[#3A2B27] px-3 sm:px-4">Salvar convidado</button>
+            <button className="btn-primary h-9 bg-[#3A2B27] px-3 sm:h-auto sm:px-4">Salvar convidado</button>
           </div>
         </form>
       </Modal>
