@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import LoadingSpinner from './components/LoadingSpinner';
+import OfflineNotice from './components/OfflineNotice';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { WeddingProvider, useWedding } from './hooks/useWedding';
 import AppLayout from './layouts/AppLayout';
@@ -71,6 +72,7 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/*" element={<Protected />} />
       </Routes>
+      <OfflineNotice />
     </AuthProvider>
   );
 }

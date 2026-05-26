@@ -12,10 +12,20 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  min-height: 100dvh;
+  background: #fff8f7;
 }
 
 button, input, select, textarea {
   font: inherit;
+}
+
+.app-header-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+.pwa-main-safe {
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
 }
 
 @layer components {

@@ -3,6 +3,7 @@ import { ReactNode, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useWedding } from '../hooks/useWedding';
+import InstallPWAButton from '../components/InstallPWAButton';
 
 const nav = [
   { to: '/dashboard', label: 'Dashboard', icon: Home },
@@ -22,9 +23,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <aside className="flex h-full flex-col bg-white">
       <div className="flex h-16 items-center gap-3 border-b border-rosew-100 px-5">
-        <span className="rounded-lg bg-rosew-100 p-2 text-rosew-500">
-          <Heart size={20} />
-        </span>
+        <img className="h-9 w-9 rounded-lg" src="/logo.svg" alt="Planejador de Casamento" />
         <span className="font-semibold text-ink">Planejador</span>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
@@ -52,7 +51,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
   const { wedding, weddings, selectWedding } = useWedding();
 
   return (
-    <div className="min-h-screen bg-rosew-50">
+    <div className="min-h-[100dvh] bg-rosew-50">
       <div className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-rosew-100 lg:block">
         <Sidebar />
       </div>
@@ -68,7 +67,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
         </div>
       )}
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-rosew-100 bg-white/85 px-4 backdrop-blur sm:px-6">
+        <header className="app-header-safe sticky top-0 z-20 flex min-h-16 items-center justify-between border-b border-rosew-100 bg-white/85 px-4 backdrop-blur sm:px-6">
           <div className="flex items-center gap-3">
             <button className="rounded-lg p-2 hover:bg-rosew-50 lg:hidden" onClick={() => setOpen(true)} aria-label="Abrir menu">
               <Menu size={22} />
@@ -79,6 +78,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <InstallPWAButton />
             {weddings.length > 1 && (
               <label className="relative hidden sm:block">
                 <select className="input appearance-none pr-9" value={wedding?.id ?? ''} onChange={(event) => selectWedding(event.target.value)}>
@@ -94,7 +94,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
             </button>
           </div>
         </header>
-        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        <main className="pwa-main-safe mx-auto max-w-7xl px-4 py-6 sm:px-6">
           {children ?? <Outlet />}
         </main>
       </div>
