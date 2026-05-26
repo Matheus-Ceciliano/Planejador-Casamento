@@ -87,14 +87,33 @@ function SummaryCard({
   );
 }
 
-function CompactEmptyState() {
+function TaskStatusChip({ label, value, active, onClick }: { label: string; value: number; active: boolean; onClick: () => void }) {
   return (
-    <div className="rounded-lg border border-[#F3E3D3] bg-white px-4 py-8 text-center shadow-[0_10px_24px_rgba(58,43,39,0.04)] md:px-4 md:py-5">
-      <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-[#F3E3D3] text-[#7A6F6B] md:h-9 md:w-9">
-        <Check size={20} />
+    <button
+      type="button"
+      onClick={onClick}
+      className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+        active
+          ? 'border-[#3A2B27] bg-[#3A2B27] text-white shadow-sm'
+          : 'border-[#F3E3D3] bg-white text-[#3A2B27] hover:border-[#D8A7A0]'
+      }`}
+    >
+      {label} <span className={active ? 'text-white/80' : 'text-[#7A6F6B]'}>{value}</span>
+    </button>
+  );
+}
+
+function CompactEmptyState({ onCreate }: { onCreate: () => void }) {
+  return (
+    <div className="rounded-lg border border-[#F3E3D3] bg-white px-4 py-6 text-center shadow-[0_10px_24px_rgba(58,43,39,0.04)] md:px-4 md:py-5">
+      <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3E3D3] text-[#7A6F6B]">
+        <Check size={18} />
       </span>
-      <h3 className="mt-3 font-semibold text-[#2F2926] md:mt-2">Nenhuma tarefa encontrada</h3>
-      <p className="mt-1 text-sm text-[#7A6F6B]">Crie uma tarefa ou ajuste os filtros da lista.</p>
+      <h3 className="mt-2 font-semibold text-[#2F2926]">Nenhuma tarefa encontrada</h3>
+      <p className="mx-auto mt-1 max-w-sm text-sm leading-snug text-[#7A6F6B]">Crie uma tarefa ou ajuste os filtros da lista.</p>
+      <button type="button" className="btn-primary mt-4 h-9 bg-[#3A2B27] px-3 text-sm md:hidden" onClick={onCreate}>
+        <Plus size={15} /> Criar primeira tarefa
+      </button>
     </div>
   );
 }
@@ -456,16 +475,22 @@ export default function Tasks() {
   }
 
   return (
-    <div className="min-h-screen space-y-5 bg-[#FFF8F6] text-[#2F2926] md:space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3 md:gap-2">
+    <div className="min-h-screen space-y-3 bg-[#FFF8F6] text-[#2F2926] md:space-y-3">
+      <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-between">
         <div>
           <h1 className="page-title text-[#2F2926]">Tarefas</h1>
           <p className="mt-1 text-sm text-[#7A6F6B]">Checklist por responsável, prioridade e prazo.</p>
         </div>
-        <button className="btn-primary bg-[#3A2B27]" onClick={() => start()}><Plus size={16} /> Nova tarefa</button>
+        <button className="btn-primary h-9 bg-[#3A2B27] px-3 md:h-auto md:px-4" onClick={() => start()}><Plus size={16} /> Nova tarefa</button>
       </div>
 
-      <section className="grid gap-3 md:grid-cols-3 md:gap-2">
+      <section className="flex scroll-smooth gap-1.5 overflow-x-auto py-0.5 [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden">
+        <TaskStatusChip label="Pendentes" value={summary.pending} active={mainFilter === 'pending'} onClick={() => setMainFilter('pending')} />
+        <TaskStatusChip label="Atrasadas" value={summary.late} active={mainFilter === 'late'} onClick={() => setMainFilter('late')} />
+        <TaskStatusChip label="Concluídas" value={summary.done} active={mainFilter === 'done'} onClick={() => setMainFilter('done')} />
+      </section>
+
+      <section className="hidden gap-3 md:grid md:grid-cols-3 md:gap-2">
         <SummaryCard
           label="Pendentes"
           value={summary.pending}
@@ -495,9 +520,9 @@ export default function Tasks() {
       <ResponsiveFilters
         activeFiltersCount={activeFilterCount}
         onClearFilters={clearFilters}
-        className="rounded-[1.25rem] p-4 md:p-3"
+        className="rounded-[1.25rem] p-2.5 md:p-3"
         gridClassName="lg:grid-cols-[minmax(180px,1.4fr)_minmax(130px,0.8fr)_minmax(140px,0.9fr)_minmax(120px,0.75fr)_minmax(125px,0.8fr)_auto]"
-        footer={<p className="mt-4 text-sm text-[#7A6F6B] md:mt-2 md:text-xs">{resultText}</p>}
+        footer={<p className="mt-1.5 text-sm text-[#7A6F6B] md:mt-2 md:text-xs">{resultText}</p>}
       >
           <label className="block">
             <span className="label text-[#7A6F6B]">Buscar</span>
@@ -537,7 +562,7 @@ export default function Tasks() {
           {rows.map(renderTaskCard)}
         </section>
       ) : (
-        <CompactEmptyState />
+        <CompactEmptyState onCreate={() => start()} />
       )}
 
       <Modal open={open} title={editing ? 'Editar tarefa' : 'Nova tarefa'} onClose={() => setOpen(false)}>
