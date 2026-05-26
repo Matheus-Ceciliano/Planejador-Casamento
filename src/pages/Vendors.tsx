@@ -1,0 +1,310 @@
+﻿import { CheckCircle2, Edit2, ExternalLink, Handshake, Plus, Search, Trash2, X } from 'lucide-react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import ConfirmDialog from '../components/ConfirmDialog';
+import CurrencyInput from '../components/CurrencyInput';
+import EmptyState from '../components/EmptyState';
+import FileUpload from '../components/FileUpload';
+import FormInput from '../components/FormInput';
+import FormSelect from '../components/FormSelect';
+import FormTextarea from '../components/FormTextarea';
+import Modal from '../components/Modal';
+import { useWeddingTable } from '../hooks/useWeddingTable';
+import { BudgetCategory, BudgetItem, Vendor } from '../types';
+import { vendorCategories } from '../utils/constants';
+import { categoryToBudgetSlug, getPaymentStatus, getPendingValue, toPrimaryCategory, vendorToBudgetPayload } from '../utils/finance';
+import { formatDate, formatMoney } from '../utils/format';
+
+const blank = {
+  name: '',
+  category: 'Espaço',
+  contact_name: '',
+  phone: '',
+  email: '',
+  instagram: '',
+  site: '',
+  contracted_value: 0,
+  paid_value: 0,
+  due_date: '',
+  status: 'pesquisando',
+  contract_url: '',
+  notes: ''
+};
+
+const vendorStatuses = ['pesquisando', 'orçamento recebido', 'em negociação', 'contratado', 'cancelado'];
+const editableVendorStatuses = vendorStatuses.filter((status) => status !== 'contratado');
+
+const vendorStatusStyles: Record<string, string> = {
+  pesquisando: 'bg-[#F3E3D3] text-[#7A6F6B] ring-[#ead5c1]',
+  'orçamento recebido': 'bg-[#D8A7A0]/18 text-[#9f675f] ring-[#D8A7A0]/30',
+  'em negociação': 'bg-[#D5A65A]/15 text-[#9a7436] ring-[#D5A65A]/25',
+  contratado: 'bg-[#8FA87A]/15 text-[#5f7f4d] ring-[#8FA87A]/25',
+  cancelado: 'bg-[#C97C7C]/15 text-[#a95757] ring-[#C97C7C]/25'
+};
+
+const paymentStatusStyles: Record<string, string> = {
+  pendente: 'bg-[#F3E3D3] text-[#7A6F6B] ring-[#ead5c1]',
+  'pago parcialmente': 'bg-[#D5A65A]/15 text-[#9a7436] ring-[#D5A65A]/25',
+  pago: 'bg-[#8FA87A]/15 text-[#5f7f4d] ring-[#8FA87A]/25',
+  vencido: 'bg-[#C97C7C]/15 text-[#a95757] ring-[#C97C7C]/25'
+};
+
+function Badge({ value, type = 'vendor' }: { value: string; type?: 'vendor' | 'payment' }) {
+  const styles = type === 'vendor' ? vendorStatusStyles : paymentStatusStyles;
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ${styles[value] ?? 'bg-stone-100 text-stone-600 ring-stone-200'}`}>{value}</span>;
+}
+
+function isVendorOverdue(vendor: Vendor) {
+  return Boolean(vendor.due_date && getPendingValue(vendor.contracted_value, vendor.paid_value) > 0 && new Date(`${vendor.due_date}T23:59:59`) < new Date());
+}
+
+export default function Vendors() {
+  const navigate = useNavigate();
+  const vendors = useWeddingTable<Vendor>('vendors', 'name');
+  const budgetItems = useWeddingTable<BudgetItem>('budget_items', 'due_date');
+  const customCategories = useWeddingTable<BudgetCategory>('budget_categories', 'sort_order');
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Vendor | null>(null);
+  const [confirming, setConfirming] = useState<Vendor | null>(null);
+  const [deleting, setDeleting] = useState<Vendor | null>(null);
+  const [message, setMessage] = useState('');
+  const [form, setForm] = useState(blank);
+  const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [status, setStatus] = useState('');
+
+  const rows = useMemo(
+    () =>
+      vendors.rows.filter(
+        (vendor) =>
+          `${vendor.name} ${vendor.phone ?? ''}`.toLowerCase().includes(search.toLowerCase()) &&
+          (!category || toPrimaryCategory(vendor.category) === category) &&
+          (!status || vendor.status === status)
+      ),
+    [category, search, status, vendors.rows]
+  );
+
+  const budgetByVendorId = useMemo(() => new Map(budgetItems.rows.filter((item) => item.vendor_id).map((item) => [item.vendor_id, item])), [budgetItems.rows]);
+  const categoryOptions = useMemo(() => {
+    const custom = customCategories.rows
+      .map((category) => category.name.trim())
+      .filter((name) => name && toPrimaryCategory(name) === name);
+    return Array.from(new Set([...vendorCategories, ...custom]));
+  }, [customCategories.rows]);
+
+  useEffect(() => {
+    vendors.rows
+      .filter((vendorItem) => vendorItem.category !== toPrimaryCategory(vendorItem.category))
+      .forEach((vendorItem) => {
+        vendors.update(vendorItem.id, { category: toPrimaryCategory(vendorItem.category) } as Partial<Vendor>).catch(console.error);
+      });
+    budgetItems.rows
+      .filter((item) => item.category !== toPrimaryCategory(item.category))
+      .forEach((item) => {
+        budgetItems.update(item.id, { category: toPrimaryCategory(item.category) } as Partial<BudgetItem>).catch(console.error);
+      });
+  }, [budgetItems.rows, vendors.rows]);
+
+  function start(row?: Vendor) {
+    setEditing(row ?? null);
+    setForm(
+      row
+        ? {
+            name: row.name,
+            category: toPrimaryCategory(row.category),
+            contact_name: row.contact_name ?? '',
+            phone: row.phone ?? '',
+            email: row.email ?? '',
+            instagram: row.instagram ?? '',
+            site: row.site ?? '',
+            contracted_value: row.contracted_value,
+            paid_value: row.paid_value,
+            due_date: row.due_date ?? '',
+            status: row.status,
+            contract_url: row.contract_url ?? '',
+            notes: row.notes ?? ''
+          }
+        : blank
+    );
+    setOpen(true);
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const payload = { ...form, category: toPrimaryCategory(form.category) };
+    if (editing) await vendors.update(editing.id, payload as Partial<Vendor>);
+    else await vendors.create(payload as Partial<Vendor>);
+    setOpen(false);
+  }
+
+  async function confirmHiring() {
+    if (!confirming) return;
+    const updatedVendor = { ...confirming, status: 'contratado' };
+    await vendors.update(confirming.id, { status: 'contratado' });
+
+    const existing = budgetItems.rows.find((item) => item.vendor_id === confirming.id);
+    const payload = vendorToBudgetPayload(updatedVendor);
+    if (existing) await budgetItems.update(existing.id, payload as Partial<BudgetItem>);
+    else await budgetItems.create(payload as Partial<BudgetItem>);
+
+    setMessage(`Contratação de ${confirming.name} confirmada e orçamento sincronizado.`);
+    setConfirming(null);
+  }
+
+  async function confirmDelete() {
+    if (!deleting) return;
+    await vendors.remove(deleting.id);
+    setDeleting(null);
+  }
+
+  function clearFilters() {
+    setSearch('');
+    setCategory('');
+    setStatus('');
+  }
+
+  function renderActions(row: Vendor) {
+    const alreadyContracted = row.status === 'contratado';
+    return (
+      <div className="flex flex-wrap gap-2">
+        {!alreadyContracted ? (
+          <button type="button" className="btn-secondary border-[#8FA87A]/30 bg-[#8FA87A]/10 text-[#5f7f4d]" onClick={() => setConfirming(row)} title="Confirmar Contratação">
+            <CheckCircle2 size={16} /> Confirmar Contratação
+          </button>
+        ) : (
+          <button type="button" className="btn-secondary border-[#F3E3D3] bg-white text-[#3A2B27]" onClick={() => navigate(`/orcamento/${categoryToBudgetSlug(row.category)}`)} title="Ver no orçamento">
+            <ExternalLink size={16} /> Ver no orçamento
+          </button>
+        )}
+        <button type="button" className="btn-secondary px-3" onClick={() => start(row)} title="Editar">
+          <Edit2 size={15} />
+        </button>
+        <button type="button" className="btn-secondary px-3" onClick={() => setDeleting(row)} title="Excluir">
+          <Trash2 size={15} className="text-[#C97C7C]" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen space-y-6 bg-[#FFF8F6] text-[#2F2926]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="page-title text-[#2F2926]">Fornecedores</h1>
+          <p className="mt-1 text-sm text-[#7A6F6B]">Cadastre, pesquise, negocie e confirme contratações para alimentar o orçamento.</p>
+        </div>
+        <button className="btn-primary bg-[#3A2B27]" onClick={() => start()}>
+          <Plus size={16} /> Fornecedor
+        </button>
+      </div>
+
+      {message && <div className="rounded-lg border border-[#8FA87A]/25 bg-[#8FA87A]/12 p-3 text-sm text-[#5f7f4d]">{message}</div>}
+
+      <section className="rounded-lg border border-[#F3E3D3] bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
+        <div className="grid gap-3 lg:grid-cols-[1.6fr_1fr_1fr_auto]">
+          <label className="block">
+            <span className="label text-[#7A6F6B]">Buscar</span>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#D8A7A0]" size={18} />
+              <input className="input border-[#F3E3D3] bg-[#FFF8F6] pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nome ou telefone" />
+            </div>
+          </label>
+          <FormSelect label="Categoria" value={category} onChange={(e) => setCategory(e.target.value)} options={[{ label: 'Todas', value: '' }, ...categoryOptions.map((value) => ({ label: value, value }))]} />
+          <FormSelect label="Status" value={status} onChange={(e) => setStatus(e.target.value)} options={[{ label: 'Todos', value: '' }, ...vendorStatuses.map((value) => ({ label: value, value }))]} />
+          <div className="flex items-end">
+            <button type="button" className="btn-secondary w-full border-[#F3E3D3] bg-white text-[#3A2B27]" onClick={clearFilters}>
+              <X size={16} /> Limpar
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-3">
+        {rows.length ? (
+          rows.map((row) => {
+            const paymentStatus = isVendorOverdue(row) ? 'vencido' : getPaymentStatus(row.contracted_value, row.paid_value);
+            const pending = getPendingValue(row.contracted_value, row.paid_value);
+            return (
+              <article key={row.id} className="rounded-lg border border-[#F3E3D3] bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
+                <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr_auto] xl:items-center">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge value={row.status} />
+                      <Badge value={paymentStatus} type="payment" />
+                      {budgetByVendorId.has(row.id) && <span className="rounded-full bg-[#F3E3D3] px-2.5 py-1 text-xs font-semibold text-[#7A6F6B]">no orçamento</span>}
+                    </div>
+                    <h3 className="mt-3 text-lg font-semibold text-[#2F2926]">{row.name}</h3>
+                    <p className="text-sm text-[#7A6F6B]">{toPrimaryCategory(row.category)} · {row.phone || 'sem telefone'}</p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-4">
+                    <div><p className="text-xs text-[#7A6F6B]">Contratado</p><p className="font-semibold">{formatMoney(row.contracted_value)}</p></div>
+                    <div><p className="text-xs text-[#7A6F6B]">Pago</p><p className="font-semibold text-[#5f7f4d]">{formatMoney(row.paid_value)}</p></div>
+                    <div><p className="text-xs text-[#7A6F6B]">Pendente</p><p className="font-semibold text-[#9a7436]">{formatMoney(pending)}</p></div>
+                    <div><p className="text-xs text-[#7A6F6B]">Vencimento</p><p className={`font-semibold ${paymentStatus === 'vencido' ? 'text-[#a95757]' : ''}`}>{formatDate(row.due_date)}</p></div>
+                  </div>
+                  <div className="xl:justify-self-end">{renderActions(row)}</div>
+                </div>
+              </article>
+            );
+          })
+        ) : (
+          <EmptyState icon={Handshake} title="Nenhum fornecedor encontrado" text="Cadastre fornecedores ou ajuste os filtros." />
+        )}
+      </section>
+
+      <Modal open={open} title={editing ? 'Editar fornecedor' : 'Novo fornecedor'} onClose={() => setOpen(false)}>
+        <form className="space-y-4" onSubmit={submit}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormInput label="Nome do fornecedor" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+            <FormSelect label="Categoria" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} options={categoryOptions.map((value) => ({ label: value, value }))} />
+            <FormInput label="Nome do contato" value={form.contact_name} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} />
+            <FormInput label="Telefone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            <FormInput label="E-mail" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            <FormInput label="Instagram" value={form.instagram} onChange={(e) => setForm({ ...form, instagram: e.target.value })} />
+            <FormInput label="Site" value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} />
+            <CurrencyInput label="Valor contratado" value={form.contracted_value} onValueChange={(value) => setForm({ ...form, contracted_value: value })} />
+            <CurrencyInput label="Valor pago" value={form.paid_value} onValueChange={(value) => setForm({ ...form, paid_value: value })} />
+            <FormInput label="Data de vencimento" type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
+            <FormSelect label="Status" value={form.status === 'contratado' ? 'em negociação' : form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={editableVendorStatuses.map((value) => ({ label: value, value }))} />
+          </div>
+          <div className="flex items-center gap-3">
+            <FileUpload folder="contratos" onUploaded={(url) => setForm({ ...form, contract_url: url })} />
+            {form.contract_url && <a className="text-sm text-rosew-500" href={form.contract_url} target="_blank" rel="noreferrer">Ver contrato</a>}
+          </div>
+          <FormTextarea label="Observações" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          <button className="btn-primary bg-[#3A2B27]">Salvar fornecedor</button>
+        </form>
+      </Modal>
+
+      <Modal open={Boolean(confirming)} title="Confirmar Contratação" onClose={() => setConfirming(null)}>
+        {confirming && (
+          <div className="space-y-5">
+            <p className="text-sm text-[#7A6F6B]">Deseja realmente confirmar a Contratação de <strong className="text-[#2F2926]">{confirming.name}</strong>?</p>
+            <div className="grid gap-3 rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] p-4 sm:grid-cols-2">
+              <div><p className="text-xs text-[#7A6F6B]">Nome</p><p className="font-semibold">{confirming.name}</p></div>
+              <div><p className="text-xs text-[#7A6F6B]">Categoria</p><p className="font-semibold">{toPrimaryCategory(confirming.category)}</p></div>
+              <div><p className="text-xs text-[#7A6F6B]">Valor contratado</p><p className="font-semibold">{formatMoney(confirming.contracted_value)}</p></div>
+              <div><p className="text-xs text-[#7A6F6B]">Vencimento</p><p className="font-semibold">{formatDate(confirming.due_date)}</p></div>
+              <div><p className="text-xs text-[#7A6F6B]">Telefone</p><p className="font-semibold">{confirming.phone || '-'}</p></div>
+              <div><p className="text-xs text-[#7A6F6B]">Status atual</p><p className="font-semibold capitalize">{confirming.status}</p></div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button className="btn-secondary" onClick={() => setConfirming(null)}>Cancelar</button>
+              <button className="btn-primary bg-[#3A2B27]" onClick={confirmHiring}>Confirmar Contratação</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        title="Excluir fornecedor"
+        message={`Tem certeza que deseja excluir ${deleting?.name ?? 'este fornecedor'}?`}
+        onCancel={() => setDeleting(null)}
+        onConfirm={confirmDelete}
+      />
+    </div>
+  );
+}
+
+
