@@ -1,5 +1,5 @@
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Clock3, Edit2, ExternalLink, Plus, Search, Trash2, X } from 'lucide-react';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, ReactNode, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EmptyState from '../components/EmptyState';
@@ -27,11 +27,7 @@ const statuses = ['pendente', 'em andamento', 'concluída', 'atrasada'];
 const priorities = ['baixa', 'média', 'alta'];
 const responsibleOptions = ['noivo', 'noiva', 'cerimonialista'];
 const taskCategories = ['Documentação', 'Igreja', 'Espaço', 'Buffet', 'Decoração', 'Roupas', 'Convidados', 'Fornecedores', 'Financeiro', 'Lua de mel', 'Outros'];
-const tabs = [
-  { label: 'Em Aberto', value: 'open' },
-  { label: 'Atrasadas', value: 'late' },
-  { label: 'Concluídas', value: 'done' }
-];
+type MainTaskFilter = 'pending' | 'late' | 'done';
 
 type DraftChecklistItem = {
   id?: string;
@@ -57,6 +53,40 @@ function Badge({ value, kind }: { value: string; kind: 'status' | 'priority' }) 
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ${styles[value] ?? 'bg-stone-100 text-stone-600 ring-stone-200'}`}>{value}</span>;
 }
 
+function SummaryCard({
+  label,
+  value,
+  icon,
+  tone,
+  active,
+  onClick
+}: {
+  label: string;
+  value: number;
+  icon: ReactNode;
+  tone: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`min-h-[112px] rounded-lg border p-4 text-left shadow-[0_14px_32px_rgba(58,43,39,0.06)] transition hover:-translate-y-0.5 hover:border-[#D8A7A0] ${
+        active ? 'border-[#3A2B27] bg-[#3A2B27] text-white' : 'border-[#F3E3D3] bg-white text-[#2F2926]'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className={`text-xs font-semibold uppercase tracking-wide ${active ? 'text-white/70' : 'text-[#7A6F6B]'}`}>{label}</p>
+          <p className={`mt-2 text-2xl font-semibold ${active ? 'text-white' : 'text-[#2F2926]'}`}>{value}</p>
+        </div>
+        <span className={`rounded-lg p-2 ${active ? 'bg-white/12 text-white' : tone}`}>{icon}</span>
+      </div>
+    </button>
+  );
+}
+
 function daysUntil(date?: string | null) {
   if (!date) return null;
   const today = new Date();
@@ -67,7 +97,11 @@ function daysUntil(date?: string | null) {
 
 function isLate(task: Task) {
   const diff = daysUntil(task.due_date);
-  return task.status !== 'concluída' && (task.status === 'atrasada' || (diff !== null && diff < 0));
+  return task.status !== 'concluída' && diff !== null && diff < 0;
+}
+
+function isPending(task: Task) {
+  return ['pendente', 'em andamento'].includes(task.status) && !isLate(task);
 }
 
 function isDueSoon(task: Task) {
@@ -107,7 +141,7 @@ export default function Tasks() {
   const [checklistDraft, setChecklistDraft] = useState<DraftChecklistItem[]>([]);
   const [deletedChecklistIds, setDeletedChecklistIds] = useState<string[]>([]);
   const [newChecklistTitle, setNewChecklistTitle] = useState('');
-  const [activeTab, setActiveTab] = useState('open');
+  const [mainFilter, setMainFilter] = useState<MainTaskFilter>('pending');
   const [search, setSearch] = useState('');
   const [responsible, setResponsible] = useState('');
   const [category, setCategory] = useState('');
@@ -129,16 +163,7 @@ export default function Tasks() {
 
   const summary = useMemo(
     () => ({
-      pending: tasks.rows.filter((task) => task.status !== 'concluída' && !isLate(task)).length,
-      late: tasks.rows.filter(isLate).length,
-      done: tasks.rows.filter((task) => task.status === 'concluída').length
-    }),
-    [tasks.rows]
-  );
-
-  const tabCounts = useMemo(
-    () => ({
-      open: tasks.rows.filter((task) => task.status !== 'concluída' && !isLate(task)).length,
+      pending: tasks.rows.filter(isPending).length,
       late: tasks.rows.filter(isLate).length,
       done: tasks.rows.filter((task) => task.status === 'concluída').length
     }),
@@ -147,13 +172,13 @@ export default function Tasks() {
 
   const rows = useMemo(() => {
     const filtered = tasks.rows.filter((task) => {
-      const matchTab =
-        (activeTab === 'open' && task.status !== 'concluída' && !isLate(task)) ||
-        (activeTab === 'late' && isLate(task)) ||
-        (activeTab === 'done' && task.status === 'concluída');
+      const matchMainFilter =
+        (mainFilter === 'pending' && isPending(task)) ||
+        (mainFilter === 'late' && isLate(task)) ||
+        (mainFilter === 'done' && task.status === 'concluída');
 
       return (
-        matchTab &&
+        matchMainFilter &&
         task.title.toLowerCase().includes(search.toLowerCase()) &&
         (!responsible || task.responsible === responsible) &&
         (!category || task.category === category) &&
@@ -166,7 +191,13 @@ export default function Tasks() {
       if (sortBy === 'created_at') return String(b.created_at ?? b.id).localeCompare(String(a.created_at ?? a.id));
       return String(a.due_date ?? '9999-12-31').localeCompare(String(b.due_date ?? '9999-12-31'));
     });
-  }, [activeTab, category, priority, responsible, search, sortBy, tasks.rows]);
+  }, [category, mainFilter, priority, responsible, search, sortBy, tasks.rows]);
+
+  const resultText = useMemo(() => {
+    if (mainFilter === 'late') return `Mostrando ${rows.length} tarefas atrasadas`;
+    if (mainFilter === 'done') return `Mostrando ${rows.length} tarefas concluídas`;
+    return `Mostrando ${rows.length} tarefas pendentes`;
+  }, [mainFilter, rows.length]);
 
   function getChecklistStats(taskId: string) {
     const items = checklistByTaskId.get(taskId) ?? [];
@@ -257,6 +288,7 @@ export default function Tasks() {
     setCategory('');
     setPriority('');
     setSortBy('due_date');
+    setMainFilter('pending');
   }
 
   function renderChecklistProgress(task: Task) {
@@ -416,24 +448,33 @@ export default function Tasks() {
       </div>
 
       <section className="grid gap-3 md:grid-cols-3">
-        <div className="rounded-[1.5rem] border border-[#F3E3D3] bg-white p-4 shadow-[0_14px_32px_rgba(58,43,39,0.06)]"><p className="text-xs font-semibold uppercase tracking-wide text-[#7A6F6B]">Pendentes</p><p className="mt-2 text-2xl font-semibold">{summary.pending}</p></div>
-        <div className="rounded-[1.5rem] border border-[#C97C7C]/25 bg-white p-4 shadow-[0_14px_32px_rgba(58,43,39,0.06)]"><p className="text-xs font-semibold uppercase tracking-wide text-[#7A6F6B]">Atrasadas</p><p className="mt-2 text-2xl font-semibold text-[#a95757]">{summary.late}</p></div>
-        <div className="rounded-[1.5rem] border border-[#8FA87A]/25 bg-white p-4 shadow-[0_14px_32px_rgba(58,43,39,0.06)]"><p className="text-xs font-semibold uppercase tracking-wide text-[#7A6F6B]">Concluídas</p><p className="mt-2 text-2xl font-semibold text-[#5f7f4d]">{summary.done}</p></div>
+        <SummaryCard
+          label="Pendentes"
+          value={summary.pending}
+          icon={<Clock3 size={18} />}
+          tone="bg-[#F3E3D3] text-[#7A6F6B]"
+          active={mainFilter === 'pending'}
+          onClick={() => setMainFilter('pending')}
+        />
+        <SummaryCard
+          label="Atrasadas"
+          value={summary.late}
+          icon={<AlertTriangle size={18} />}
+          tone="bg-[#C97C7C]/15 text-[#a95757]"
+          active={mainFilter === 'late'}
+          onClick={() => setMainFilter('late')}
+        />
+        <SummaryCard
+          label="Concluídas"
+          value={summary.done}
+          icon={<Check size={18} />}
+          tone="bg-[#8FA87A]/15 text-[#5f7f4d]"
+          active={mainFilter === 'done'}
+          onClick={() => setMainFilter('done')}
+        />
       </section>
 
       <section className="rounded-[1.5rem] border border-[#F3E3D3] bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
-        <div className="flex gap-2 overflow-x-auto pb-3">
-          {tabs.map((tab) => (
-            <button
-              key={tab.value}
-              className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition ${activeTab === tab.value ? 'border-[#3A2B27] bg-[#3A2B27] text-white' : 'border-[#F3E3D3] bg-[#FFF8F6] text-[#3A2B27]'}`}
-              onClick={() => setActiveTab(tab.value)}
-            >
-              {tab.label} <span className={activeTab === tab.value ? 'text-white/75' : 'text-[#7A6F6B]'}>({tabCounts[tab.value as keyof typeof tabCounts]})</span>
-            </button>
-          ))}
-        </div>
-
         <div className="grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_1fr_1fr_auto]">
           <label className="block">
             <span className="label text-[#7A6F6B]">Buscar</span>
@@ -447,9 +488,10 @@ export default function Tasks() {
           <FormSelect label="Prioridade" value={priority} onChange={(event) => setPriority(event.target.value)} options={[{ label: 'Todas', value: '' }, ...priorities.map((value) => ({ label: value, value }))]} />
           <FormSelect label="Ordenar" value={sortBy} onChange={(event) => setSortBy(event.target.value)} options={[{ label: 'Data limite', value: 'due_date' }, { label: 'Prioridade', value: 'priority' }, { label: 'Criação', value: 'created_at' }]} />
           <div className="flex items-end">
-            <button className="btn-secondary w-full border-[#F3E3D3] bg-white text-[#3A2B27]" onClick={clearFilters}>Limpar filtros</button>
+            <button className="btn-secondary w-full border-[#F3E3D3] bg-white text-[#3A2B27]" onClick={clearFilters}><X size={16} /> Limpar filtros</button>
           </div>
         </div>
+        <p className="mt-4 text-sm text-[#7A6F6B]">{resultText}</p>
       </section>
 
       {rows.length ? (
