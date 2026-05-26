@@ -1,8 +1,7 @@
-import { AlertTriangle, Check, ChevronDown, ChevronUp, Clock3, Edit2, ExternalLink, Plus, Search, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronUp, Clock3, Edit2, ExternalLink, Plus, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { FormEvent, ReactNode, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
-import EmptyState from '../components/EmptyState';
 import FormInput from '../components/FormInput';
 import FormSelect from '../components/FormSelect';
 import FormTextarea from '../components/FormTextarea';
@@ -72,18 +71,30 @@ function SummaryCard({
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-[112px] rounded-lg border p-4 text-left shadow-[0_14px_32px_rgba(58,43,39,0.06)] transition hover:-translate-y-0.5 hover:border-[#D8A7A0] ${
+      className={`rounded-lg border p-4 text-left shadow-[0_12px_26px_rgba(58,43,39,0.05)] transition hover:-translate-y-0.5 hover:border-[#D8A7A0] md:min-h-0 md:px-3 md:py-2.5 md:shadow-[0_8px_18px_rgba(58,43,39,0.04)] ${
         active ? 'border-[#3A2B27] bg-[#3A2B27] text-white' : 'border-[#F3E3D3] bg-white text-[#2F2926]'
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      <div className="flex items-start justify-between gap-3 md:items-center md:gap-2">
+        <div className="min-w-0 md:flex md:items-baseline md:gap-2">
           <p className={`text-xs font-semibold uppercase tracking-wide ${active ? 'text-white/70' : 'text-[#7A6F6B]'}`}>{label}</p>
-          <p className={`mt-2 text-2xl font-semibold ${active ? 'text-white' : 'text-[#2F2926]'}`}>{value}</p>
+          <p className={`mt-2 text-2xl font-semibold md:mt-0 md:text-xl ${active ? 'text-white' : 'text-[#2F2926]'}`}>{value}</p>
         </div>
-        <span className={`rounded-lg p-2 ${active ? 'bg-white/12 text-white' : tone}`}>{icon}</span>
+        <span className={`rounded-lg p-2 md:p-1.5 ${active ? 'bg-white/12 text-white' : tone}`}>{icon}</span>
       </div>
     </button>
+  );
+}
+
+function CompactEmptyState() {
+  return (
+    <div className="rounded-lg border border-[#F3E3D3] bg-white px-4 py-8 text-center shadow-[0_10px_24px_rgba(58,43,39,0.04)] md:px-4 md:py-5">
+      <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-[#F3E3D3] text-[#7A6F6B] md:h-9 md:w-9">
+        <Check size={20} />
+      </span>
+      <h3 className="mt-3 font-semibold text-[#2F2926] md:mt-2">Nenhuma tarefa encontrada</h3>
+      <p className="mt-1 text-sm text-[#7A6F6B]">Crie uma tarefa ou ajuste os filtros da lista.</p>
+    </div>
   );
 }
 
@@ -142,6 +153,7 @@ export default function Tasks() {
   const [deletedChecklistIds, setDeletedChecklistIds] = useState<string[]>([]);
   const [newChecklistTitle, setNewChecklistTitle] = useState('');
   const [mainFilter, setMainFilter] = useState<MainTaskFilter>('pending');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [responsible, setResponsible] = useState('');
   const [category, setCategory] = useState('');
@@ -198,6 +210,11 @@ export default function Tasks() {
     if (mainFilter === 'done') return `Mostrando ${rows.length} tarefas concluídas`;
     return `Mostrando ${rows.length} tarefas pendentes`;
   }, [mainFilter, rows.length]);
+
+  const activeFilterCount = useMemo(
+    () => [search.trim(), responsible, category, priority, sortBy !== 'due_date' ? sortBy : ''].filter(Boolean).length,
+    [category, priority, responsible, search, sortBy]
+  );
 
   function getChecklistStats(taskId: string) {
     const items = checklistByTaskId.get(taskId) ?? [];
@@ -438,8 +455,8 @@ export default function Tasks() {
   }
 
   return (
-    <div className="min-h-screen space-y-6 bg-[#FFF8F6] text-[#2F2926]">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="min-h-screen space-y-5 bg-[#FFF8F6] text-[#2F2926] md:space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 md:gap-2">
         <div>
           <h1 className="page-title text-[#2F2926]">Tarefas</h1>
           <p className="mt-1 text-sm text-[#7A6F6B]">Checklist por responsável, prioridade e prazo.</p>
@@ -447,11 +464,11 @@ export default function Tasks() {
         <button className="btn-primary bg-[#3A2B27]" onClick={() => start()}><Plus size={16} /> Nova tarefa</button>
       </div>
 
-      <section className="grid gap-3 md:grid-cols-3">
+      <section className="grid gap-3 md:grid-cols-3 md:gap-2">
         <SummaryCard
           label="Pendentes"
           value={summary.pending}
-          icon={<Clock3 size={18} />}
+          icon={<Clock3 size={16} />}
           tone="bg-[#F3E3D3] text-[#7A6F6B]"
           active={mainFilter === 'pending'}
           onClick={() => setMainFilter('pending')}
@@ -459,7 +476,7 @@ export default function Tasks() {
         <SummaryCard
           label="Atrasadas"
           value={summary.late}
-          icon={<AlertTriangle size={18} />}
+          icon={<AlertTriangle size={16} />}
           tone="bg-[#C97C7C]/15 text-[#a95757]"
           active={mainFilter === 'late'}
           onClick={() => setMainFilter('late')}
@@ -467,39 +484,72 @@ export default function Tasks() {
         <SummaryCard
           label="Concluídas"
           value={summary.done}
-          icon={<Check size={18} />}
+          icon={<Check size={16} />}
           tone="bg-[#8FA87A]/15 text-[#5f7f4d]"
           active={mainFilter === 'done'}
           onClick={() => setMainFilter('done')}
         />
       </section>
 
-      <section className="rounded-[1.5rem] border border-[#F3E3D3] bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
-        <div className="grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_1fr_1fr_auto]">
+      <section className="rounded-[1.25rem] border border-[#F3E3D3] bg-white p-4 shadow-[0_14px_30px_rgba(58,43,39,0.05)] md:p-3 md:shadow-[0_8px_20px_rgba(58,43,39,0.04)]">
+        <button
+          type="button"
+          aria-expanded={filtersOpen}
+          className={`mb-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition md:hidden ${
+            activeFilterCount
+              ? 'border-[#3A2B27] bg-[#3A2B27] text-white'
+              : 'border-[#F3E3D3] bg-[#FFF8F6] text-[#3A2B27] hover:bg-[#F3E3D3]/45'
+          }`}
+          onClick={() => setFiltersOpen((open) => !open)}
+        >
+          <SlidersHorizontal size={16} /> Filtros{activeFilterCount ? ` (${activeFilterCount})` : ''}
+        </button>
+
+        <div className={`${filtersOpen ? 'grid' : 'hidden'} gap-2 rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] p-3 md:grid md:border-0 md:bg-transparent md:p-0 lg:grid-cols-[minmax(180px,1.4fr)_minmax(130px,0.8fr)_minmax(140px,0.9fr)_minmax(120px,0.75fr)_minmax(125px,0.8fr)_auto]`}>
           <label className="block">
             <span className="label text-[#7A6F6B]">Buscar</span>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#D8A7A0]" size={18} />
-              <input className="input border-[#F3E3D3] bg-[#FFF8F6] pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Título da tarefa" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#D8A7A0]" size={16} />
+              <input className="input h-9 border-[#F3E3D3] bg-white pl-8 text-sm md:bg-[#FFF8F6]" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Título da tarefa" />
             </div>
           </label>
-          <FormSelect label="Responsável" value={responsible} onChange={(event) => setResponsible(event.target.value)} options={[{ label: 'Todos', value: '' }, ...responsibleOptions.map((value) => ({ label: value, value }))]} />
-          <FormSelect label="Categoria" value={category} onChange={(event) => setCategory(event.target.value)} options={[{ label: 'Todas', value: '' }, ...taskCategories.map((value) => ({ label: value, value }))]} />
-          <FormSelect label="Prioridade" value={priority} onChange={(event) => setPriority(event.target.value)} options={[{ label: 'Todas', value: '' }, ...priorities.map((value) => ({ label: value, value }))]} />
-          <FormSelect label="Ordenar" value={sortBy} onChange={(event) => setSortBy(event.target.value)} options={[{ label: 'Data limite', value: 'due_date' }, { label: 'Prioridade', value: 'priority' }, { label: 'Criação', value: 'created_at' }]} />
+          <label className="block">
+            <span className="label text-[#7A6F6B]">Responsável</span>
+            <select className="input h-9 border-[#F3E3D3] bg-white text-sm md:bg-[#FFF8F6]" value={responsible} onChange={(event) => setResponsible(event.target.value)}>
+              {[{ label: 'Todos', value: '' }, ...responsibleOptions.map((value) => ({ label: value, value }))].map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="label text-[#7A6F6B]">Categoria</span>
+            <select className="input h-9 border-[#F3E3D3] bg-white text-sm md:bg-[#FFF8F6]" value={category} onChange={(event) => setCategory(event.target.value)}>
+              {[{ label: 'Todas', value: '' }, ...taskCategories.map((value) => ({ label: value, value }))].map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="label text-[#7A6F6B]">Prioridade</span>
+            <select className="input h-9 border-[#F3E3D3] bg-white text-sm md:bg-[#FFF8F6]" value={priority} onChange={(event) => setPriority(event.target.value)}>
+              {[{ label: 'Todas', value: '' }, ...priorities.map((value) => ({ label: value, value }))].map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="label text-[#7A6F6B]">Ordenar</span>
+            <select className="input h-9 border-[#F3E3D3] bg-white text-sm md:bg-[#FFF8F6]" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+              {[{ label: 'Data limite', value: 'due_date' }, { label: 'Prioridade', value: 'priority' }, { label: 'Criação', value: 'created_at' }].map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
           <div className="flex items-end">
-            <button className="btn-secondary w-full border-[#F3E3D3] bg-white text-[#3A2B27]" onClick={clearFilters}><X size={16} /> Limpar filtros</button>
+            <button className="btn-secondary h-9 w-full border-[#F3E3D3] bg-white px-3 text-sm text-[#3A2B27]" onClick={clearFilters}><X size={15} /> Limpar filtros</button>
           </div>
         </div>
-        <p className="mt-4 text-sm text-[#7A6F6B]">{resultText}</p>
+        <p className="mt-4 text-sm text-[#7A6F6B] md:mt-2 md:text-xs">{resultText}</p>
       </section>
 
       {rows.length ? (
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-3 xl:grid-cols-3">
           {rows.map(renderTaskCard)}
         </section>
       ) : (
-        <EmptyState icon={Check} title="Nenhuma tarefa encontrada" text="Crie uma tarefa ou ajuste os filtros da lista." />
+        <CompactEmptyState />
       )}
 
       <Modal open={open} title={editing ? 'Editar tarefa' : 'Nova tarefa'} onClose={() => setOpen(false)}>
