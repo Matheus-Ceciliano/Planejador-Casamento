@@ -145,13 +145,13 @@ function ActionButton({ title, children, onClick }: { title: string; children: R
 
 function GuestEmptyState({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="rounded-lg border border-[#F3E3D3] bg-white px-4 py-7 text-center shadow-[0_12px_28px_rgba(58,43,39,0.05)] sm:px-6 sm:py-12">
-      <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-[#F3E3D3] text-[#7A6F6B] sm:h-12 sm:w-12">
-        <UserPlus size={20} />
+    <div className="rounded-lg border border-[#F3E3D3] bg-white px-4 py-5 text-center shadow-[0_10px_24px_rgba(58,43,39,0.04)] sm:px-6 sm:py-12 sm:shadow-[0_12px_28px_rgba(58,43,39,0.05)]">
+      <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3E3D3] text-[#7A6F6B] sm:h-12 sm:w-12">
+        <UserPlus size={18} className="sm:h-5 sm:w-5" />
       </span>
-      <h3 className="mt-3 text-base font-semibold text-[#2F2926] sm:text-lg">Nenhum convidado ainda</h3>
-      <p className="mx-auto mt-1 max-w-md text-sm text-[#7A6F6B] sm:text-base">Comece adicionando seus convidados para acompanhar confirmações e mesas.</p>
-      <button type="button" className="btn-primary mt-4 bg-[#3A2B27]" onClick={onAdd}>
+      <h3 className="mt-2 text-base font-semibold text-[#2F2926] sm:mt-3 sm:text-lg">Nenhum convidado ainda</h3>
+      <p className="mx-auto mt-1 max-w-md text-sm leading-snug text-[#7A6F6B] sm:text-base">Comece adicionando convidados para acompanhar confirmações e mesas.</p>
+      <button type="button" className="mt-3 inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[#3A2B27] px-3 text-sm font-medium text-white transition hover:bg-black sm:mt-4 sm:h-auto sm:px-4 sm:py-2" onClick={onAdd}>
         <Plus size={16} /> Adicionar primeiro convidado
       </button>
     </div>
@@ -310,7 +310,7 @@ export default function Guests() {
   ];
 
   return (
-    <div className="min-h-screen space-y-4 bg-[#FFF8F6] text-[#2F2926] sm:space-y-6">
+    <div className="min-h-screen space-y-3 bg-[#FFF8F6] text-[#2F2926] sm:space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="min-w-0">
           <h1 className="page-title text-[#2F2926]">Convidados</h1>
@@ -331,7 +331,7 @@ export default function Guests() {
 
         <div className="relative grid grid-cols-[1fr_auto] gap-2 sm:hidden">
           <button className="btn-primary min-w-0 bg-[#3A2B27] px-3" onClick={() => start()}>
-            <Plus size={16} /> Convidado
+            <Plus size={16} /> Novo convidado
           </button>
           <button
             type="button"
@@ -355,12 +355,12 @@ export default function Guests() {
         </div>
       </div>
 
-      <section className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden">
+      <section className="-mx-1 flex scroll-smooth gap-1.5 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:hidden">
         {summaryChips.map((chip) => (
           <button
             key={chip.value}
             type="button"
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
+            className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
               summaryFilter === chip.value
                 ? 'border-[#3A2B27] bg-[#3A2B27] text-white'
                 : 'border-[#F3E3D3] bg-white text-[#3A2B27]'
@@ -372,14 +372,17 @@ export default function Guests() {
         ))}
       </section>
 
-      <section className="rounded-lg border border-[#F3E3D3] bg-white p-3 shadow-[0_10px_24px_rgba(58,43,39,0.04)] sm:p-4">
-        <div className="mb-2 flex items-center justify-between gap-3 text-sm">
+      <section className="rounded-lg border border-[#F3E3D3] bg-white p-3 shadow-[0_8px_18px_rgba(58,43,39,0.04)] sm:p-4 sm:shadow-[0_10px_24px_rgba(58,43,39,0.04)]">
+        <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
           <span className="font-medium text-[#7A6F6B]">Confirmações recebidas</span>
           <strong className="text-[#2F2926]">{summary.confirmed} de {summary.total} ({confirmationPercent}%)</strong>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-[#F3E3D3]">
+        <div className="h-1.5 overflow-hidden rounded-full bg-[#F3E3D3] sm:h-2">
           <div className="h-full rounded-full bg-[#8FA87A] transition-all" style={{ width: `${confirmationPercent}%` }} />
         </div>
+        <p className="mt-1.5 text-xs text-[#7A6F6B] sm:hidden">
+          {summary.confirmed ? 'Acompanhando respostas recebidas' : 'Nenhuma resposta recebida ainda'}
+        </p>
       </section>
 
       <section className="hidden gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-4">
@@ -424,9 +427,9 @@ export default function Guests() {
       <ResponsiveFilters
         activeFiltersCount={activeFilterCount}
         onClearFilters={clearFilters}
-        className="p-3 sm:p-4"
+        className="p-2.5 sm:p-4"
         gridClassName="md:grid-cols-2 xl:grid-cols-[1.6fr_1fr_1fr_1fr_auto]"
-        footer={<p className="mt-2 text-sm text-[#7A6F6B] sm:mt-4">{resultText}</p>}
+        footer={<p className="mt-1.5 text-sm text-[#7A6F6B] sm:mt-4">{resultText}</p>}
       >
           <label className="block">
             <span className="label text-[#7A6F6B]">Buscar</span>
