@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, ChevronDown, ChevronUp, Clock3, Edit2, ExternalLink, Plus, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, ChevronUp, Clock3, Edit2, ExternalLink, Plus, Search, Trash2, X } from 'lucide-react';
 import { FormEvent, ReactNode, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -6,6 +6,7 @@ import FormInput from '../components/FormInput';
 import FormSelect from '../components/FormSelect';
 import FormTextarea from '../components/FormTextarea';
 import Modal from '../components/Modal';
+import ResponsiveFilters from '../components/ResponsiveFilters';
 import { useWeddingTable } from '../hooks/useWeddingTable';
 import { BudgetItem, Task, TaskChecklistItem, Vendor } from '../types';
 import { categoryToBudgetSlug } from '../utils/finance';
@@ -153,7 +154,6 @@ export default function Tasks() {
   const [deletedChecklistIds, setDeletedChecklistIds] = useState<string[]>([]);
   const [newChecklistTitle, setNewChecklistTitle] = useState('');
   const [mainFilter, setMainFilter] = useState<MainTaskFilter>('pending');
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [responsible, setResponsible] = useState('');
   const [category, setCategory] = useState('');
@@ -491,21 +491,13 @@ export default function Tasks() {
         />
       </section>
 
-      <section className="rounded-[1.25rem] border border-[#F3E3D3] bg-white p-4 shadow-[0_14px_30px_rgba(58,43,39,0.05)] md:p-3 md:shadow-[0_8px_20px_rgba(58,43,39,0.04)]">
-        <button
-          type="button"
-          aria-expanded={filtersOpen}
-          className={`mb-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition md:hidden ${
-            activeFilterCount
-              ? 'border-[#3A2B27] bg-[#3A2B27] text-white'
-              : 'border-[#F3E3D3] bg-[#FFF8F6] text-[#3A2B27] hover:bg-[#F3E3D3]/45'
-          }`}
-          onClick={() => setFiltersOpen((open) => !open)}
-        >
-          <SlidersHorizontal size={16} /> Filtros{activeFilterCount ? ` (${activeFilterCount})` : ''}
-        </button>
-
-        <div className={`${filtersOpen ? 'grid' : 'hidden'} gap-2 rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] p-3 md:grid md:border-0 md:bg-transparent md:p-0 lg:grid-cols-[minmax(180px,1.4fr)_minmax(130px,0.8fr)_minmax(140px,0.9fr)_minmax(120px,0.75fr)_minmax(125px,0.8fr)_auto]`}>
+      <ResponsiveFilters
+        activeFiltersCount={activeFilterCount}
+        onClearFilters={clearFilters}
+        className="rounded-[1.25rem] p-4 md:p-3"
+        gridClassName="lg:grid-cols-[minmax(180px,1.4fr)_minmax(130px,0.8fr)_minmax(140px,0.9fr)_minmax(120px,0.75fr)_minmax(125px,0.8fr)_auto]"
+        footer={<p className="mt-4 text-sm text-[#7A6F6B] md:mt-2 md:text-xs">{resultText}</p>}
+      >
           <label className="block">
             <span className="label text-[#7A6F6B]">Buscar</span>
             <div className="relative">
@@ -537,12 +529,7 @@ export default function Tasks() {
               {[{ label: 'Data limite', value: 'due_date' }, { label: 'Prioridade', value: 'priority' }, { label: 'Criação', value: 'created_at' }].map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
-          <div className="flex items-end">
-            <button className="btn-secondary h-9 w-full border-[#F3E3D3] bg-white px-3 text-sm text-[#3A2B27]" onClick={clearFilters}><X size={15} /> Limpar filtros</button>
-          </div>
-        </div>
-        <p className="mt-4 text-sm text-[#7A6F6B] md:mt-2 md:text-xs">{resultText}</p>
-      </section>
+      </ResponsiveFilters>
 
       {rows.length ? (
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-3 xl:grid-cols-3">

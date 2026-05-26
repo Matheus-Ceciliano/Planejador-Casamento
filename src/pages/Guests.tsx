@@ -9,7 +9,6 @@ import {
   Search,
   Trash2,
   Users,
-  X,
   XCircle
 } from 'lucide-react';
 import { FormEvent, ReactNode, useMemo, useState } from 'react';
@@ -19,6 +18,7 @@ import FormInput from '../components/FormInput';
 import FormSelect from '../components/FormSelect';
 import FormTextarea from '../components/FormTextarea';
 import Modal from '../components/Modal';
+import ResponsiveFilters from '../components/ResponsiveFilters';
 import { useWeddingTable } from '../hooks/useWeddingTable';
 import { Guest, GuestGroup, WeddingTable } from '../types';
 import { toCsv } from '../utils/format';
@@ -175,6 +175,11 @@ export default function Guests() {
     return `Mostrando ${filtered.length} de ${guests.rows.length} convidados`;
   }, [filtered.length, guests.rows.length, summaryFilter]);
 
+  const activeFilterCount = useMemo(
+    () => [search.trim(), type, group, table].filter(Boolean).length,
+    [group, search, table, type]
+  );
+
   function start(row?: Guest) {
     setEditing(row ?? null);
     setForm(
@@ -309,8 +314,12 @@ export default function Guests() {
         />
       </section>
 
-      <section className="rounded-lg border border-[#F3E3D3] bg-white p-3 shadow-[0_16px_38px_rgba(58,43,39,0.06)] sm:p-4">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.6fr_1fr_1fr_1fr_auto]">
+      <ResponsiveFilters
+        activeFiltersCount={activeFilterCount}
+        onClearFilters={clearFilters}
+        gridClassName="md:grid-cols-2 xl:grid-cols-[1.6fr_1fr_1fr_1fr_auto]"
+        footer={<p className="mt-4 text-sm text-[#7A6F6B]">{resultText}</p>}
+      >
           <label className="block">
             <span className="label text-[#7A6F6B]">Buscar</span>
             <div className="relative">
@@ -326,16 +335,7 @@ export default function Guests() {
           <FormSelect label="Tipo" value={type} onChange={(e) => setType(e.target.value)} options={[{ label: 'Todos', value: '' }, ...typeOptions.map((v) => ({ label: v, value: v }))]} />
           <FormSelect label="Família" value={group} onChange={(e) => setGroup(e.target.value)} options={[{ label: 'Todas', value: '' }, ...groups.rows.map((g) => ({ label: g.name, value: g.id }))]} />
           <FormSelect label="Mesa" value={table} onChange={(e) => setTable(e.target.value)} options={[{ label: 'Todas', value: '' }, { label: 'Sem mesa', value: withoutTableFilter }, ...tables.rows.map((t) => ({ label: t.name, value: t.id }))]} />
-          <div className="flex items-end md:col-span-2 xl:col-span-1">
-            <button type="button" className="btn-secondary w-full border-[#F3E3D3] bg-white text-[#3A2B27]" onClick={clearFilters}>
-              <X size={16} /> Limpar filtros
-            </button>
-          </div>
-        </div>
-        <p className="mt-4 text-sm text-[#7A6F6B]">
-          {resultText}
-        </p>
-      </section>
+      </ResponsiveFilters>
 
       {filtered.length ? (
         <>

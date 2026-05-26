@@ -1,4 +1,4 @@
-﻿import { CheckCircle2, Edit2, ExternalLink, Handshake, Plus, Search, Trash2, X } from 'lucide-react';
+﻿import { CheckCircle2, Edit2, ExternalLink, Handshake, Plus, Search, Trash2 } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -9,6 +9,7 @@ import FormInput from '../components/FormInput';
 import FormSelect from '../components/FormSelect';
 import FormTextarea from '../components/FormTextarea';
 import Modal from '../components/Modal';
+import ResponsiveFilters from '../components/ResponsiveFilters';
 import { useWeddingTable } from '../hooks/useWeddingTable';
 import { BudgetCategory, BudgetItem, Vendor } from '../types';
 import { vendorCategories } from '../utils/constants';
@@ -91,6 +92,11 @@ export default function Vendors() {
       .filter((name) => name && toPrimaryCategory(name) === name);
     return Array.from(new Set([...vendorCategories, ...custom]));
   }, [customCategories.rows]);
+
+  const activeFilterCount = useMemo(
+    () => [search.trim(), category, status].filter(Boolean).length,
+    [category, search, status]
+  );
 
   useEffect(() => {
     vendors.rows
@@ -200,8 +206,7 @@ export default function Vendors() {
 
       {message && <div className="rounded-lg border border-[#8FA87A]/25 bg-[#8FA87A]/12 p-3 text-sm text-[#5f7f4d]">{message}</div>}
 
-      <section className="rounded-lg border border-[#F3E3D3] bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
-        <div className="grid gap-3 lg:grid-cols-[1.6fr_1fr_1fr_auto]">
+      <ResponsiveFilters activeFiltersCount={activeFilterCount} onClearFilters={clearFilters} clearLabel="Limpar" gridClassName="lg:grid-cols-[1.6fr_1fr_1fr_auto]">
           <label className="block">
             <span className="label text-[#7A6F6B]">Buscar</span>
             <div className="relative">
@@ -211,13 +216,7 @@ export default function Vendors() {
           </label>
           <FormSelect label="Categoria" value={category} onChange={(e) => setCategory(e.target.value)} options={[{ label: 'Todas', value: '' }, ...categoryOptions.map((value) => ({ label: value, value }))]} />
           <FormSelect label="Status" value={status} onChange={(e) => setStatus(e.target.value)} options={[{ label: 'Todos', value: '' }, ...vendorStatuses.map((value) => ({ label: value, value }))]} />
-          <div className="flex items-end">
-            <button type="button" className="btn-secondary w-full border-[#F3E3D3] bg-white text-[#3A2B27]" onClick={clearFilters}>
-              <X size={16} /> Limpar
-            </button>
-          </div>
-        </div>
-      </section>
+      </ResponsiveFilters>
 
       <section className="grid gap-3">
         {rows.length ? (

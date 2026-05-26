@@ -12,8 +12,7 @@
   Receipt,
   Search,
   Trash2,
-  WalletCards,
-  X
+  WalletCards
 } from 'lucide-react';
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -25,6 +24,7 @@ import FormInput from '../components/FormInput';
 import FormSelect from '../components/FormSelect';
 import FormTextarea from '../components/FormTextarea';
 import Modal from '../components/Modal';
+import ResponsiveFilters from '../components/ResponsiveFilters';
 import { useWedding } from '../hooks/useWedding';
 import { useWeddingTable } from '../hooks/useWeddingTable';
 import { BudgetCategory, BudgetItem, Vendor } from '../types';
@@ -199,6 +199,11 @@ export default function Budget() {
       contractedVendors
     };
   }, [items.rows, vendors.rows, wedding?.planned_budget]);
+
+  const activeFilterCount = useMemo(
+    () => [search.trim(), status, vendor, dueFilter].filter(Boolean).length,
+    [dueFilter, search, status, vendor]
+  );
 
   function start(row?: BudgetItem) {
     setEditing(row ?? null);
@@ -422,8 +427,16 @@ export default function Budget() {
         </div>
       </section>
 
-      <section className="rounded-lg border border-[#F3E3D3] bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
-        <div className="grid gap-3 lg:grid-cols-[1.7fr_1fr_1fr_1fr_auto]">
+      <ResponsiveFilters
+        activeFiltersCount={activeFilterCount}
+        onClearFilters={clearFilters}
+        gridClassName="lg:grid-cols-[1.7fr_1fr_1fr_1fr_auto]"
+        footer={
+          <p className="mt-4 text-sm text-[#7A6F6B]">
+            Mostrando <strong className="text-[#2F2926]">{filteredRows.length}</strong> gastos em <strong className="text-[#2F2926]">{active}</strong>
+          </p>
+        }
+      >
           <label className="block">
             <span className="label text-[#7A6F6B]">Buscar gasto</span>
             <div className="relative">
@@ -450,16 +463,7 @@ export default function Budget() {
               { label: 'Sem vencimento', value: 'no_due' }
             ]}
           />
-          <div className="flex items-end">
-            <button type="button" className="btn-secondary w-full border-[#F3E3D3] bg-white text-[#3A2B27]" onClick={clearFilters}>
-              <X size={16} /> Limpar filtros
-            </button>
-          </div>
-        </div>
-        <p className="mt-4 text-sm text-[#7A6F6B]">
-          Mostrando <strong className="text-[#2F2926]">{filteredRows.length}</strong> gastos em <strong className="text-[#2F2926]">{active}</strong>
-        </p>
-      </section>
+      </ResponsiveFilters>
 
       {filteredRows.some(isOverdue) && (
         <div className="flex items-center gap-2 rounded-lg border border-[#C97C7C]/20 bg-[#C97C7C]/10 p-3 text-sm text-[#a95757]">

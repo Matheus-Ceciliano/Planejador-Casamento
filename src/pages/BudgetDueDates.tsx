@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
 import FormSelect from '../components/FormSelect';
+import ResponsiveFilters from '../components/ResponsiveFilters';
 import { useWeddingTable } from '../hooks/useWeddingTable';
 import { BudgetItem, Vendor } from '../types';
 import { getPendingValue, isBudgetOverdue } from '../utils/finance';
@@ -54,6 +55,15 @@ export default function BudgetDueDates() {
 
   const overdueCount = items.rows.filter(isBudgetOverdue).length;
   const pendingTotal = rows.reduce((sum, item) => sum + getPendingValue(item.contracted_value, item.paid_value), 0);
+  const activeFilterCount = useMemo(
+    () => [search.trim(), filter !== 'next30' ? filter : ''].filter(Boolean).length,
+    [filter, search]
+  );
+
+  function clearFilters() {
+    setSearch('');
+    setFilter('next30');
+  }
 
   return (
     <div className="min-h-screen space-y-6 bg-[#FFF8F6] text-[#2F2926]">
@@ -82,8 +92,7 @@ export default function BudgetDueDates() {
         </div>
       </section>
 
-      <section className="rounded-lg border border-[#F3E3D3] bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
-        <div className="grid gap-3 md:grid-cols-[1fr_260px]">
+      <ResponsiveFilters activeFiltersCount={activeFilterCount} onClearFilters={clearFilters} gridClassName="md:grid-cols-[1fr_260px_auto]">
           <label className="block">
             <span className="label text-[#7A6F6B]">Buscar</span>
             <div className="relative">
@@ -97,8 +106,7 @@ export default function BudgetDueDates() {
             </div>
           </label>
           <FormSelect label="Período" value={filter} onChange={(event) => setFilter(event.target.value)} options={dueOptions} />
-        </div>
-      </section>
+      </ResponsiveFilters>
 
       <section className="grid gap-3">
         {rows.length ? (
