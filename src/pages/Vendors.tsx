@@ -1,4 +1,4 @@
-﻿import { CheckCircle2, ChevronDown, Edit2, ExternalLink, Handshake, Plus, Search, Trash2 } from 'lucide-react';
+import { CheckCircle2, ChevronDown, Edit2, ExternalLink, Handshake, Plus, Search, Trash2 } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -145,7 +145,11 @@ export default function Vendors() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const payload = { ...form, category: toPrimaryCategory(form.category) };
+    const payload = {
+      ...form,
+      category: toPrimaryCategory(form.category),
+      due_date: form.due_date || null
+    };
     if (editing) await vendors.update(editing.id, payload as Partial<Vendor>);
     else await vendors.create(payload as Partial<Vendor>);
     setOpen(false);

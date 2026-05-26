@@ -12,7 +12,7 @@ export default function FormSelect({ label, options, ...props }: Props) {
       <select className="input" {...props}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
-            {option.label}
+            {option.label.charAt(0).toUpperCase() + option.label.slice(1)}
           </option>
         ))}
       </select>
