@@ -22,10 +22,10 @@ const chartColors = ['#D8A7A0', '#D5A65A', '#8FA87A', '#C97C7C'];
 
 function Panel({ title, icon, children, className = '' }: { title: string; icon: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`rounded-lg border border-[#F3E3D3] bg-white p-4 shadow-[0_14px_32px_rgba(58,43,39,0.06)] ${className}`}>
-      <div className="mb-4 flex items-center gap-2">
-        <span className="rounded-lg bg-[#F3E3D3] p-2 text-[#7A6F6B]">{icon}</span>
-        <h2 className="text-base font-semibold text-[#2F2926]">{title}</h2>
+    <section className={`rounded-lg border border-[#F3E3D3] bg-white p-3 shadow-[0_10px_24px_rgba(58,43,39,0.05)] sm:p-4 sm:shadow-[0_14px_32px_rgba(58,43,39,0.06)] ${className}`}>
+      <div className="mb-3 flex items-center gap-2 sm:mb-4">
+        <span className="rounded-lg bg-[#F3E3D3] p-1.5 text-[#7A6F6B] sm:p-2">{icon}</span>
+        <h2 className="text-sm font-semibold text-[#2F2926] sm:text-base">{title}</h2>
       </div>
       {children}
     </section>
@@ -51,17 +51,17 @@ function KpiCard({
     <button
       type="button"
       onClick={onClick}
-      className={`min-w-[220px] rounded-lg border bg-white p-4 text-left shadow-[0_14px_32px_rgba(58,43,39,0.06)] transition hover:-translate-y-0.5 hover:border-[#D8A7A0] sm:min-w-0 ${
+      className={`rounded-lg border bg-white p-3 text-left shadow-[0_10px_24px_rgba(58,43,39,0.05)] transition hover:-translate-y-0.5 hover:border-[#D8A7A0] sm:p-4 sm:shadow-[0_14px_32px_rgba(58,43,39,0.06)] ${
         alert ? 'border-[#C97C7C]/35 ring-1 ring-[#C97C7C]/10' : 'border-[#F3E3D3]'
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#7A6F6B]">{title}</p>
-          <p className={`mt-2 text-2xl font-semibold ${alert ? 'text-[#a95757]' : 'text-[#2F2926]'}`}>{value}</p>
-          <p className="mt-1 line-clamp-2 text-sm text-[#7A6F6B]">{helper}</p>
+          <p className="line-clamp-1 text-[11px] font-semibold uppercase tracking-wide text-[#7A6F6B] sm:text-xs">{title}</p>
+          <p className={`mt-1 text-xl font-semibold sm:mt-2 sm:text-2xl ${alert ? 'text-[#a95757]' : 'text-[#2F2926]'}`}>{value}</p>
+          <p className="mt-0.5 line-clamp-2 text-xs text-[#7A6F6B] sm:mt-1 sm:text-sm">{helper}</p>
         </div>
-        <span className={`rounded-lg p-2 ${alert ? 'bg-[#C97C7C]/15 text-[#a95757]' : 'bg-[#F3E3D3] text-[#7A6F6B]'}`}>{icon}</span>
+        <span className={`rounded-lg p-1.5 sm:p-2 ${alert ? 'bg-[#C97C7C]/15 text-[#a95757]' : 'bg-[#F3E3D3] text-[#7A6F6B]'}`}>{icon}</span>
       </div>
     </button>
   );
@@ -77,7 +77,7 @@ function ProgressBar({ value, tone = 'bg-[#8FA87A]' }: { value: number; tone?: s
 
 function EmptyBox({ title, text }: { title: string; text: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-[#F3E3D3] bg-[#FFF8F6] p-4 text-sm">
+    <div className="rounded-lg border border-dashed border-[#F3E3D3] bg-[#FFF8F6] p-3 text-sm sm:p-4">
       <p className="font-semibold text-[#2F2926]">{title}</p>
       <p className="mt-1 text-[#7A6F6B]">{text}</p>
     </div>
@@ -122,6 +122,10 @@ export default function Dashboard() {
   const contractedVendors = vendors.rows.filter((vendor) => vendor.status === 'contratado').length;
 
   const coupleName = [wedding?.bride_name, wedding?.groom_name].filter(Boolean).join(' & ') || wedding?.name || 'Dashboard';
+  const compactCoupleName = [wedding?.bride_name, wedding?.groom_name]
+    .filter(Boolean)
+    .map((name) => String(name).trim().split(/\s+/)[0])
+    .join(' & ') || coupleName;
   const remainingDays = wedding?.wedding_date ? daysUntil(wedding.wedding_date) : null;
 
   const financeChart = [
@@ -167,20 +171,21 @@ export default function Dashboard() {
   }, [budget.rows, tasks.rows]);
 
   return (
-    <div className="min-h-screen space-y-5 bg-[#FFF8F6] text-[#2F2926] sm:space-y-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="min-h-screen space-y-3 bg-[#FFF8F6] text-[#2F2926] sm:space-y-6">
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-[#2F2926] sm:text-3xl">{coupleName}</h1>
-          <p className="mt-1 text-sm text-[#7A6F6B]">
+          <h1 className="text-xl font-semibold text-[#2F2926] sm:hidden">{compactCoupleName}</h1>
+          <h1 className="hidden text-3xl font-semibold text-[#2F2926] sm:block">{coupleName}</h1>
+          <p className="mt-0.5 text-sm text-[#7A6F6B] sm:mt-1">
             Resumo do casamento {remainingDays !== null ? `• ${remainingDays} dias restantes` : '• Data não definida'}
           </p>
         </div>
-        <span className="inline-flex w-fit items-center gap-2 rounded-full bg-[#F3E3D3] px-3 py-1.5 text-sm font-semibold text-[#8a5a12]">
-          <Clock3 size={15} /> Planejamento em andamento
+        <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-[#F3E3D3] px-2.5 py-1 text-xs font-semibold text-[#8a5a12] sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm">
+          <Clock3 size={14} /> Planejamento em andamento
         </span>
       </header>
 
-      <section className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-4 [&::-webkit-scrollbar]:hidden">
+      <section className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <KpiCard
           title="Convidados"
           value={totalGuests}
@@ -214,32 +219,32 @@ export default function Dashboard() {
         />
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1fr_1fr_1fr]">
+      <section className="grid gap-3 sm:gap-4 xl:grid-cols-[1fr_1fr_1fr]">
         <Panel title="Convidados" icon={<Users size={17} />}>
           {totalGuests ? (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-lg bg-[#8FA87A]/12 p-3">
+                <div className="rounded-lg bg-[#8FA87A]/12 p-2 sm:p-3">
                   <p className="text-xs text-[#5f7f4d]">Confirmados</p>
-                  <p className="mt-1 text-xl font-semibold text-[#5f7f4d]">{confirmedGuests}</p>
+                  <p className="mt-0.5 text-lg font-semibold text-[#5f7f4d] sm:mt-1 sm:text-xl">{confirmedGuests}</p>
                 </div>
-                <div className="rounded-lg bg-[#F3E3D3] p-3">
+                <div className="rounded-lg bg-[#F3E3D3] p-2 sm:p-3">
                   <p className="text-xs text-[#7A6F6B]">Pendentes</p>
-                  <p className="mt-1 text-xl font-semibold text-[#8a5a12]">{pendingGuests}</p>
+                  <p className="mt-0.5 text-lg font-semibold text-[#8a5a12] sm:mt-1 sm:text-xl">{pendingGuests}</p>
                 </div>
-                <div className="rounded-lg bg-[#C97C7C]/12 p-3">
+                <div className="rounded-lg bg-[#C97C7C]/12 p-2 sm:p-3">
                   <p className="text-xs text-[#a95757]">Recusados</p>
-                  <p className="mt-1 text-xl font-semibold text-[#a95757]">{refusedGuests}</p>
+                  <p className="mt-0.5 text-lg font-semibold text-[#a95757] sm:mt-1 sm:text-xl">{refusedGuests}</p>
                 </div>
               </div>
-              <div className="grid gap-2 text-sm text-[#7A6F6B]">
+              <div className="grid gap-1.5 text-sm text-[#7A6F6B] sm:gap-2">
                 <div className="flex justify-between"><span>Total</span><strong className="text-[#2F2926]">{totalGuests}</strong></div>
-                <div className="flex justify-between"><span>Adultos</span><strong className="text-[#2F2926]">{adults}</strong></div>
-                <div className="flex justify-between"><span>Crianças</span><strong className="text-[#2F2926]">{children}</strong></div>
-                <div className="flex justify-between"><span>Especiais</span><strong className="text-[#2F2926]">{special}</strong></div>
+                <div className="hidden justify-between sm:flex"><span>Adultos</span><strong className="text-[#2F2926]">{adults}</strong></div>
+                <div className="hidden justify-between sm:flex"><span>Crianças</span><strong className="text-[#2F2926]">{children}</strong></div>
+                <div className="hidden justify-between sm:flex"><span>Especiais</span><strong className="text-[#2F2926]">{special}</strong></div>
               </div>
               <div>
-                <div className="mb-2 flex justify-between text-sm text-[#7A6F6B]">
+                <div className="mb-1.5 flex justify-between text-sm text-[#7A6F6B] sm:mb-2">
                   <span>Confirmação</span>
                   <strong className="text-[#2F2926]">{confirmationPercent}%</strong>
                 </div>
@@ -253,15 +258,15 @@ export default function Dashboard() {
 
         <Panel title="Financeiro" icon={<CircleDollarSign size={17} />}>
           {hasFinanceData ? (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               <div>
-                <div className="mb-2 flex justify-between text-sm text-[#7A6F6B]">
+                <div className="mb-1.5 flex justify-between text-sm text-[#7A6F6B] sm:mb-2">
                   <span>Orçamento usado</span>
                   <strong className={budgetPercent > 100 ? 'text-[#a95757]' : 'text-[#2F2926]'}>{budgetPercent}%</strong>
                 </div>
                 <ProgressBar value={budgetPercent} tone={budgetPercent > 100 ? 'bg-[#C97C7C]' : 'bg-[#D8A7A0]'} />
               </div>
-              <div className="grid gap-2 text-sm text-[#7A6F6B]">
+              <div className="grid gap-1.5 text-sm text-[#7A6F6B] sm:gap-2">
                 <div className="flex justify-between"><span>Planejado</span><strong className="text-[#2F2926]">{formatMoney(planned)}</strong></div>
                 <div className="flex justify-between"><span>Contratado</span><strong className="text-[#2F2926]">{formatMoney(contracted)}</strong></div>
                 <div className="flex justify-between"><span>Pago</span><strong className="text-[#5f7f4d]">{formatMoney(paid)}</strong></div>
@@ -278,11 +283,11 @@ export default function Dashboard() {
           {upcomingItems.length ? (
             <div className="space-y-2">
               {upcomingItems.map((item) => (
-                <div key={item.id} className={`rounded-lg border bg-[#FFF8F6] p-3 ${item.alert ? 'border-[#C97C7C]/35' : 'border-[#F3E3D3]'}`}>
+                <div key={item.id} className={`rounded-lg border bg-[#FFF8F6] p-2.5 sm:p-3 ${item.alert ? 'border-[#C97C7C]/35' : 'border-[#F3E3D3]'}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="line-clamp-1 font-semibold text-[#2F2926]">{item.title}</p>
-                      <p className={`mt-1 text-sm ${item.alert ? 'text-[#a95757]' : 'text-[#7A6F6B]'}`}>{item.alert ? 'Atrasado' : item.meta}</p>
+                      <p className="line-clamp-1 text-sm font-semibold text-[#2F2926] sm:text-base">{item.title}</p>
+                      <p className={`mt-0.5 text-xs sm:mt-1 sm:text-sm ${item.alert ? 'text-[#a95757]' : 'text-[#7A6F6B]'}`}>{item.alert ? 'Atrasado' : item.meta}</p>
                     </div>
                     <ChevronRight size={16} className="mt-1 shrink-0 text-[#D8A7A0]" />
                   </div>
@@ -295,10 +300,10 @@ export default function Dashboard() {
         </Panel>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-2">
-        <Panel title="Financeiro: planejado x realizado" icon={<WalletCards size={17} />}>
+      <section className="grid gap-3 sm:gap-4 xl:grid-cols-2">
+        <Panel title="Financeiro: planejado x realizado" icon={<WalletCards size={17} />} className={!hasFinanceData ? 'hidden sm:block' : ''}>
           {hasFinanceData ? (
-            <div className="h-64 sm:h-72">
+            <div className="h-56 sm:h-72">
               <ResponsiveContainer>
                 <BarChart data={financeChart}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#F3E3D3" />
@@ -316,9 +321,9 @@ export default function Dashboard() {
           )}
         </Panel>
 
-        <Panel title="Convidados por status" icon={<CheckCircle2 size={17} />}>
+        <Panel title="Convidados por status" icon={<CheckCircle2 size={17} />} className={!guestStatusData.length ? 'hidden sm:block' : ''}>
           {guestStatusData.length ? (
-            <div className="h-64 sm:h-72">
+            <div className="h-56 sm:h-72">
               <ResponsiveContainer>
                 <PieChart>
                   <Pie data={guestStatusData} dataKey="value" nameKey="name" innerRadius={52} outerRadius={92} paddingAngle={3}>
