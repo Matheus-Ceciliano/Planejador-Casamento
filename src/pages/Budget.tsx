@@ -18,7 +18,6 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
 import CurrencyInput from '../components/CurrencyInput';
-import EmptyState from '../components/EmptyState';
 import FileUpload from '../components/FileUpload';
 import FormInput from '../components/FormInput';
 import FormSelect from '../components/FormSelect';
@@ -87,6 +86,47 @@ function SummaryCard({ label, value, icon, tone }: { label: string; value: strin
           <p className="mt-2 text-2xl font-semibold text-[#2F2926]">{value}</p>
         </div>
         <span className={`rounded-lg p-2 ${tone}`}>{icon}</span>
+      </div>
+    </div>
+  );
+}
+
+function MobileSummaryCard({ label, value, icon, tone }: { label: string; value: string | number; icon: ReactNode; tone: string }) {
+  return (
+    <div className="rounded-lg border border-[#F3E3D3] bg-white p-2.5 shadow-[0_8px_18px_rgba(58,43,39,0.04)]">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#7A6F6B]">{label}</p>
+          <p className="mt-1 truncate text-base font-semibold text-[#2F2926]">{value}</p>
+        </div>
+        <span className={`rounded-lg p-1.5 ${tone}`}>{icon}</span>
+      </div>
+    </div>
+  );
+}
+
+function compactMoney(value: number) {
+  const abs = Math.abs(value);
+  if (abs >= 1000000) return `R$ ${(value / 1000000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`;
+  if (abs >= 1000) return `R$ ${Math.round(value / 1000).toLocaleString('pt-BR')}k`;
+  return formatMoney(value).replace(',00', '');
+}
+
+function BudgetEmptyState({ onVendors, onAdd }: { onVendors: () => void; onAdd: () => void }) {
+  return (
+    <div className="rounded-lg border border-[#F3E3D3] bg-white px-4 py-6 text-center shadow-[0_10px_24px_rgba(58,43,39,0.04)] sm:px-6 sm:py-10">
+      <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3E3D3] text-[#7A6F6B] sm:h-12 sm:w-12">
+        <Receipt size={18} />
+      </span>
+      <h3 className="mt-2 font-semibold text-[#2F2926] sm:mt-3 sm:text-lg">Nenhum gasto encontrado</h3>
+      <p className="mx-auto mt-1 max-w-md text-sm leading-snug text-[#7A6F6B]">Contrate um fornecedor para aparecer aqui ou adicione um gasto avulso.</p>
+      <div className="mt-4 grid gap-2 sm:flex sm:justify-center">
+        <button type="button" className="btn-primary h-9 bg-[#3A2B27] px-3 sm:h-auto" onClick={onVendors}>
+          <ExternalLink size={15} /> Ver fornecedores
+        </button>
+        <button type="button" className="btn-secondary h-9 border-[#F3E3D3] bg-white px-3 text-[#3A2B27] sm:h-auto" onClick={onAdd}>
+          <Plus size={15} /> Adicionar gasto avulso
+        </button>
       </div>
     </div>
   );
@@ -360,28 +400,38 @@ export default function Budget() {
   const formPending = getPendingValue(form.contracted_value, form.paid_value);
 
   return (
-    <div className="min-h-screen space-y-6 bg-[#FFF8F6] text-[#2F2926]">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="min-h-screen space-y-3 bg-[#FFF8F6] text-[#2F2926] sm:space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
         <div>
           <h1 className="page-title text-[#2F2926]">Orçamento</h1>
           <p className="mt-1 text-sm text-[#7A6F6B]">Central financeira dos fornecedores contratados, pagamentos, pendências e vencimentos.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button className="btn-primary bg-[#3A2B27]" onClick={() => navigate('/fornecedores')}>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <button className="btn-primary col-span-2 h-9 bg-[#3A2B27] px-3 sm:col-span-1 sm:h-auto sm:px-4" onClick={() => navigate('/fornecedores')}>
             <ExternalLink size={16} /> Ver fornecedores
           </button>
-          <button className="btn-secondary border-[#F3E3D3] bg-white text-[#3A2B27]" onClick={() => navigate('/orcamento/vencimentos')}>
+          <button className="btn-secondary h-9 border-[#F3E3D3] bg-white px-3 text-[#3A2B27] sm:h-auto sm:px-4" onClick={() => navigate('/orcamento/vencimentos')}>
             <CalendarClock size={16} /> Vencimentos
           </button>
-          <button className="btn-secondary border-[#F3E3D3] bg-white text-[#3A2B27]" onClick={() => start()}>
-            <Plus size={16} /> Adicionar gasto avulso
+          <button className="btn-secondary h-9 border-[#F3E3D3] bg-white px-3 text-[#3A2B27] sm:h-auto sm:px-4" onClick={() => start()}>
+            <Plus size={16} />
+            <span className="sm:hidden">Gasto avulso</span>
+            <span className="hidden sm:inline">Adicionar gasto avulso</span>
           </button>
         </div>
       </div>
 
       {message && <div className="rounded-lg border border-[#8FA87A]/25 bg-[#8FA87A]/12 p-3 text-sm text-[#5f7f4d]">{message}</div>}
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid grid-cols-2 gap-2 sm:hidden">
+        <MobileSummaryCard label="Contratado" value={compactMoney(allTotals.contracted)} icon={<WalletCards size={15} />} tone="bg-[#D8A7A0]/20 text-[#9f675f]" />
+        <MobileSummaryCard label="Pago" value={compactMoney(allTotals.paid)} icon={<CheckCircle2 size={15} />} tone="bg-[#8FA87A]/15 text-[#5f7f4d]" />
+        <MobileSummaryCard label="Pendente" value={compactMoney(allTotals.pending)} icon={<CalendarClock size={15} />} tone="bg-[#D5A65A]/15 text-[#9a7436]" />
+        <MobileSummaryCard label="Vencidos" value={allTotals.overdue} icon={<AlertTriangle size={15} />} tone="bg-[#C97C7C]/15 text-[#a95757]" />
+        <p className="col-span-2 text-xs text-[#7A6F6B]">Fornecedores contratados: <strong className="text-[#2F2926]">{allTotals.contractedVendors}</strong></p>
+      </section>
+
+      <section className="hidden gap-3 sm:grid sm:grid-cols-2 xl:grid-cols-5">
         <SummaryCard label="Total contratado" value={formatMoney(allTotals.contracted)} icon={<WalletCards size={18} />} tone="bg-[#D8A7A0]/20 text-[#9f675f]" />
         <SummaryCard label="Total pago" value={formatMoney(allTotals.paid)} icon={<CheckCircle2 size={18} />} tone="bg-[#8FA87A]/15 text-[#5f7f4d]" />
         <SummaryCard label="Total pendente" value={formatMoney(allTotals.pending)} icon={<CalendarClock size={18} />} tone="bg-[#D5A65A]/15 text-[#9a7436]" />
@@ -389,7 +439,7 @@ export default function Budget() {
         <SummaryCard label="Fornecedores contratados" value={allTotals.contractedVendors} icon={<Receipt size={18} />} tone="bg-[#F3E3D3] text-[#3A2B27]" />
       </section>
 
-      <section className="rounded-lg border border-[#F3E3D3] bg-white px-2 py-2 shadow-[0_12px_28px_rgba(58,43,39,0.05)]">
+      <section className="rounded-lg border border-[#F3E3D3] bg-white px-2 py-1.5 shadow-[0_8px_18px_rgba(58,43,39,0.04)] sm:py-2 sm:shadow-[0_12px_28px_rgba(58,43,39,0.05)]">
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
           <button
             type="button"
@@ -399,20 +449,23 @@ export default function Budget() {
           >
             <ChevronLeft size={16} />
           </button>
-          <div id="budget-category-scroll" className="flex gap-2 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div id="budget-category-scroll" className="flex scroll-smooth gap-1.5 overflow-x-auto py-0.5 [scrollbar-width:none] sm:gap-2 sm:py-1 [&::-webkit-scrollbar]:hidden">
             {tabCategories.map((category) => (
               <button
                 key={category}
                 type="button"
                 onClick={() => setActive(category)}
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-left transition ${
+                className={`shrink-0 rounded-full border px-2.5 py-1 text-left transition sm:px-3 sm:py-1.5 ${
                   active === category ? 'border-[#3A2B27] bg-[#3A2B27] text-white shadow-sm' : 'border-[#F3E3D3] bg-[#FFF8F6] text-[#3A2B27] hover:border-[#D8A7A0]'
                 }`}
               >
                 <span className="block whitespace-nowrap text-xs font-semibold leading-4">{category}</span>
-                <span className={`block whitespace-nowrap text-[10px] leading-3 ${active === category ? 'text-white/75' : 'text-[#7A6F6B]'}`}>
-                  {formatMoney(category === 'Todos' ? allTotals.contracted : categoryTotals[category] ?? 0)}
-                </span>
+                {(category === 'Todos' ? allTotals.contracted : categoryTotals[category] ?? 0) > 0 && (
+                  <span className={`block whitespace-nowrap text-[10px] leading-3 ${active === category ? 'text-white/75' : 'text-[#7A6F6B]'}`}>
+                    <span className="sm:hidden">{compactMoney(category === 'Todos' ? allTotals.contracted : categoryTotals[category] ?? 0)}</span>
+                    <span className="hidden sm:inline">{formatMoney(category === 'Todos' ? allTotals.contracted : categoryTotals[category] ?? 0)}</span>
+                  </span>
+                )}
               </button>
             ))}
           </div>
@@ -430,9 +483,10 @@ export default function Budget() {
       <ResponsiveFilters
         activeFiltersCount={activeFilterCount}
         onClearFilters={clearFilters}
+        className="p-2.5 sm:p-4"
         gridClassName="lg:grid-cols-[1.7fr_1fr_1fr_1fr_auto]"
         footer={
-          <p className="mt-4 text-sm text-[#7A6F6B]">
+          <p className="mt-1.5 text-sm text-[#7A6F6B] sm:mt-4">
             Mostrando <strong className="text-[#2F2926]">{filteredRows.length}</strong> gastos em <strong className="text-[#2F2926]">{active}</strong>
           </p>
         }
@@ -473,7 +527,7 @@ export default function Budget() {
       )}
 
       <section className="grid gap-3">
-        {filteredRows.length ? filteredRows.map(renderExpenseCard) : <EmptyState icon={Receipt} title="Nenhum gasto encontrado" text="Adicione um gasto ou ajuste os filtros." />}
+        {filteredRows.length ? filteredRows.map(renderExpenseCard) : <BudgetEmptyState onVendors={() => navigate('/fornecedores')} onAdd={() => start()} />}
       </section>
 
       <Modal open={open} title={editing ? 'Editar financeiro' : 'Adicionar gasto avulso'} onClose={() => setOpen(false)}>
