@@ -1,4 +1,5 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Wedding } from '../types';
 import { useAuth } from './useAuth';
@@ -45,6 +46,97 @@ export function WeddingProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     refresh().catch(() => setLoading(false));
   }, [refresh]);
+
+  useEffect(() => {
+    if (!wedding?.id) return;
+
+    const weddingId = wedding.id;
+    const applyWeddingChange = (next: Wedding) => {
+      setWedding(next);
+      setWeddings((current) => current.map((item) => (item.id === weddingId ? next : item)));
+    };
+
+    const channel = supabase
+      .channel(`public:weddings:${weddingId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'weddings',
+          filter: `id=eq.${weddingId}`
+        },
+        (payload: RealtimePostgresChangesPayload<Wedding>) => {
+          const next = payload.new as Wedding;
+          if (next?.id === weddingId) applyWeddingChange(next);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'weddings',
+          filter: `id=eq.${weddingId}`
+        },
+        (payload: RealtimePostgresChangesPayload<Wedding>) => {
+          const next = payload.new as Wedding;
+          if (next?.id === weddingId) applyWeddingChange(next);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'weddings'
+        },
+        (payload: RealtimePostgresChangesPayload<Wedding>) => {
+          const old = payload.old as Partial<Wedding>;
+          if (old?.id === weddingId) refresh().catch(console.error);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'wedding_members',
+          filter: `wedding_id=eq.${weddingId}`
+        },
+        () => {
+          refresh().catch(console.error);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'wedding_members',
+          filter: `wedding_id=eq.${weddingId}`
+        },
+        () => {
+          refresh().catch(console.error);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'wedding_members'
+        },
+        () => {
+          refresh().catch(console.error);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refresh, wedding?.id]);
 
   const value = useMemo<WeddingContextValue>(
     () => ({
