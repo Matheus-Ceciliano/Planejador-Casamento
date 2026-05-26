@@ -34,15 +34,21 @@ function Panel({ title, icon, children, className = '' }: { title: string; icon:
 
 function KpiCard({
   title,
+  mobileTitle,
   value,
+  mobileValue,
   helper,
+  mobileHelper,
   icon,
   alert,
   onClick
 }: {
   title: string;
+  mobileTitle?: string;
   value: string | number;
+  mobileValue?: string | number;
   helper: string;
+  mobileHelper?: string;
   icon: ReactNode;
   alert?: boolean;
   onClick: () => void;
@@ -51,15 +57,20 @@ function KpiCard({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-lg border bg-white p-3 text-left shadow-[0_10px_24px_rgba(58,43,39,0.05)] transition hover:-translate-y-0.5 hover:border-[#D8A7A0] sm:p-4 sm:shadow-[0_14px_32px_rgba(58,43,39,0.06)] ${
+      className={`rounded-lg border bg-white p-2.5 text-left shadow-[0_8px_18px_rgba(58,43,39,0.05)] transition hover:-translate-y-0.5 hover:border-[#D8A7A0] sm:p-4 sm:shadow-[0_14px_32px_rgba(58,43,39,0.06)] ${
         alert ? 'border-[#C97C7C]/35 ring-1 ring-[#C97C7C]/10' : 'border-[#F3E3D3]'
       }`}
     >
       <div className="flex items-start justify-between gap-2 sm:gap-3">
         <div className="min-w-0">
-          <p className="line-clamp-1 text-[11px] font-semibold uppercase tracking-wide text-[#7A6F6B] sm:text-xs">{title}</p>
-          <p className={`mt-1 text-xl font-semibold sm:mt-2 sm:text-2xl ${alert ? 'text-[#a95757]' : 'text-[#2F2926]'}`}>{value}</p>
-          <p className="mt-0.5 line-clamp-2 text-xs text-[#7A6F6B] sm:mt-1 sm:text-sm">{helper}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#7A6F6B] sm:hidden">{mobileTitle ?? title}</p>
+          <p className="hidden text-xs font-semibold uppercase tracking-wide text-[#7A6F6B] sm:block">{title}</p>
+          <p className={`mt-0.5 text-lg font-semibold sm:mt-2 sm:text-2xl ${alert ? 'text-[#a95757]' : 'text-[#2F2926]'}`}>
+            <span className="sm:hidden">{mobileValue ?? value}</span>
+            <span className="hidden sm:inline">{value}</span>
+          </p>
+          <p className="mt-0.5 text-[11px] leading-snug text-[#7A6F6B] sm:hidden">{mobileHelper ?? helper}</p>
+          <p className="mt-1 hidden text-sm text-[#7A6F6B] sm:line-clamp-2 sm:block">{helper}</p>
         </div>
         <span className={`rounded-lg p-1.5 sm:p-2 ${alert ? 'bg-[#C97C7C]/15 text-[#a95757]' : 'bg-[#F3E3D3] text-[#7A6F6B]'}`}>{icon}</span>
       </div>
@@ -82,6 +93,24 @@ function EmptyBox({ title, text }: { title: string; text: string }) {
       <p className="mt-1 text-[#7A6F6B]">{text}</p>
     </div>
   );
+}
+
+function CompactGuestEmpty({ onClick }: { onClick: () => void }) {
+  return (
+    <div className="rounded-lg border border-dashed border-[#F3E3D3] bg-[#FFF8F6] p-3 text-sm">
+      <p className="font-semibold text-[#2F2926]">Nenhum convidado adicionado</p>
+      <button type="button" className="mt-3 inline-flex h-8 items-center justify-center rounded-lg border border-[#F3E3D3] bg-white px-3 text-xs font-semibold text-[#3A2B27]" onClick={onClick}>
+        Adicionar convidados
+      </button>
+    </div>
+  );
+}
+
+function compactMoney(value: number) {
+  const abs = Math.abs(value);
+  if (abs >= 1000000) return `R$ ${(value / 1000000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`;
+  if (abs >= 1000) return `R$ ${Math.round(value / 1000).toLocaleString('pt-BR')}k`;
+  return formatMoney(value).replace(',00', '');
 }
 
 function isLateTask(task: Task) {
@@ -189,30 +218,41 @@ export default function Dashboard() {
         <KpiCard
           title="Convidados"
           value={totalGuests}
+          mobileValue={totalGuests}
           helper={`${confirmedGuests} confirmados • ${pendingGuests} pendentes`}
+          mobileHelper={`${confirmedGuests} confirmados`}
           icon={<Users size={19} />}
           onClick={() => navigate('/convidados')}
         />
         <KpiCard
           title="Financeiro"
+          mobileTitle="Financeiro"
           value={formatMoney(planned)}
+          mobileValue={compactMoney(planned)}
           helper={`${formatMoney(contracted)} contratado (${budgetPercent}%)`}
+          mobileHelper={`${budgetPercent}% usado`}
           icon={<WalletCards size={19} />}
           alert={planned > 0 && contracted > planned}
           onClick={() => navigate('/orcamento')}
         />
         <KpiCard
           title="Pagamentos vencidos"
+          mobileTitle="Vencidos"
           value={overdueItems.length}
+          mobileValue={overdueItems.length}
           helper={overdueItems.length ? `${formatMoney(overdueItems.reduce((sum, item) => sum + getPendingValue(item.contracted_value, item.paid_value), 0))} em atraso` : 'Nenhum em atraso'}
+          mobileHelper={overdueItems.length ? `${overdueItems.length} em atraso` : 'Nenhum atraso'}
           icon={<AlertTriangle size={19} />}
           alert={overdueItems.length > 0}
           onClick={() => navigate('/orcamento/vencimentos?filter=overdue')}
         />
         <KpiCard
           title="Tarefas atrasadas"
+          mobileTitle="Tarefas"
           value={lateTasks.length}
+          mobileValue={lateTasks.length}
           helper={lateTasks.length ? 'Abrir tarefas vencidas' : `${contractedVendors} fornecedores contratados`}
+          mobileHelper={`${lateTasks.length} atrasadas`}
           icon={<ListChecks size={19} />}
           alert={lateTasks.length > 0}
           onClick={() => navigate('/tarefas?filter=late')}
@@ -220,7 +260,7 @@ export default function Dashboard() {
       </section>
 
       <section className="grid gap-3 sm:gap-4 xl:grid-cols-[1fr_1fr_1fr]">
-        <Panel title="Convidados" icon={<Users size={17} />}>
+        <Panel title="Convidados" icon={<Users size={17} />} className="order-3 xl:order-1">
           {totalGuests ? (
             <div className="space-y-3 sm:space-y-4">
               <div className="grid grid-cols-3 gap-2 text-center">
@@ -252,11 +292,14 @@ export default function Dashboard() {
               </div>
             </div>
           ) : (
-            <EmptyBox title="Nenhum convidado adicionado" text="Adicione convidados para acompanhar confirmações." />
+            <>
+              <div className="sm:hidden"><CompactGuestEmpty onClick={() => navigate('/convidados')} /></div>
+              <div className="hidden sm:block"><EmptyBox title="Nenhum convidado adicionado" text="Adicione convidados para acompanhar confirmações." /></div>
+            </>
           )}
         </Panel>
 
-        <Panel title="Financeiro" icon={<CircleDollarSign size={17} />}>
+        <Panel title="Financeiro" icon={<CircleDollarSign size={17} />} className="order-2 xl:order-2">
           {hasFinanceData ? (
             <div className="space-y-3 sm:space-y-4">
               <div>
@@ -279,7 +322,7 @@ export default function Dashboard() {
           )}
         </Panel>
 
-        <Panel title="Próximas tarefas" icon={<CalendarClock size={17} />}>
+        <Panel title="Próximas tarefas" icon={<CalendarClock size={17} />} className="order-1 xl:order-3">
           {upcomingItems.length ? (
             <div className="space-y-2">
               {upcomingItems.map((item) => (
