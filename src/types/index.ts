@@ -1,4 +1,4 @@
-export type MemberRole = 'noivo' | 'noiva' | 'cerimonialista';
+export type MemberRole = 'owner' | 'bride' | 'groom' | 'planner';
 
 export type WeddingMember = {
   id: string;
@@ -8,6 +8,21 @@ export type WeddingMember = {
   email: string;
   role: MemberRole;
   can_edit: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type WeddingInvite = {
+  id: string;
+  wedding_id: string;
+  token: string;
+  role: Exclude<MemberRole, 'owner'>;
+  created_by: string | null;
+  used_by: string | null;
+  used_at: string | null;
+  expires_at: string | null;
+  is_revoked: boolean;
+  created_at: string;
 };
 
 export type Wedding = {
@@ -35,10 +50,12 @@ export type Guest = {
   guest_type: string;
   invite_status: string;
   companions: number;
-  table_id: string | null;
   food_restriction: string | null;
   notes: string | null;
   gift_received: boolean;
+  // WhatsApp invite field (added via whatsapp-invite.sql)
+  rsvp_token: string | null;
+  invite_sent_at: string | null;
 };
 
 export type GuestGroup = {
@@ -49,14 +66,10 @@ export type GuestGroup = {
   responsible_name: string | null;
   responsible_phone: string | null;
   notes: string | null;
-};
-
-export type WeddingTable = {
-  id: string;
-  wedding_id: string;
-  name: string;
-  capacity: number;
-  notes: string | null;
+  // WhatsApp invite fields (added via whatsapp-invite.sql)
+  rsvp_token: string | null;
+  invite_sent_at: string | null;
+  last_invite_sent_at: string | null;
 };
 
 export type BudgetItem = {

@@ -15,6 +15,7 @@ import { BudgetCategory, BudgetItem, Vendor } from '../types';
 import { vendorCategories } from '../utils/constants';
 import { categoryToBudgetSlug, getPaymentStatus, getPendingValue, toPrimaryCategory, vendorToBudgetPayload } from '../utils/finance';
 import { formatDate, formatMoney } from '../utils/format';
+import { buildWhatsAppChatLink } from '../utils/whatsappService';
 
 const blank = {
   name: '',
@@ -36,18 +37,18 @@ const vendorStatuses = ['pesquisando', 'orçamento recebido', 'em negociação',
 const editableVendorStatuses = vendorStatuses.filter((status) => status !== 'contratado');
 
 const vendorStatusStyles: Record<string, string> = {
-  pesquisando: 'bg-[#F3E3D3] text-[#7A6F6B] ring-[#ead5c1]',
-  'orçamento recebido': 'bg-[#D8A7A0]/18 text-[#9f675f] ring-[#D8A7A0]/30',
-  'em negociação': 'bg-[#D5A65A]/15 text-[#9a7436] ring-[#D5A65A]/25',
-  contratado: 'bg-[#8FA87A]/15 text-[#5f7f4d] ring-[#8FA87A]/25',
-  cancelado: 'bg-[#C97C7C]/15 text-[#a95757] ring-[#C97C7C]/25'
+  pesquisando: 'bg-[#E7E0D8] text-[#6F6760] ring-[#E7E0D8]',
+  'orçamento recebido': 'bg-[#B76E79]/18 text-[#B76E79] ring-[#B76E79]/30',
+  'em negociação': 'bg-[#D4A373]/15 text-[#B07C45] ring-[#D4A373]/25',
+  contratado: 'bg-[#5F8D6D]/15 text-[#5F8D6D] ring-[#5F8D6D]/25',
+  cancelado: 'bg-[#C46A6A]/15 text-[#C46A6A] ring-[#C46A6A]/25'
 };
 
 const paymentStatusStyles: Record<string, string> = {
-  pendente: 'bg-[#F3E3D3] text-[#7A6F6B] ring-[#ead5c1]',
-  'pago parcialmente': 'bg-[#D5A65A]/15 text-[#9a7436] ring-[#D5A65A]/25',
-  pago: 'bg-[#8FA87A]/15 text-[#5f7f4d] ring-[#8FA87A]/25',
-  vencido: 'bg-[#C97C7C]/15 text-[#a95757] ring-[#C97C7C]/25'
+  pendente: 'bg-[#E7E0D8] text-[#6F6760] ring-[#E7E0D8]',
+  'pago parcialmente': 'bg-[#D4A373]/15 text-[#B07C45] ring-[#D4A373]/25',
+  pago: 'bg-[#5F8D6D]/15 text-[#5F8D6D] ring-[#5F8D6D]/25',
+  vencido: 'bg-[#C46A6A]/15 text-[#C46A6A] ring-[#C46A6A]/25'
 };
 
 function Badge({ value, type = 'vendor' }: { value: string; type?: 'vendor' | 'payment' }) {
@@ -186,11 +187,11 @@ export default function Vendors() {
     return (
       <div className="flex flex-wrap gap-2">
         {!alreadyContracted ? (
-          <button type="button" className="btn-secondary border-[#8FA87A]/30 bg-[#8FA87A]/10 text-[#5f7f4d]" onClick={() => setConfirming(row)} title="Confirmar Contratação">
+          <button type="button" className="btn-secondary border-[#5F8D6D]/30 bg-[#5F8D6D]/10 text-[#5F8D6D]" onClick={() => setConfirming(row)} title="Confirmar Contratação">
             <CheckCircle2 size={16} /> Confirmar Contratação
           </button>
         ) : (
-          <button type="button" className="btn-secondary border-[#F3E3D3] bg-white text-[#3A2B27]" onClick={() => navigate(`/orcamento/${categoryToBudgetSlug(row.category)}`)} title="Ver no orçamento">
+          <button type="button" className="btn-secondary border-[#E7E0D8] bg-white text-[#2D2A26]" onClick={() => navigate(`/orcamento/${categoryToBudgetSlug(row.category)}`)} title="Ver no orçamento">
             <ExternalLink size={16} /> Ver no orçamento
           </button>
         )}
@@ -198,32 +199,32 @@ export default function Vendors() {
           <Edit2 size={15} />
         </button>
         <button type="button" className="btn-secondary px-3" onClick={() => setDeleting(row)} title="Excluir">
-          <Trash2 size={15} className="text-[#C97C7C]" />
+          <Trash2 size={15} className="text-[#C46A6A]" />
         </button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen space-y-6 bg-[#FFF8F6] text-[#2F2926]">
+    <div className="space-y-6 text-[#2D2A26]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="page-title text-[#2F2926]">Fornecedores</h1>
-          <p className="mt-1 text-sm text-[#7A6F6B]">Cadastre, pesquise, negocie e confirme contratações para alimentar o orçamento.</p>
+          <h1 className="page-title text-[#2D2A26]">Fornecedores</h1>
+          <p className="mt-1 text-sm text-[#6F6760]">Cadastre, pesquise, negocie e confirme contratações para alimentar o orçamento.</p>
         </div>
-        <button className="btn-primary bg-[#3A2B27]" onClick={() => start()}>
+        <button className="btn-primary bg-[#B76E79]" onClick={() => start()}>
           <Plus size={16} /> Fornecedor
         </button>
       </div>
 
-      {message && <div className="rounded-lg border border-[#8FA87A]/25 bg-[#8FA87A]/12 p-3 text-sm text-[#5f7f4d]">{message}</div>}
+      {message && <div className="rounded-lg border border-[#5F8D6D]/25 bg-[#5F8D6D]/12 p-3 text-sm text-[#5F8D6D]">{message}</div>}
 
       <ResponsiveFilters activeFiltersCount={activeFilterCount} onClearFilters={clearFilters} clearLabel="Limpar" gridClassName="lg:grid-cols-[1.6fr_1fr_1fr_auto]">
           <label className="block">
-            <span className="label text-[#7A6F6B]">Buscar</span>
+            <span className="label text-[#6F6760]">Buscar</span>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#D8A7A0]" size={18} />
-              <input className="input border-[#F3E3D3] bg-[#FFF8F6] pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nome ou telefone" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#B76E79]" size={18} />
+              <input className="input border-[#E7E0D8] bg-[#FAF8F5] pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nome ou telefone" />
             </div>
           </label>
           <FormSelect label="Categoria" value={category} onChange={(e) => setCategory(e.target.value)} options={[{ label: 'Todas', value: '' }, ...categoryOptions.map((value) => ({ label: value, value }))]} />
@@ -236,22 +237,29 @@ export default function Vendors() {
             const paymentStatus = isVendorOverdue(row) ? 'vencido' : getPaymentStatus(row.contracted_value, row.paid_value);
             const pending = getPendingValue(row.contracted_value, row.paid_value);
             return (
-              <article key={row.id} className="rounded-lg border border-[#F3E3D3] bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
+              <article key={row.id} className="rounded-lg border border-[#E7E0D8] bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
                 <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr_auto] xl:items-center">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge value={row.status} />
                       <Badge value={paymentStatus} type="payment" />
-                      {budgetByVendorId.has(row.id) && <span className="rounded-full bg-[#F3E3D3] px-2.5 py-1 text-xs font-semibold text-[#7A6F6B]">no orçamento</span>}
+                      {budgetByVendorId.has(row.id) && <span className="rounded-full bg-[#E7E0D8] px-2.5 py-1 text-xs font-semibold text-[#6F6760]">no orçamento</span>}
                     </div>
-                    <h3 className="mt-3 text-lg font-semibold text-[#2F2926]">{row.name}</h3>
-                    <p className="text-sm text-[#7A6F6B]">{toPrimaryCategory(row.category)} · {row.phone || 'sem telefone'}</p>
+                    <h3 className="mt-3 text-lg font-semibold text-[#2D2A26]">{row.name}</h3>
+                    <p className="text-sm text-[#6F6760]">
+                      {toPrimaryCategory(row.category)} ·{' '}
+                      {row.phone ? (
+                        <a className="font-medium text-[#2D2A26] transition hover:text-[#B76E79]" href={buildWhatsAppChatLink(row.phone)} target="_blank" rel="noreferrer">
+                          {row.phone}
+                        </a>
+                      ) : 'sem telefone'}
+                    </p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-4">
-                    <div><p className="text-xs text-[#7A6F6B]">Contratado</p><p className="font-semibold">{formatMoney(row.contracted_value)}</p></div>
-                    <div><p className="text-xs text-[#7A6F6B]">Pago</p><p className="font-semibold text-[#5f7f4d]">{formatMoney(row.paid_value)}</p></div>
-                    <div><p className="text-xs text-[#7A6F6B]">Pendente</p><p className="font-semibold text-[#9a7436]">{formatMoney(pending)}</p></div>
-                    <div><p className="text-xs text-[#7A6F6B]">Vencimento</p><p className={`font-semibold ${paymentStatus === 'vencido' ? 'text-[#a95757]' : ''}`}>{formatDate(row.due_date)}</p></div>
+                    <div><p className="text-xs text-[#6F6760]">Contratado</p><p className="font-semibold">{formatMoney(row.contracted_value)}</p></div>
+                    <div><p className="text-xs text-[#6F6760]">Pago</p><p className="font-semibold text-[#5F8D6D]">{formatMoney(row.paid_value)}</p></div>
+                    <div><p className="text-xs text-[#6F6760]">Pendente</p><p className="font-semibold text-[#B07C45]">{formatMoney(pending)}</p></div>
+                    <div><p className="text-xs text-[#6F6760]">Vencimento</p><p className={`font-semibold ${paymentStatus === 'vencido' ? 'text-[#C46A6A]' : ''}`}>{formatDate(row.due_date)}</p></div>
                   </div>
                   <div className="xl:justify-self-end">{renderActions(row)}</div>
                 </div>
@@ -266,8 +274,8 @@ export default function Vendors() {
       <Modal open={open} title={editing ? 'Editar fornecedor' : 'Novo fornecedor'} onClose={() => setOpen(false)}>
         <form className="-m-4 flex min-h-full flex-col [&_.input]:text-sm [&_.label]:mb-0.5 [&_.label]:text-[10px] [&_input.input]:h-9 [&_select.input]:h-9 [&_textarea.input]:min-h-20 sm:-m-5 sm:min-h-0 sm:[&_.label]:mb-1 sm:[&_.label]:text-xs sm:[&_input.input]:h-auto sm:[&_select.input]:h-auto sm:[&_textarea.input]:min-h-24" onSubmit={submit}>
           <div className="flex-1 space-y-3 overflow-y-auto p-4 pb-24 sm:space-y-4 sm:p-5">
-            <section className="rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] p-2.5 sm:p-4">
-              <h3 className="text-sm font-semibold text-[#2F2926]">Dados principais</h3>
+            <section className="rounded-lg border border-[#E7E0D8] bg-[#FAF8F5] p-2.5 sm:p-4">
+              <h3 className="text-sm font-semibold text-[#2D2A26]">Dados principais</h3>
               <div className="mt-3 grid gap-3 md:grid-cols-2 md:gap-4">
                 <FormInput label="Nome do fornecedor" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
                 <FormSelect label="Categoria" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} options={categoryOptions.map((value) => ({ label: value, value }))} />
@@ -278,10 +286,10 @@ export default function Vendors() {
               </div>
             </section>
 
-            <details className="group rounded-lg border border-[#F3E3D3] bg-white p-2.5 sm:p-4" open={Boolean(editing)}>
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-[#2F2926]">
+            <details className="group rounded-lg border border-[#E7E0D8] bg-white p-2.5 sm:p-4" open={Boolean(editing)}>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-[#2D2A26]">
                 Mais detalhes
-                <ChevronDown size={16} className="text-[#7A6F6B] transition group-open:rotate-180" />
+                <ChevronDown size={16} className="text-[#6F6760] transition group-open:rotate-180" />
               </summary>
               <div className="mt-3 grid gap-3 md:grid-cols-2 md:gap-4">
                 <FormInput label="E-mail" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
@@ -299,9 +307,9 @@ export default function Vendors() {
               </div>
             </details>
           </div>
-          <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-[#F3E3D3] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] pt-2.5 sm:flex sm:justify-end sm:px-5 sm:py-4">
+          <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-[#E7E0D8] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] pt-2.5 sm:flex sm:justify-end sm:px-5 sm:py-4">
             <button type="button" className="btn-secondary h-9 sm:h-auto" onClick={() => setOpen(false)}>Cancelar</button>
-            <button className="btn-primary h-9 bg-[#3A2B27] sm:h-auto">Salvar fornecedor</button>
+            <button className="btn-primary h-9 bg-[#B76E79] sm:h-auto">Salvar fornecedor</button>
           </div>
         </form>
       </Modal>
@@ -309,18 +317,27 @@ export default function Vendors() {
       <Modal open={Boolean(confirming)} title="Confirmar Contratação" onClose={() => setConfirming(null)}>
         {confirming && (
           <div className="space-y-5">
-            <p className="text-sm text-[#7A6F6B]">Deseja realmente confirmar a Contratação de <strong className="text-[#2F2926]">{confirming.name}</strong>?</p>
-            <div className="grid gap-3 rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] p-4 sm:grid-cols-2">
-              <div><p className="text-xs text-[#7A6F6B]">Nome</p><p className="font-semibold">{confirming.name}</p></div>
-              <div><p className="text-xs text-[#7A6F6B]">Categoria</p><p className="font-semibold">{toPrimaryCategory(confirming.category)}</p></div>
-              <div><p className="text-xs text-[#7A6F6B]">Valor contratado</p><p className="font-semibold">{formatMoney(confirming.contracted_value)}</p></div>
-              <div><p className="text-xs text-[#7A6F6B]">Vencimento</p><p className="font-semibold">{formatDate(confirming.due_date)}</p></div>
-              <div><p className="text-xs text-[#7A6F6B]">Telefone</p><p className="font-semibold">{confirming.phone || '-'}</p></div>
-              <div><p className="text-xs text-[#7A6F6B]">Status atual</p><p className="font-semibold capitalize">{confirming.status}</p></div>
+            <p className="text-sm text-[#6F6760]">Deseja realmente confirmar a Contratação de <strong className="text-[#2D2A26]">{confirming.name}</strong>?</p>
+            <div className="grid gap-3 rounded-lg border border-[#E7E0D8] bg-[#FAF8F5] p-4 sm:grid-cols-2">
+              <div><p className="text-xs text-[#6F6760]">Nome</p><p className="font-semibold">{confirming.name}</p></div>
+              <div><p className="text-xs text-[#6F6760]">Categoria</p><p className="font-semibold">{toPrimaryCategory(confirming.category)}</p></div>
+              <div><p className="text-xs text-[#6F6760]">Valor contratado</p><p className="font-semibold">{formatMoney(confirming.contracted_value)}</p></div>
+              <div><p className="text-xs text-[#6F6760]">Vencimento</p><p className="font-semibold">{formatDate(confirming.due_date)}</p></div>
+              <div>
+                <p className="text-xs text-[#6F6760]">Telefone</p>
+                <p className="font-semibold">
+                  {confirming.phone ? (
+                    <a className="text-[#2D2A26] transition hover:text-[#B76E79]" href={buildWhatsAppChatLink(confirming.phone)} target="_blank" rel="noreferrer">
+                      {confirming.phone}
+                    </a>
+                  ) : '-'}
+                </p>
+              </div>
+              <div><p className="text-xs text-[#6F6760]">Status atual</p><p className="font-semibold capitalize">{confirming.status}</p></div>
             </div>
             <div className="flex justify-end gap-2">
               <button className="btn-secondary" onClick={() => setConfirming(null)}>Cancelar</button>
-              <button className="btn-primary bg-[#3A2B27]" onClick={confirmHiring}>Confirmar Contratação</button>
+              <button className="btn-primary bg-[#B76E79]" onClick={confirmHiring}>Confirmar Contratação</button>
             </div>
           </div>
         )}

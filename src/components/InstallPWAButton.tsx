@@ -61,14 +61,14 @@ export default function InstallPWAButton() {
     <div className="relative">
       <button
         type="button"
-        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] px-2.5 text-xs font-semibold text-[#3A2B27] transition hover:border-[#D8A7A0] hover:bg-white"
+        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-[#E7E0D8] bg-[#FAF8F5] px-2.5 text-xs font-semibold text-[#2D2A26] transition hover:border-[#B76E79] hover:bg-white"
         onClick={installApp}
       >
         {isIos && !installPrompt ? <Share2 size={15} /> : <Download size={15} />}
         <span className="hidden sm:inline">Instalar app</span>
       </button>
       {isIos && showIosTip && (
-        <div className="absolute right-0 top-11 z-30 w-64 rounded-lg border border-[#F3E3D3] bg-white p-3 text-xs leading-snug text-[#7A6F6B] shadow-[0_18px_45px_rgba(92,64,51,0.12)]">
+        <div className="absolute right-0 top-11 z-30 w-64 rounded-lg border border-[#E7E0D8] bg-white p-3 text-xs leading-snug text-[#6F6760] shadow-[0_18px_45px_rgba(92,64,51,0.12)]">
           Para instalar no iPhone, toque em Compartilhar e depois em Adicionar à Tela de Início.
         </div>
       )}

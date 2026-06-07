@@ -8,10 +8,10 @@ import { useAuth } from '../hooks/useAuth';
 export default function Login() {
   const { signIn, resetPassword, configured } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [message, setMessage]   = useState('');
+  const [loading, setLoading]   = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -28,33 +28,64 @@ export default function Login() {
   }
 
   async function recover() {
-    if (!email) {
-      setMessage('Informe seu e-mail para recuperar a senha.');
-      return;
-    }
+    if (!email) { setMessage('Informe seu e-mail para recuperar a senha.'); return; }
     await resetPassword(email);
     setMessage('Enviamos as instruções para seu e-mail.');
   }
 
   return (
     <AuthLayout>
-      <div className="mx-auto max-w-md">
-        <div className="mb-8 flex items-center gap-3 md:hidden">
-          <Heart className="text-rosew-500" />
-          <span className="font-semibold">Planejador de Casamento</span>
+      <div className="mx-auto max-w-sm animate-slide-up">
+
+        {/* Mobile brand */}
+        <div className="mb-8 flex items-center gap-2.5 md:hidden">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-w-rose shadow-rose">
+            <Heart size={15} className="fill-white text-white" />
+          </span>
+          <span className="text-sm font-bold text-w-text">Planejador de Casamento</span>
         </div>
-        <h1 className="text-3xl font-semibold text-ink">Entrar</h1>
-        <p className="mt-2 text-sm text-stone-500">Acesse o planejamento do casamento.</p>
-        {!configured && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">Configure as variáveis do Supabase no arquivo .env.</p>}
+
+        <h1 className="text-3xl font-extrabold tracking-tight text-w-text">Bem-vindo</h1>
+        <p className="mt-1.5 text-sm text-w-muted">
+          Entre para acessar o planejamento do seu casamento.
+        </p>
+
+        {!configured && (
+          <p className="mt-4 rounded-xl bg-w-red-lt p-3 text-sm font-medium text-[#DC2626]">
+            Configure as variáveis do Supabase no arquivo .env.
+          </p>
+        )}
+
         <form className="mt-8 space-y-4" onSubmit={submit}>
-          <FormInput label="E-mail" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
-          <FormInput label="Senha" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
-          {message && <p className="text-sm text-stone-600">{message}</p>}
-          <button className="btn-primary w-full" disabled={loading || !configured}>{loading ? 'Entrando...' : 'Entrar'}</button>
+          <FormInput
+            label="E-mail"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <FormInput
+            label="Senha"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          {message && (
+            <p className="rounded-xl bg-w-surface p-3 text-sm text-w-muted">{message}</p>
+          )}
+          <button className="btn-primary w-full py-3" disabled={loading || !configured}>
+            {loading ? 'Entrando…' : 'Entrar'}
+          </button>
         </form>
+
         <div className="mt-5 flex items-center justify-between text-sm">
-          <button className="text-rosew-500 hover:underline" onClick={recover}>Recuperar senha</button>
-          <Link className="font-medium text-ink hover:underline" to="/register">Criar conta</Link>
+          <button className="font-medium text-w-rose hover:underline" onClick={recover}>
+            Recuperar senha
+          </button>
+          <Link className="font-semibold text-w-text hover:text-w-rose" to="/register">
+            Criar conta →
+          </Link>
         </div>
       </div>
     </AuthLayout>

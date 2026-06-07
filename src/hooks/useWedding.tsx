@@ -181,7 +181,7 @@ export function WeddingProvider({ children }: { children: ReactNode }) {
           user_id: user.id,
           name: user.user_metadata.full_name ?? user.email,
           email: user.email,
-          role: 'noivo',
+          role: 'owner',
           can_edit: true
         });
         if (memberError) throw memberError;

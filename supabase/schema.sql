@@ -121,9 +121,19 @@ create table if not exists public.guests (
   food_restriction text,
   notes text,
   gift_received boolean not null default false,
+  rsvp_token text unique,
+  invite_sent_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.guests
+  add column if not exists rsvp_token text unique,
+  add column if not exists invite_sent_at timestamptz;
+
+create unique index if not exists guests_rsvp_token_idx
+  on public.guests (rsvp_token)
+  where rsvp_token is not null;
 
 create table if not exists public.table_guests (
   id uuid primary key default uuid_generate_v4(),
@@ -374,3 +384,17 @@ using (bucket_id = 'wedding-files' and auth.uid() is not null);
 create policy "wedding files authenticated delete"
 on storage.objects for delete
 using (bucket_id = 'wedding-files' and auth.uid() is not null);
+
+-- ============================================================
+-- Extensões documentadas em migrations separadas
+-- ============================================================
+-- whatsapp-invite.sql:
+--   alter table public.guest_groups
+--     add column if not exists rsvp_token text unique,
+--     add column if not exists invite_sent_at timestamptz,
+--     add column if not exists last_invite_sent_at timestamptz;
+--
+--   alter table public.guests
+--     add column if not exists rsvp_token text unique,
+--     add column if not exists invite_sent_at timestamptz;
+-- ============================================================

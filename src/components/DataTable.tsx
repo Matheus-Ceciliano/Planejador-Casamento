@@ -9,21 +9,27 @@ export default function DataTable<T extends { id: string }>({ rows, columns }: {
   return (
     <div className="panel overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-rosew-100 text-sm">
-          <thead className="bg-rosew-50">
+        <table className="min-w-full divide-y divide-w-border text-sm">
+          <thead className="bg-w-surface">
             <tr>
               {columns.map((column) => (
-                <th key={column.header} className="px-4 py-3 text-left font-semibold text-stone-600">
+                <th
+                  key={column.header}
+                  className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-w-faint"
+                >
                   {column.header}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-rosew-100 bg-white">
+          <tbody className="divide-y divide-w-border bg-w-card">
             {rows.map((row) => (
-              <tr key={row.id} className="hover:bg-rosew-50/60">
+              <tr
+                key={row.id}
+                className="transition-colors duration-100 hover:bg-w-surface"
+              >
                 {columns.map((column) => (
-                  <td key={column.header} className="px-4 py-3 align-middle">
+                  <td key={column.header} className="px-4 py-3.5 align-middle">
                     {column.render(row)}
                   </td>
                 ))}

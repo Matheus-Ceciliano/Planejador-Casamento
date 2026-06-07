@@ -31,7 +31,7 @@ export default function Register() {
   return (
     <AuthLayout>
       <div className="mx-auto max-w-md">
-        <h1 className="text-3xl font-semibold text-ink">Criar conta</h1>
+        <h1 className="text-3xl font-semibold text-event-text">Criar conta</h1>
         <p className="mt-2 text-sm text-stone-500">Cadastre-se para iniciar o planejamento.</p>
         {!configured && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">Supabase não configurado. Crie o arquivo .env com VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY para liberar o cadastro.</p>}
         <form className="mt-8 space-y-4" onSubmit={submit}>
@@ -42,7 +42,7 @@ export default function Register() {
           <button className="btn-primary w-full" disabled={loading || !configured}>{loading ? 'Criando...' : 'Cadastrar'}</button>
         </form>
         <p className="mt-5 text-sm text-stone-500">
-          Já tem conta? <Link className="font-medium text-ink hover:underline" to="/login">Entrar</Link>
+          Já tem conta? <Link className="font-medium text-event-text hover:underline" to="/login">Entrar</Link>
         </p>
       </div>
     </AuthLayout>

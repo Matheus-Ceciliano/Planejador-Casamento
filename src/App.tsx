@@ -4,17 +4,16 @@ import OfflineNotice from './components/OfflineNotice';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { WeddingProvider, useWedding } from './hooks/useWedding';
 import AppLayout from './layouts/AppLayout';
+import Agenda from './pages/Agenda';
 import Budget from './pages/Budget';
 import BudgetDueDates from './pages/BudgetDueDates';
 import Categories from './pages/Categories';
 import Dashboard from './pages/Dashboard';
-import Families from './pages/Families';
 import Files from './pages/Files';
 import Guests from './pages/Guests';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Settings from './pages/Settings';
-import Tables from './pages/Tables';
 import Tasks from './pages/Tasks';
 import Timeline from './pages/Timeline';
 import Vendors from './pages/Vendors';
@@ -44,9 +43,8 @@ function RoutesContent() {
   return (
     <Routes>
       <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/agenda" element={<Agenda />} />
       <Route path="/convidados" element={<Guests />} />
-      <Route path="/familias" element={<Families />} />
-      <Route path="/mesas" element={<Tables />} />
       <Route path="/orcamento" element={<Budget />} />
       <Route path="/orcamento/vencimentos" element={<BudgetDueDates />} />
       <Route path="/orcamento/:category" element={<Budget />} />

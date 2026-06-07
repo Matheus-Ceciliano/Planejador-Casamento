@@ -55,44 +55,44 @@ export default function Categories() {
   }
 
   return (
-    <div className="min-h-screen space-y-6 bg-[#FFF8F6] text-[#2F2926]">
+    <div className="space-y-6 text-[#2D2A26]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="page-title text-[#2F2926]">Categorias</h1>
-          <p className="mt-1 text-sm text-[#7A6F6B]">Crie categorias personalizadas para usar em fornecedores e orçamento.</p>
+          <h1 className="page-title text-[#2D2A26]">Categorias</h1>
+          <p className="mt-1 text-sm text-[#6F6760]">Crie categorias personalizadas para usar em fornecedores e orçamento.</p>
         </div>
-        <button className="btn-primary bg-[#3A2B27]" onClick={() => start()}>
+        <button className="btn-primary bg-[#B76E79]" onClick={() => start()}>
           <Plus size={16} /> Nova categoria
         </button>
       </div>
 
-      {message && <div className="rounded-lg border border-[#8FA87A]/25 bg-[#8FA87A]/12 p-3 text-sm text-[#5f7f4d]">{message}</div>}
+      {message && <div className="rounded-lg border border-[#5F8D6D]/25 bg-[#5F8D6D]/12 p-3 text-sm text-[#5F8D6D]">{message}</div>}
 
       <section className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-        <div className="rounded-lg border border-[#F3E3D3] bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
-          <h2 className="text-sm font-semibold text-[#2F2926]">Categorias padrão</h2>
-          <p className="mt-1 text-sm text-[#7A6F6B]">Estas já ficam disponíveis automaticamente.</p>
+        <div className="rounded-lg border border-[#E7E0D8] bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
+          <h2 className="text-sm font-semibold text-[#2D2A26]">Categorias padrão</h2>
+          <p className="mt-1 text-sm text-[#6F6760]">Estas já ficam disponíveis automaticamente.</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {defaultCategories.map((name) => (
-              <span key={name} className="rounded-full bg-[#F3E3D3] px-3 py-1 text-xs font-semibold text-[#7A6F6B]">{name}</span>
+              <span key={name} className="rounded-full bg-[#E7E0D8] px-3 py-1 text-xs font-semibold text-[#6F6760]">{name}</span>
             ))}
           </div>
         </div>
 
-        <div className="rounded-lg border border-[#F3E3D3] bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
-          <h2 className="text-sm font-semibold text-[#2F2926]">Categorias personalizadas</h2>
-          <p className="mt-1 text-sm text-[#7A6F6B]">Aparecem nos formulários de fornecedor e orçamento.</p>
+        <div className="rounded-lg border border-[#E7E0D8] bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
+          <h2 className="text-sm font-semibold text-[#2D2A26]">Categorias personalizadas</h2>
+          <p className="mt-1 text-sm text-[#6F6760]">Aparecem nos formulários de fornecedor e orçamento.</p>
           <div className="mt-4 space-y-3">
             {visibleCustomCategories.length ? (
               visibleCustomCategories.map((row) => (
-                <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] p-3">
+                <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#E7E0D8] bg-[#FAF8F5] p-3">
                   <div>
-                    <p className="font-semibold text-[#2F2926]">{row.name}</p>
-                    <p className="text-xs text-[#7A6F6B]">Ordem {row.sort_order} · {usageCount(row.name)} usos</p>
+                    <p className="font-semibold text-[#2D2A26]">{row.name}</p>
+                    <p className="text-xs text-[#6F6760]">Ordem {row.sort_order} · {usageCount(row.name)} usos</p>
                   </div>
                   <div className="flex gap-2">
                     <button className="btn-secondary px-3" onClick={() => start(row)} title="Editar categoria"><Edit2 size={15} /></button>
-                    <button className="btn-secondary px-3" onClick={() => setDeleting(row)} title="Excluir categoria"><Trash2 size={15} className="text-[#C97C7C]" /></button>
+                    <button className="btn-secondary px-3" onClick={() => setDeleting(row)} title="Excluir categoria"><Trash2 size={15} className="text-[#C46A6A]" /></button>
                   </div>
                 </div>
               ))
@@ -111,7 +111,7 @@ export default function Categories() {
           </div>
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Cancelar</button>
-            <button className="btn-primary bg-[#3A2B27]">Salvar categoria</button>
+            <button className="btn-primary bg-[#B76E79]">Salvar categoria</button>
           </div>
         </form>
       </Modal>

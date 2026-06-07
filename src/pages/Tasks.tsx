@@ -36,16 +36,16 @@ type DraftChecklistItem = {
 };
 
 const statusStyles: Record<string, string> = {
-  pendente: 'bg-[#F3E3D3] text-[#7A6F6B] ring-[#ead5c1]',
-  'em andamento': 'bg-[#D5A65A]/15 text-[#9a7436] ring-[#D5A65A]/25',
-  concluída: 'bg-[#8FA87A]/15 text-[#5f7f4d] ring-[#8FA87A]/25',
-  atrasada: 'bg-[#C97C7C]/15 text-[#a95757] ring-[#C97C7C]/25'
+  pendente: 'bg-[#E7E0D8] text-[#6F6760] ring-[#E7E0D8]',
+  'em andamento': 'bg-[#D4A373]/15 text-[#B07C45] ring-[#D4A373]/25',
+  concluída: 'bg-[#5F8D6D]/15 text-[#5F8D6D] ring-[#5F8D6D]/25',
+  atrasada: 'bg-[#C46A6A]/15 text-[#C46A6A] ring-[#C46A6A]/25'
 };
 
 const priorityStyles: Record<string, string> = {
-  baixa: 'bg-[#8FA87A]/12 text-[#5f7f4d] ring-[#8FA87A]/20',
-  média: 'bg-[#F3E3D3] text-[#7A6F6B] ring-[#ead5c1]',
-  alta: 'bg-[#C97C7C]/15 text-[#a95757] ring-[#C97C7C]/25'
+  baixa: 'bg-[#5F8D6D]/12 text-[#5F8D6D] ring-[#5F8D6D]/20',
+  média: 'bg-[#E7E0D8] text-[#6F6760] ring-[#E7E0D8]',
+  alta: 'bg-[#C46A6A]/15 text-[#C46A6A] ring-[#C46A6A]/25'
 };
 
 function Badge({ value, kind }: { value: string; kind: 'status' | 'priority' }) {
@@ -72,14 +72,14 @@ function SummaryCard({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-lg border p-4 text-left shadow-[0_12px_26px_rgba(58,43,39,0.05)] transition hover:-translate-y-0.5 hover:border-[#D8A7A0] md:min-h-0 md:px-3 md:py-2.5 md:shadow-[0_8px_18px_rgba(58,43,39,0.04)] ${
-        active ? 'border-[#3A2B27] bg-[#3A2B27] text-white' : 'border-[#F3E3D3] bg-white text-[#2F2926]'
+      className={`rounded-lg border p-4 text-left shadow-[0_12px_26px_rgba(58,43,39,0.05)] transition hover:-translate-y-0.5 hover:border-[#B76E79] md:min-h-0 md:px-3 md:py-2.5 md:shadow-[0_8px_18px_rgba(58,43,39,0.04)] ${
+        active ? 'border-[#B76E79] bg-[#B76E79] text-white' : 'border-[#E7E0D8] bg-white text-[#2D2A26]'
       }`}
     >
       <div className="flex items-start justify-between gap-3 md:items-center md:gap-2">
         <div className="min-w-0 md:flex md:items-baseline md:gap-2">
-          <p className={`text-xs font-semibold uppercase tracking-wide ${active ? 'text-white/70' : 'text-[#7A6F6B]'}`}>{label}</p>
-          <p className={`mt-2 text-2xl font-semibold md:mt-0 md:text-xl ${active ? 'text-white' : 'text-[#2F2926]'}`}>{value}</p>
+          <p className={`text-xs font-semibold uppercase tracking-wide ${active ? 'text-white/70' : 'text-[#6F6760]'}`}>{label}</p>
+          <p className={`mt-2 text-2xl font-semibold md:mt-0 md:text-xl ${active ? 'text-white' : 'text-[#2D2A26]'}`}>{value}</p>
         </div>
         <span className={`rounded-lg p-2 md:p-1.5 ${active ? 'bg-white/12 text-white' : tone}`}>{icon}</span>
       </div>
@@ -94,24 +94,24 @@ function TaskStatusChip({ label, value, active, onClick }: { label: string; valu
       onClick={onClick}
       className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
         active
-          ? 'border-[#3A2B27] bg-[#3A2B27] text-white shadow-sm'
-          : 'border-[#F3E3D3] bg-white text-[#3A2B27] hover:border-[#D8A7A0]'
+          ? 'border-[#B76E79] bg-[#B76E79] text-white shadow-sm'
+          : 'border-[#E7E0D8] bg-white text-[#2D2A26] hover:border-[#B76E79]'
       }`}
     >
-      {label} <span className={active ? 'text-white/80' : 'text-[#7A6F6B]'}>{value}</span>
+      {label} <span className={active ? 'text-white/80' : 'text-[#6F6760]'}>{value}</span>
     </button>
   );
 }
 
 function CompactEmptyState({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="rounded-lg border border-[#F3E3D3] bg-white px-4 py-6 text-center shadow-[0_10px_24px_rgba(58,43,39,0.04)] md:px-4 md:py-5">
-      <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3E3D3] text-[#7A6F6B]">
+    <div className="rounded-lg border border-[#E7E0D8] bg-white px-4 py-6 text-center shadow-[0_10px_24px_rgba(58,43,39,0.04)] md:px-4 md:py-5">
+      <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-[#E7E0D8] text-[#6F6760]">
         <Check size={18} />
       </span>
-      <h3 className="mt-2 font-semibold text-[#2F2926]">Nenhuma tarefa encontrada</h3>
-      <p className="mx-auto mt-1 max-w-sm text-sm leading-snug text-[#7A6F6B]">Crie uma tarefa ou ajuste os filtros da lista.</p>
-      <button type="button" className="btn-primary mt-4 h-9 bg-[#3A2B27] px-3 text-sm md:hidden" onClick={onCreate}>
+      <h3 className="mt-2 font-semibold text-[#2D2A26]">Nenhuma tarefa encontrada</h3>
+      <p className="mx-auto mt-1 max-w-sm text-sm leading-snug text-[#6F6760]">Crie uma tarefa ou ajuste os filtros da lista.</p>
+      <button type="button" className="btn-primary mt-4 h-9 bg-[#B76E79] px-3 text-sm md:hidden" onClick={onCreate}>
         <Plus size={15} /> Criar primeira tarefa
       </button>
     </div>
@@ -332,13 +332,13 @@ export default function Tasks() {
     const stats = getChecklistStats(task.id);
 
     return (
-      <div className="rounded-2xl bg-[#FFF8F6] px-3 py-2">
-        <div className="flex items-center justify-between gap-3 text-xs font-semibold text-[#7A6F6B]">
+      <div className="rounded-2xl bg-[#FAF8F5] px-3 py-2">
+        <div className="flex items-center justify-between gap-3 text-xs font-semibold text-[#6F6760]">
           <span>Checklist</span>
           <span>{stats.done} de {stats.total} concluídas</span>
         </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#F3E3D3]">
-          <div className="h-full rounded-full bg-[#8FA87A] transition-all" style={{ width: `${stats.percent}%` }} />
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#E7E0D8]">
+          <div className="h-full rounded-full bg-[#5F8D6D] transition-all" style={{ width: `${stats.percent}%` }} />
         </div>
       </div>
     );
@@ -351,31 +351,31 @@ export default function Tasks() {
     if (!linkedVendor && !linkedBudgetItem) return null;
 
     return (
-      <div className="mt-5 border-t border-[#F3E3D3] pt-4">
-        <h4 className="text-sm font-semibold text-[#2F2926]">Vínculos</h4>
+      <div className="mt-5 border-t border-[#E7E0D8] pt-4">
+        <h4 className="text-sm font-semibold text-[#2D2A26]">Vínculos</h4>
         <div className="mt-3 grid gap-3">
           {linkedVendor && (
-            <div className="rounded-2xl border border-[#F3E3D3] bg-white px-3 py-3">
-              <span className="text-xs font-semibold uppercase tracking-wide text-[#7A6F6B]">Fornecedor vinculado</span>
+            <div className="rounded-2xl border border-[#E7E0D8] bg-white px-3 py-3">
+              <span className="text-xs font-semibold uppercase tracking-wide text-[#6F6760]">Fornecedor vinculado</span>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <p className="font-semibold text-[#2F2926]">{linkedVendor.name}</p>
+                <p className="font-semibold text-[#2D2A26]">{linkedVendor.name}</p>
                 <button className="btn-secondary h-8 px-2.5 text-xs" onClick={() => navigate('/fornecedores')}>
                   <ExternalLink size={14} /> Abrir fornecedor
                 </button>
               </div>
-              <p className="mt-1 text-xs text-[#7A6F6B]">{linkedVendor.category}</p>
+              <p className="mt-1 text-xs text-[#6F6760]">{linkedVendor.category}</p>
             </div>
           )}
           {linkedBudgetItem && (
-            <div className="rounded-2xl border border-[#F3E3D3] bg-white px-3 py-3">
-              <span className="text-xs font-semibold uppercase tracking-wide text-[#7A6F6B]">Item financeiro vinculado</span>
+            <div className="rounded-2xl border border-[#E7E0D8] bg-white px-3 py-3">
+              <span className="text-xs font-semibold uppercase tracking-wide text-[#6F6760]">Item financeiro vinculado</span>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                <p className="font-semibold text-[#2F2926]">{linkedBudgetItem.name} - {linkedBudgetItem.category}</p>
+                <p className="font-semibold text-[#2D2A26]">{linkedBudgetItem.name} - {linkedBudgetItem.category}</p>
                 <button className="btn-secondary h-8 px-2.5 text-xs" onClick={() => navigate(`/orcamento/${categoryToBudgetSlug(linkedBudgetItem.category)}`)}>
                   <ExternalLink size={14} /> Abrir item financeiro
                 </button>
               </div>
-              <p className="mt-1 text-xs text-[#7A6F6B]">Status: {linkedBudgetItem.payment_status}</p>
+              <p className="mt-1 text-xs text-[#6F6760]">Status: {linkedBudgetItem.payment_status}</p>
             </div>
           )}
         </div>
@@ -393,7 +393,7 @@ export default function Tasks() {
       <article
         key={task.id}
         className={`flex h-full flex-col rounded-[1.75rem] border bg-white p-4 shadow-[0_14px_32px_rgba(58,43,39,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(58,43,39,0.09)] ${
-          late ? 'border-[#C97C7C]/35 ring-1 ring-[#C97C7C]/10' : dueSoon ? 'border-[#D5A65A]/35 ring-1 ring-[#D5A65A]/10' : 'border-[#F3E3D3]'
+          late ? 'border-[#C46A6A]/35 ring-1 ring-[#C46A6A]/10' : dueSoon ? 'border-[#D4A373]/35 ring-1 ring-[#D4A373]/10' : 'border-[#E7E0D8]'
         }`}
       >
         <div className="flex flex-1 flex-col gap-3">
@@ -401,20 +401,20 @@ export default function Tasks() {
             <div className="flex flex-wrap items-center gap-2">
               <Badge value={late ? 'atrasada' : task.status} kind="status" />
               <Badge value={task.priority} kind="priority" />
-              {dueSoon && !late && <span className="inline-flex items-center gap-1 rounded-full bg-[#D5A65A]/15 px-2.5 py-1 text-xs font-semibold text-[#9a7436] ring-1 ring-[#D5A65A]/25"><Clock3 size={13} /> vence em breve</span>}
-              {late && <span className="inline-flex items-center gap-1 rounded-full bg-[#C97C7C]/15 px-2.5 py-1 text-xs font-semibold text-[#a95757] ring-1 ring-[#C97C7C]/25"><AlertTriangle size={13} /> vencida</span>}
+              {dueSoon && !late && <span className="inline-flex items-center gap-1 rounded-full bg-[#D4A373]/15 px-2.5 py-1 text-xs font-semibold text-[#B07C45] ring-1 ring-[#D4A373]/25"><Clock3 size={13} /> vence em breve</span>}
+              {late && <span className="inline-flex items-center gap-1 rounded-full bg-[#C46A6A]/15 px-2.5 py-1 text-xs font-semibold text-[#C46A6A] ring-1 ring-[#C46A6A]/25"><AlertTriangle size={13} /> vencida</span>}
             </div>
-            <h3 className="mt-3 line-clamp-2 min-h-[3rem] text-base font-semibold leading-snug text-[#2F2926]">{task.title}</h3>
-            <div className="mt-2 grid gap-1 text-sm text-[#7A6F6B]">
-              <span>Responsável: <strong className="font-semibold text-[#2F2926] capitalize">{task.responsible}</strong></span>
-              <span>Prazo: <strong className={`font-semibold ${late ? 'text-[#a95757]' : dueSoon ? 'text-[#9a7436]' : 'text-[#2F2926]'}`}>{formatDate(task.due_date)}</strong></span>
+            <h3 className="mt-3 line-clamp-2 min-h-[3rem] text-base font-semibold leading-snug text-[#2D2A26]">{task.title}</h3>
+            <div className="mt-2 grid gap-1 text-sm text-[#6F6760]">
+              <span>Responsável: <strong className="font-semibold text-[#2D2A26] capitalize">{task.responsible}</strong></span>
+              <span>Prazo: <strong className={`font-semibold ${late ? 'text-[#C46A6A]' : dueSoon ? 'text-[#B07C45]' : 'text-[#2D2A26]'}`}>{formatDate(task.due_date)}</strong></span>
             </div>
           </div>
 
           {renderChecklistProgress(task)}
 
           <div className="mt-auto flex flex-wrap gap-2">
-            <button className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-[#8FA87A]/30 bg-[#8FA87A]/10 px-2.5 text-xs font-medium text-[#5f7f4d]" onClick={() => tasks.update(task.id, { status: 'concluída' })}>
+            <button className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-[#5F8D6D]/30 bg-[#5F8D6D]/10 px-2.5 text-xs font-medium text-[#5F8D6D]" onClick={() => tasks.update(task.id, { status: 'concluída' })}>
               <Check size={14} /> Concluir
             </button>
             <button className="btn-secondary h-8 px-2.5 text-xs" onClick={() => setExpanded(isOpen ? null : task.id)}>
@@ -424,48 +424,48 @@ export default function Tasks() {
               <Edit2 size={14} />
             </button>
             <button className="btn-secondary h-8 px-2.5" onClick={() => setDeleting(task)} title="Excluir">
-              <Trash2 size={14} className="text-[#C97C7C]" />
+              <Trash2 size={14} className="text-[#C46A6A]" />
             </button>
           </div>
         </div>
 
         {isOpen && (
-          <div className="mt-4 rounded-[1.5rem] border border-[#F3E3D3] bg-[#FFF8F6] p-4">
-            <p className="text-sm text-[#7A6F6B]">{task.description || 'Sem descrição cadastrada.'}</p>
+          <div className="mt-4 rounded-[1.5rem] border border-[#E7E0D8] bg-[#FAF8F5] p-4">
+            <p className="text-sm text-[#6F6760]">{task.description || 'Sem descrição cadastrada.'}</p>
             <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-              <div><span className="text-[#7A6F6B]">Categoria</span><p className="font-semibold text-[#2F2926]">{task.category}</p></div>
-              <div><span className="text-[#7A6F6B]">Responsável</span><p className="font-semibold capitalize text-[#2F2926]">{task.responsible}</p></div>
-              <div><span className="text-[#7A6F6B]">Prazo</span><p className="font-semibold text-[#2F2926]">{formatDate(task.due_date)}</p></div>
-              <div><span className="text-[#7A6F6B]">Prioridade</span><p className="font-semibold capitalize text-[#2F2926]">{task.priority}</p></div>
-              <div><span className="text-[#7A6F6B]">Status</span><p className="font-semibold capitalize text-[#2F2926]">{task.status}</p></div>
+              <div><span className="text-[#6F6760]">Categoria</span><p className="font-semibold text-[#2D2A26]">{task.category}</p></div>
+              <div><span className="text-[#6F6760]">Responsável</span><p className="font-semibold capitalize text-[#2D2A26]">{task.responsible}</p></div>
+              <div><span className="text-[#6F6760]">Prazo</span><p className="font-semibold text-[#2D2A26]">{formatDate(task.due_date)}</p></div>
+              <div><span className="text-[#6F6760]">Prioridade</span><p className="font-semibold capitalize text-[#2D2A26]">{task.priority}</p></div>
+              <div><span className="text-[#6F6760]">Status</span><p className="font-semibold capitalize text-[#2D2A26]">{task.status}</p></div>
             </div>
 
             {renderLinkedRecords(task)}
 
-            <div className="mt-5 border-t border-[#F3E3D3] pt-4">
+            <div className="mt-5 border-t border-[#E7E0D8] pt-4">
               <div className="flex items-center justify-between gap-3">
-                <h4 className="text-sm font-semibold text-[#2F2926]">Checklist interno</h4>
-                <span className="text-xs font-semibold text-[#7A6F6B]">{stats.done} de {stats.total} concluídas</span>
+                <h4 className="text-sm font-semibold text-[#2D2A26]">Checklist interno</h4>
+                <span className="text-xs font-semibold text-[#6F6760]">{stats.done} de {stats.total} concluídas</span>
               </div>
               {stats.items.length ? (
                 <div className="mt-3 space-y-2">
                   {stats.items.map((item) => (
-                    <div key={item.id} className="flex items-center gap-2 rounded-2xl border border-[#F3E3D3] bg-white px-3 py-2">
+                    <div key={item.id} className="flex items-center gap-2 rounded-2xl border border-[#E7E0D8] bg-white px-3 py-2">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 accent-[#8FA87A]"
+                        className="h-4 w-4 accent-[#5F8D6D]"
                         checked={item.is_completed}
                         onChange={() => checklist.update(item.id, { is_completed: !item.is_completed })}
                       />
-                      <span className={`min-w-0 flex-1 text-sm ${item.is_completed ? 'text-[#7A6F6B] line-through' : 'text-[#2F2926]'}`}>{item.title}</span>
-                      <button className="rounded-full p-1.5 text-[#C97C7C] transition hover:bg-[#C97C7C]/10" onClick={() => checklist.remove(item.id)} title="Excluir subtarefa">
+                      <span className={`min-w-0 flex-1 text-sm ${item.is_completed ? 'text-[#6F6760] line-through' : 'text-[#2D2A26]'}`}>{item.title}</span>
+                      <button className="rounded-full p-1.5 text-[#C46A6A] transition hover:bg-[#C46A6A]/10" onClick={() => checklist.remove(item.id)} title="Excluir subtarefa">
                         <Trash2 size={14} />
                       </button>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="mt-3 rounded-2xl border border-dashed border-[#F3E3D3] bg-white px-3 py-3 text-sm text-[#7A6F6B]">Nenhuma subtarefa cadastrada.</p>
+                <p className="mt-3 rounded-2xl border border-dashed border-[#E7E0D8] bg-white px-3 py-3 text-sm text-[#6F6760]">Nenhuma subtarefa cadastrada.</p>
               )}
             </div>
           </div>
@@ -475,13 +475,13 @@ export default function Tasks() {
   }
 
   return (
-    <div className="min-h-screen space-y-3 bg-[#FFF8F6] text-[#2F2926] md:space-y-3">
+    <div className="space-y-3 text-[#2D2A26] md:space-y-3">
       <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-between">
         <div>
-          <h1 className="page-title text-[#2F2926]">Tarefas</h1>
-          <p className="mt-1 text-sm text-[#7A6F6B]">Checklist por responsável, prioridade e prazo.</p>
+          <h1 className="page-title text-[#2D2A26]">Tarefas</h1>
+          <p className="mt-1 text-sm text-[#6F6760]">Checklist por responsável, prioridade e prazo.</p>
         </div>
-        <button className="btn-primary h-9 bg-[#3A2B27] px-3 md:h-auto md:px-4" onClick={() => start()}><Plus size={16} /> Nova tarefa</button>
+        <button className="btn-primary h-9 bg-[#B76E79] px-3 md:h-auto md:px-4" onClick={() => start()}><Plus size={16} /> Nova tarefa</button>
       </div>
 
       <section className="flex scroll-smooth gap-1.5 overflow-x-auto py-0.5 [scrollbar-width:none] md:hidden [&::-webkit-scrollbar]:hidden">
@@ -495,7 +495,7 @@ export default function Tasks() {
           label="Pendentes"
           value={summary.pending}
           icon={<Clock3 size={16} />}
-          tone="bg-[#F3E3D3] text-[#7A6F6B]"
+          tone="bg-[#E7E0D8] text-[#6F6760]"
           active={mainFilter === 'pending'}
           onClick={() => setMainFilter('pending')}
         />
@@ -503,7 +503,7 @@ export default function Tasks() {
           label="Atrasadas"
           value={summary.late}
           icon={<AlertTriangle size={16} />}
-          tone="bg-[#C97C7C]/15 text-[#a95757]"
+          tone="bg-[#C46A6A]/15 text-[#C46A6A]"
           active={mainFilter === 'late'}
           onClick={() => setMainFilter('late')}
         />
@@ -511,7 +511,7 @@ export default function Tasks() {
           label="Concluídas"
           value={summary.done}
           icon={<Check size={16} />}
-          tone="bg-[#8FA87A]/15 text-[#5f7f4d]"
+          tone="bg-[#5F8D6D]/15 text-[#5F8D6D]"
           active={mainFilter === 'done'}
           onClick={() => setMainFilter('done')}
         />
@@ -522,36 +522,36 @@ export default function Tasks() {
         onClearFilters={clearFilters}
         className="rounded-[1.25rem] p-2.5 md:p-3"
         gridClassName="lg:grid-cols-[minmax(180px,1.4fr)_minmax(130px,0.8fr)_minmax(140px,0.9fr)_minmax(120px,0.75fr)_minmax(125px,0.8fr)_auto]"
-        footer={<p className="mt-1.5 text-sm text-[#7A6F6B] md:mt-2 md:text-xs">{resultText}</p>}
+        footer={<p className="mt-1.5 text-sm text-[#6F6760] md:mt-2 md:text-xs">{resultText}</p>}
       >
           <label className="block">
-            <span className="label text-[#7A6F6B]">Buscar</span>
+            <span className="label text-[#6F6760]">Buscar</span>
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#D8A7A0]" size={16} />
-              <input className="input h-9 border-[#F3E3D3] bg-white pl-8 text-sm md:bg-[#FFF8F6]" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Título da tarefa" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#B76E79]" size={16} />
+              <input className="input h-9 border-[#E7E0D8] bg-white pl-8 text-sm md:bg-[#FAF8F5]" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Título da tarefa" />
             </div>
           </label>
           <label className="block">
-            <span className="label text-[#7A6F6B]">Responsável</span>
-            <select className="input h-9 border-[#F3E3D3] bg-white text-sm md:bg-[#FFF8F6]" value={responsible} onChange={(event) => setResponsible(event.target.value)}>
+            <span className="label text-[#6F6760]">Responsável</span>
+            <select className="input h-9 border-[#E7E0D8] bg-white text-sm md:bg-[#FAF8F5]" value={responsible} onChange={(event) => setResponsible(event.target.value)}>
               {[{ label: 'Todos', value: '' }, ...responsibleOptions.map((value) => ({ label: value, value }))].map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
           <label className="block">
-            <span className="label text-[#7A6F6B]">Categoria</span>
-            <select className="input h-9 border-[#F3E3D3] bg-white text-sm md:bg-[#FFF8F6]" value={category} onChange={(event) => setCategory(event.target.value)}>
+            <span className="label text-[#6F6760]">Categoria</span>
+            <select className="input h-9 border-[#E7E0D8] bg-white text-sm md:bg-[#FAF8F5]" value={category} onChange={(event) => setCategory(event.target.value)}>
               {[{ label: 'Todas', value: '' }, ...taskCategories.map((value) => ({ label: value, value }))].map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
           <label className="block">
-            <span className="label text-[#7A6F6B]">Prioridade</span>
-            <select className="input h-9 border-[#F3E3D3] bg-white text-sm md:bg-[#FFF8F6]" value={priority} onChange={(event) => setPriority(event.target.value)}>
+            <span className="label text-[#6F6760]">Prioridade</span>
+            <select className="input h-9 border-[#E7E0D8] bg-white text-sm md:bg-[#FAF8F5]" value={priority} onChange={(event) => setPriority(event.target.value)}>
               {[{ label: 'Todas', value: '' }, ...priorities.map((value) => ({ label: value, value }))].map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
           <label className="block">
-            <span className="label text-[#7A6F6B]">Ordenar</span>
-            <select className="input h-9 border-[#F3E3D3] bg-white text-sm md:bg-[#FFF8F6]" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+            <span className="label text-[#6F6760]">Ordenar</span>
+            <select className="input h-9 border-[#E7E0D8] bg-white text-sm md:bg-[#FAF8F5]" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
               {[{ label: 'Data limite', value: 'due_date' }, { label: 'Prioridade', value: 'priority' }, { label: 'Criação', value: 'created_at' }].map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
@@ -568,8 +568,8 @@ export default function Tasks() {
       <Modal open={open} title={editing ? 'Editar tarefa' : 'Nova tarefa'} onClose={() => setOpen(false)}>
         <form className="-m-4 flex min-h-full flex-col [&_.input]:text-sm [&_.label]:mb-0.5 [&_.label]:text-[10px] [&_input.input]:h-9 [&_select.input]:h-9 [&_textarea.input]:min-h-20 sm:-m-5 sm:min-h-0 sm:[&_.label]:mb-1 sm:[&_.label]:text-xs sm:[&_input.input]:h-auto sm:[&_select.input]:h-auto sm:[&_textarea.input]:min-h-24" onSubmit={submit}>
           <div className="flex-1 space-y-3 overflow-y-auto p-4 pb-24 sm:space-y-5 sm:p-5">
-            <section className="rounded-lg border border-[#F3E3D3] bg-[#FFF8F6] p-2.5 sm:rounded-[1.5rem] sm:p-4">
-              <h3 className="text-sm font-semibold text-[#2F2926]">Dados da tarefa</h3>
+            <section className="rounded-lg border border-[#E7E0D8] bg-[#FAF8F5] p-2.5 sm:rounded-[1.5rem] sm:p-4">
+              <h3 className="text-sm font-semibold text-[#2D2A26]">Dados da tarefa</h3>
               <div className="mt-3 grid gap-3 md:grid-cols-2 md:gap-4">
                 <FormInput label="Título" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required />
                 <FormSelect label="Categoria" value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} options={taskCategories.map((value) => ({ label: value, value }))} />
@@ -580,10 +580,10 @@ export default function Tasks() {
               </div>
             </section>
 
-            <details className="group rounded-lg border border-[#F3E3D3] bg-white p-2.5 sm:rounded-[1.5rem] sm:p-4" open={Boolean(editing)}>
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-[#2F2926]">
+            <details className="group rounded-lg border border-[#E7E0D8] bg-white p-2.5 sm:rounded-[1.5rem] sm:p-4" open={Boolean(editing)}>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-[#2D2A26]">
                 Mais detalhes
-                <ChevronDown size={16} className="text-[#7A6F6B] transition group-open:rotate-180" />
+                <ChevronDown size={16} className="text-[#6F6760] transition group-open:rotate-180" />
               </summary>
               <div className="mt-3">
                 <FormTextarea label="Descrição" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
@@ -604,21 +604,21 @@ export default function Tasks() {
               </div>
             </details>
 
-            <details className="group rounded-lg border border-[#F3E3D3] bg-white p-2.5 sm:rounded-[1.5rem] sm:p-4" open={Boolean(editing && checklistDraft.length)}>
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-[#2F2926]">
+            <details className="group rounded-lg border border-[#E7E0D8] bg-white p-2.5 sm:rounded-[1.5rem] sm:p-4" open={Boolean(editing && checklistDraft.length)}>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-[#2D2A26]">
                 Checklist interno
-                <ChevronDown size={16} className="text-[#7A6F6B] transition group-open:rotate-180" />
+                <ChevronDown size={16} className="text-[#6F6760] transition group-open:rotate-180" />
               </summary>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <p className="mt-1 text-xs text-[#7A6F6B]">Adicione etapas menores para acompanhar esta tarefa.</p>
+                <p className="mt-1 text-xs text-[#6F6760]">Adicione etapas menores para acompanhar esta tarefa.</p>
               </div>
-              <span className="rounded-full bg-[#FFF8F6] px-3 py-1 text-xs font-semibold text-[#7A6F6B]">{checklistDraft.filter((item) => item.is_completed).length} de {checklistDraft.length} concluídas</span>
+              <span className="rounded-full bg-[#FAF8F5] px-3 py-1 text-xs font-semibold text-[#6F6760]">{checklistDraft.filter((item) => item.is_completed).length} de {checklistDraft.length} concluídas</span>
             </div>
 
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
               <input
-                className="input flex-1 border-[#F3E3D3] bg-[#FFF8F6]"
+                className="input flex-1 border-[#E7E0D8] bg-[#FAF8F5]"
                 value={newChecklistTitle}
                 onChange={(event) => setNewChecklistTitle(event.target.value)}
                 onKeyDown={(event) => {
@@ -635,33 +635,33 @@ export default function Tasks() {
             {checklistDraft.length ? (
               <div className="mt-4 space-y-2">
                 {checklistDraft.map((item, index) => (
-                  <div key={item.id ?? `${item.title}-${index}`} className="flex items-center gap-2 rounded-2xl border border-[#F3E3D3] bg-[#FFF8F6] px-3 py-2">
+                  <div key={item.id ?? `${item.title}-${index}`} className="flex items-center gap-2 rounded-2xl border border-[#E7E0D8] bg-[#FAF8F5] px-3 py-2">
                     <input
                       type="checkbox"
-                      className="h-4 w-4 accent-[#8FA87A]"
+                      className="h-4 w-4 accent-[#5F8D6D]"
                       checked={item.is_completed}
                       onChange={() => setChecklistDraft((items) => items.map((current, itemIndex) => itemIndex === index ? { ...current, is_completed: !current.is_completed } : current))}
                     />
                     <input
-                      className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${item.is_completed ? 'text-[#7A6F6B] line-through' : 'text-[#2F2926]'}`}
+                      className={`min-w-0 flex-1 bg-transparent text-sm outline-none ${item.is_completed ? 'text-[#6F6760] line-through' : 'text-[#2D2A26]'}`}
                       value={item.title}
                       onChange={(event) => setChecklistDraft((items) => items.map((current, itemIndex) => itemIndex === index ? { ...current, title: event.target.value } : current))}
                     />
-                    <button type="button" className="rounded-full p-1.5 text-[#C97C7C] transition hover:bg-[#C97C7C]/10" onClick={() => removeChecklistDraft(index)} title="Remover subtarefa">
+                    <button type="button" className="rounded-full p-1.5 text-[#C46A6A] transition hover:bg-[#C46A6A]/10" onClick={() => removeChecklistDraft(index)} title="Remover subtarefa">
                       <X size={16} />
                     </button>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="mt-4 rounded-2xl border border-dashed border-[#F3E3D3] bg-[#FFF8F6] px-3 py-3 text-sm text-[#7A6F6B]">Nenhuma subtarefa adicionada.</p>
+              <p className="mt-4 rounded-2xl border border-dashed border-[#E7E0D8] bg-[#FAF8F5] px-3 py-3 text-sm text-[#6F6760]">Nenhuma subtarefa adicionada.</p>
             )}
             </details>
           </div>
 
-          <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-[#F3E3D3] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] pt-2.5 sm:flex sm:justify-end sm:px-5 sm:py-4">
+          <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-[#E7E0D8] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] pt-2.5 sm:flex sm:justify-end sm:px-5 sm:py-4">
             <button type="button" className="btn-secondary h-9 sm:h-auto" onClick={() => setOpen(false)}>Cancelar</button>
-            <button className="btn-primary h-9 bg-[#3A2B27] sm:h-auto">Salvar tarefa</button>
+            <button className="btn-primary h-9 bg-[#B76E79] sm:h-auto">Salvar tarefa</button>
           </div>
         </form>
       </Modal>
