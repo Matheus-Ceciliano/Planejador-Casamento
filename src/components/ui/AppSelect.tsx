@@ -3,6 +3,7 @@ import { Check, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { ReactNode, useId, useState } from 'react';
 
 const SEARCH_THRESHOLD = 8;
+const EMPTY_OPTION_VALUE = '__app_select_empty__';
 
 export type AppSelectOption = { label: string; value: string };
 
@@ -81,7 +82,7 @@ export default function AppSelect({
 
       <Select.Root
         value={radixValue}
-        onValueChange={onValueChange}
+        onValueChange={(nextValue) => onValueChange?.(nextValue === EMPTY_OPTION_VALUE ? '' : nextValue)}
         disabled={disabled}
         name={name}
         onOpenChange={(open) => { if (!open) setSearch(''); }}
@@ -155,10 +156,10 @@ export default function AppSelect({
 
             <Select.Viewport className="max-h-[264px] p-1.5">
               {filteredOptions.length > 0 ? (
-                filteredOptions.map((opt) => (
+                filteredOptions.map((opt, index) => (
                   <Select.Item
-                    key={opt.value}
-                    value={opt.value}
+                    key={`${opt.value || EMPTY_OPTION_VALUE}-${index}`}
+                    value={opt.value === '' ? EMPTY_OPTION_VALUE : opt.value}
                     className="radix-select-item group relative flex cursor-pointer select-none items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-[#1F2937] outline-none transition-colors hover:bg-[#FFF1F5] hover:text-[#E11D48] data-[disabled]:cursor-not-allowed data-[highlighted]:bg-[#FFF1F5] data-[highlighted]:text-[#E11D48] data-[state=checked]:font-semibold data-[state=checked]:text-[#E11D48]"
                   >
                     <Select.ItemText>

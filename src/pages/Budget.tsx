@@ -1,22 +1,20 @@
 import {
-  AlertTriangle,
+  BarChart3,
   CalendarClock,
-  CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  CreditCard,
   DollarSign,
   ExternalLink,
   FileText,
   Plus,
   Receipt,
   Search,
-  Sparkles,
   Trash2,
-  WalletCards,
+  Wallet,
   X
 } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useNavigate, useParams } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
 import CurrencyInput from '../components/CurrencyInput';
@@ -36,8 +34,6 @@ import { syncVendorBudgetItem } from '../utils/vendorBudgetSync';
 
 const preferredTabs = ['Todos', 'Buffet', 'Decoração', 'Foto e Vídeo', 'Música / DJ', 'Cerimonial', 'Espaço', 'Bebidas', 'Outros'];
 const paymentStatuses = ['pendente', 'pago parcialmente', 'pago', 'vencido', 'cancelado'];
-const chartColors = ['#E11D48', '#2563EB', '#16A34A', '#F97316', '#7C3AED', '#0F766E', '#D97706', '#52525B'];
-
 const blank = {
   name: '',
   category: 'Buffet',
@@ -61,13 +57,6 @@ const paymentBlank = {
   receipt_url: '',
   notes: ''
 };
-
-function compactMoney(value: number) {
-  const abs = Math.abs(value);
-  if (abs >= 1000000) return `R$ ${(value / 1000000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`;
-  if (abs >= 1000) return `R$ ${Math.round(value / 1000).toLocaleString('pt-BR')}k`;
-  return formatMoney(value).replace(',00', '');
-}
 
 function percent(value: number, total: number) {
   if (!total) return 0;
@@ -128,27 +117,35 @@ function CategorySelect({
   );
 }
 
-function Kpi({ label, value, helper, tone }: { label: string; value: string; helper: string; tone: string }) {
+function Kpi({ label, value, helper, tone, icon: Icon }: { label: string; value: string; helper: string; tone: string; icon: typeof Wallet }) {
   return (
-    <div className="glass rounded-3xl p-4 shadow-[0_18px_55px_rgba(24,24,27,0.08)]">
-      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-w-faint">{label}</p>
-      <p className="mt-2 truncate text-2xl font-bold text-w-text">{value}</p>
+    <div className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-soft">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-w-faint">{label}</p>
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-w-surface ${tone}`}>
+          <Icon size={16} />
+        </span>
+      </div>
+      <p className="mt-3 truncate text-2xl font-bold text-w-text">{value}</p>
       <p className={`mt-2 text-xs font-semibold ${tone}`}>{helper}</p>
     </div>
   );
 }
 
-function ProgressLine({ label, value, color }: { label: string; value: number; color: string }) {
+function BudgetProgress({ committed, planned, pct }: { committed: number; planned: number; pct: number }) {
   return (
-    <div>
-      <div className="mb-2 flex items-center justify-between text-sm">
-        <span className="font-semibold text-w-text">{label}</span>
-        <span className="font-bold text-w-muted">{value}%</span>
+    <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-soft">
+      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="text-sm font-bold text-w-text">OrÃ§amento utilizado</h2>
+          <p className="mt-1 text-sm text-w-muted">{formatMoney(committed)} de {formatMoney(planned)}</p>
+        </div>
+        <p className="text-sm font-bold text-w-rose">{pct}% comprometido</p>
       </div>
-      <div className="h-3 overflow-hidden rounded-full bg-white/70 ring-1 ring-white/70">
-        <div className="h-full rounded-full" style={{ width: `${value}%`, background: color }} />
+      <div className="h-3 overflow-hidden rounded-full bg-[#F3F4F6]">
+        <div className="h-full rounded-full bg-[#E11D48]" style={{ width: `${pct}%` }} />
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -251,41 +248,15 @@ export default function Budget() {
     });
   }, [active, dueFilter, items.rows, search, status, vendorById]);
 
-  const categoryData = useMemo(() => {
-    const grouped = items.rows.reduce<Record<string, number>>((acc, item) => {
-      const key = toPrimaryCategory(item.category);
-      acc[key] = (acc[key] ?? 0) + Number(item.contracted_value ?? 0);
-      return acc;
-    }, {});
-    return Object.entries(grouped).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-  }, [items.rows]);
-
-  const plannedPaidData = [
-    { name: 'Planejado', value: totals.planned },
-    { name: 'Comprometido', value: totals.committed },
-    { name: 'Pago', value: totals.paid }
-  ];
-
-  const evolutionData = useMemo(() => {
-    const monthly = items.rows.reduce<Record<string, number>>((acc, item) => {
-      const key = (item.due_date ?? 'Sem data').slice(0, 7);
-      acc[key] = (acc[key] ?? 0) + Number(item.contracted_value ?? 0);
-      return acc;
-    }, {});
-    return Object.entries(monthly)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, value]) => ({ month, value }));
-  }, [items.rows]);
-
-  const nextDue = useMemo(
+  const upcomingDue = useMemo(
     () =>
       items.rows
         .filter((item) => item.due_date && getPendingValue(item.contracted_value, item.paid_value) > 0)
-        .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)))[0],
+        .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)))
+        .slice(0, 3),
     [items.rows]
   );
 
-  const expensiveCategory = categoryData[0];
   const activeFilterCount = [search.trim(), status, dueFilter].filter(Boolean).length;
 
   async function createCategory(name: string) {
@@ -352,12 +323,6 @@ export default function Budget() {
     setPaying(null);
   }
 
-  const dueGroups = {
-    today: items.rows.filter((item) => dueBucket(item) === 'today'),
-    next7: items.rows.filter((item) => dueBucket(item) === 'next7'),
-    overdue: items.rows.filter((item) => dueBucket(item) === 'overdue')
-  };
-
   return (
     <div className="space-y-5 text-w-text">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -369,97 +334,39 @@ export default function Budget() {
         <div className="flex flex-wrap gap-2">
           <button className="btn-secondary" onClick={() => navigate('/fornecedores')}><ExternalLink size={16} /> Fornecedores</button>
           <button className="btn-primary" onClick={() => start()}><Plus size={16} /> Gasto</button>
+          <button className="btn-secondary" onClick={() => navigate('/orcamento/analise')}><BarChart3 size={16} /> Ver analise financeira</button>
         </div>
       </div>
 
       {message && <div className="rounded-2xl border border-[#BBF7D0] bg-[#F0FDF4] p-3 text-sm font-medium text-[#15803D]">{message}</div>}
-
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi label="Orçamento total" value={formatMoney(totals.planned)} helper="Planejado nas configurações" tone="text-w-muted" />
-        <Kpi label="Comprometido" value={formatMoney(totals.committed)} helper={`${totals.committedPct}% contratado`} tone="text-w-rose" />
-        <Kpi label="Pago" value={formatMoney(totals.paid)} helper={`${totals.paidPct}% pago`} tone="text-[#16A34A]" />
-        <Kpi label="Restante" value={formatMoney(totals.remaining)} helper={`${formatMoney(totals.pending)} em aberto`} tone="text-[#D97706]" />
+        <Kpi label="Orcamento total" value={formatMoney(totals.planned)} helper="Planejado" tone="text-w-muted" icon={Wallet} />
+        <Kpi label="Comprometido" value={formatMoney(totals.committed)} helper={`${totals.committedPct}% do total`} tone="text-w-rose" icon={CreditCard} />
+        <Kpi label="Pago" value={formatMoney(totals.paid)} helper={`${totals.paidPct}% pago`} tone="text-[#22C55E]" icon={DollarSign} />
+        <Kpi label="Em aberto" value={formatMoney(totals.pending)} helper="A pagar" tone="text-[#F59E0B]" icon={CalendarClock} />
       </section>
 
-      <section className="glass rounded-3xl p-4 shadow-[0_20px_70px_rgba(24,24,27,0.08)]">
-        <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
-          <div className="space-y-5">
-            <ProgressLine label="Contratado" value={totals.committedPct} color="linear-gradient(90deg,#E11D48,#FB7185)" />
-            <ProgressLine label="Pago" value={totals.paidPct} color="linear-gradient(90deg,#16A34A,#86EFAC)" />
-          </div>
-          <div className="rounded-2xl bg-white/70 p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Sparkles size={17} className="text-w-rose" />
-              <h2 className="text-sm font-bold">Insights automáticos</h2>
-            </div>
-            <div className="space-y-2 text-sm text-w-muted">
-              <p><strong className="text-w-text">Atenção:</strong> você já comprometeu {totals.committedPct}% do orçamento.</p>
-              <p><strong className="text-w-text">Disponível:</strong> ainda restam {formatMoney(totals.remaining)} do planejado.</p>
-              <p><strong className="text-w-text">Próximo vencimento:</strong> {nextDue ? `${nextDue.name} em ${formatDate(nextDue.due_date)}` : 'nenhum vencimento pendente'}.</p>
-              <p><strong className="text-w-text">Categoria mais cara:</strong> {expensiveCategory ? `${expensiveCategory.name} (${formatMoney(expensiveCategory.value)})` : 'sem dados'}.</p>
-            </div>
-          </div>
-        </div>
-      </section>
+      <BudgetProgress committed={totals.committed} planned={totals.planned} pct={totals.committedPct} />
 
-      <section className="grid gap-3 lg:grid-cols-3">
-        <div className="rounded-3xl border border-w-border bg-white p-4 shadow-card">
-          <h2 className="text-sm font-bold">Gastos por categoria</h2>
-          <div className="mt-3 h-60">
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={categoryData} dataKey="value" nameKey="name" innerRadius={52} outerRadius={82} paddingAngle={3}>
-                  {categoryData.map((_, index) => <Cell key={index} fill={chartColors[index % chartColors.length]} />)}
-                </Pie>
-                <Tooltip formatter={(value: number) => formatMoney(value)} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+      <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-soft">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-bold text-w-text">Proximos vencimentos</h2>
+          <button type="button" className="btn-ghost" onClick={() => navigate('/orcamento/vencimentos')}>Ver todos</button>
         </div>
-        <div className="rounded-3xl border border-w-border bg-white p-4 shadow-card">
-          <h2 className="text-sm font-bold">Planejado x Pago</h2>
-          <div className="mt-3 h-60">
-            <ResponsiveContainer>
-              <BarChart data={plannedPaidData} layout="vertical" margin={{ left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis type="number" hide />
-                <YAxis dataKey="name" type="category" width={96} tickLine={false} axisLine={false} />
-                <Tooltip formatter={(value: number) => formatMoney(value)} />
-                <Bar dataKey="value" radius={[0, 10, 10, 0]} fill="#E11D48" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="mt-3 grid gap-2">
+          {upcomingDue.length ? upcomingDue.map((item) => (
+            <button key={item.id} type="button" className="grid gap-2 rounded-2xl border border-[#E5E7EB] p-3 text-left sm:grid-cols-[1fr_auto_auto] sm:items-center" onClick={() => setDueFilter('next30')}>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-w-text">{item.name}</p>
+                <p className="text-xs font-semibold text-w-muted">{toPrimaryCategory(item.category)}</p>
+              </div>
+              <p className="text-sm font-semibold text-w-muted">{formatDate(item.due_date)}</p>
+              <p className="text-sm font-bold text-[#F59E0B]">{formatMoney(getPendingValue(item.contracted_value, item.paid_value))}</p>
+            </button>
+          )) : (
+            <p className="rounded-2xl bg-w-surface p-4 text-sm font-semibold text-w-muted">Nenhum vencimento proximo.</p>
+          )}
         </div>
-        <div className="rounded-3xl border border-w-border bg-white p-4 shadow-card">
-          <h2 className="text-sm font-bold">Evolução dos gastos</h2>
-          <div className="mt-3 h-60">
-            <ResponsiveContainer>
-              <LineChart data={evolutionData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} />
-                <YAxis hide />
-                <Tooltip formatter={(value: number) => formatMoney(value)} />
-                <Line type="monotone" dataKey="value" stroke="#2563EB" strokeWidth={3} dot={{ r: 4 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-3 lg:grid-cols-3">
-        {[
-          { label: 'Vence hoje', rows: dueGroups.today, tone: 'border-[#FDE68A] bg-[#FEFCE8]', icon: CalendarClock },
-          { label: 'Vence em 7 dias', rows: dueGroups.next7, tone: 'border-[#BFDBFE] bg-[#EFF6FF]', icon: WalletCards },
-          { label: 'Vencidos', rows: dueGroups.overdue, tone: 'border-[#FECACA] bg-[#FEF2F2]', icon: AlertTriangle }
-        ].map(({ label, rows: groupRows, tone, icon: Icon }) => (
-          <button key={label} type="button" className={`rounded-3xl border p-4 text-left ${tone}`} onClick={() => setDueFilter(label === 'Vencidos' ? 'overdue' : label === 'Vence hoje' ? 'today' : 'next7')}>
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2 text-sm font-bold"><Icon size={17} /> {label}</span>
-              <span className="rounded-full bg-white/80 px-2 py-0.5 text-xs font-bold">{groupRows.length}</span>
-            </div>
-            <p className="mt-3 text-xl font-bold">{formatMoney(groupRows.reduce((sum, item) => sum + getPendingValue(item.contracted_value, item.paid_value), 0))}</p>
-          </button>
-        ))}
       </section>
 
       <section className="rounded-3xl border border-w-border bg-white p-2 shadow-card">

@@ -6,6 +6,7 @@ import { WeddingProvider, useWedding } from './hooks/useWedding';
 import AppLayout from './layouts/AppLayout';
 import Agenda from './pages/Agenda';
 import Budget from './pages/Budget';
+import BudgetAnalysis from './pages/BudgetAnalysis';
 import BudgetDueDates from './pages/BudgetDueDates';
 import Dashboard from './pages/Dashboard';
 import Files from './pages/Files';
@@ -44,6 +45,7 @@ function RoutesContent() {
       <Route path="/agenda" element={<Agenda />} />
       <Route path="/convidados" element={<Guests />} />
       <Route path="/orcamento" element={<Budget />} />
+      <Route path="/orcamento/analise" element={<BudgetAnalysis />} />
       <Route path="/orcamento/vencimentos" element={<BudgetDueDates />} />
       <Route path="/orcamento/:category" element={<Budget />} />
       <Route path="/categorias" element={<Navigate to="/orcamento" replace />} />
