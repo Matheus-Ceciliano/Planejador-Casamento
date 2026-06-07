@@ -1,6 +1,6 @@
 import {
   CalendarDays, ChevronDown, Clock3, Files, Handshake,
-  Heart, Home, ListTodo, LogOut, Menu, MoreHorizontal,
+  Heart, Home, LogOut, Menu, MoreHorizontal,
   Send, Settings, Tags, Users, WalletCards, X,
 } from 'lucide-react';
 import { ReactNode, useState } from 'react';
@@ -16,7 +16,6 @@ const nav = [
   { to: '/orcamento',    label: 'Orçamento',       icon: WalletCards },
   { to: '/categorias',   label: 'Categorias',      icon: Tags },
   { to: '/fornecedores', label: 'Fornecedores',    icon: Handshake },
-  { to: '/tarefas',      label: 'Tarefas',         icon: ListTodo },
   { to: '/cronograma',   label: 'Cronograma',      icon: Clock3 },
   { to: '/arquivos',     label: 'Arquivos',        icon: Files },
   { to: '/configuracoes',label: 'Configurações',   icon: Settings },
@@ -25,9 +24,8 @@ const nav = [
 const mobileNav = [
   { to: '/dashboard',   label: 'Início',     icon: Home },
   { to: '/convidados',  label: 'Convidados', icon: Users },
-  { to: '/agenda',      label: 'Convites',   icon: Send },
+  { to: '/agenda',      label: 'Agenda',     icon: Send },
   { to: '/orcamento',   label: 'Orçamento',  icon: WalletCards },
-  { to: '/tarefas',     label: 'Tarefas',    icon: ListTodo },
   { to: '/configuracoes',label: 'Mais',      icon: MoreHorizontal },
 ];
 
@@ -183,7 +181,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
 
       {/* ── Mobile Bottom Nav ── */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-w-border/80 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-xl lg:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-6 gap-0.5">
+        <div className="mx-auto grid max-w-md grid-cols-5 gap-0.5">
           {mobileNav.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}

@@ -284,14 +284,14 @@ export default function Dashboard() {
           onClick={() => navigate('/orcamento/vencimentos?filter=overdue')}
         />
         <KpiCard
-          title="Tarefas atrasadas"
-          mobileTitle="Tarefas"
+          title="Pendências atrasadas"
+          mobileTitle="Agenda"
           value={lateTasks.length}
-          helper={lateTasks.length ? 'Abrir tarefas vencidas' : `${contractedVendors} fornecedores contratados`}
+          helper={lateTasks.length ? 'Abrir itens atrasados na Agenda' : `${contractedVendors} fornecedores contratados`}
           mobileHelper={lateTasks.length ? `${lateTasks.length} atrasadas` : 'Em dia'}
           icon={<ListChecks size={18} />}
           tone={lateTasks.length > 0 ? 'gold' : 'green'}
-          onClick={() => navigate('/tarefas?filter=late')}
+          onClick={() => navigate('/agenda')}
         />
       </section>
 
@@ -362,8 +362,8 @@ export default function Dashboard() {
           )}
         </Panel>
 
-        {/* Próximas tarefas */}
-        <Panel title="Próximas tarefas" icon={<CalendarClock size={16} />} className="order-1 xl:order-3">
+        {/* Próximos itens da agenda */}
+        <Panel title="Próximos itens da agenda" icon={<CalendarClock size={16} />} className="order-1 xl:order-3">
           {upcomingItems.length ? (
             <div className="space-y-2">
               {upcomingItems.map((item) => (
@@ -386,7 +386,7 @@ export default function Dashboard() {
               ))}
             </div>
           ) : (
-            <EmptyBox title="Nenhuma tarefa pendente" text="As próximas tarefas aparecerão aqui." />
+            <EmptyBox title="Nenhum item pendente" text="Os próximos itens da Agenda aparecerão aqui." />
           )}
         </Panel>
       </section>

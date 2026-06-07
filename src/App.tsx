@@ -14,7 +14,6 @@ import Guests from './pages/Guests';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Settings from './pages/Settings';
-import Tasks from './pages/Tasks';
 import Timeline from './pages/Timeline';
 import Vendors from './pages/Vendors';
 
@@ -53,7 +52,6 @@ function RoutesContent() {
       <Route path="/espacos" element={<Navigate to="/orcamento/espaco" replace />} />
       <Route path="/buffet" element={<Navigate to="/orcamento/buffet" replace />} />
       <Route path="/bebidas" element={<Navigate to="/orcamento/bebidas" replace />} />
-      <Route path="/tarefas" element={<Tasks />} />
       <Route path="/cronograma" element={<Timeline />} />
       <Route path="/arquivos" element={<Files />} />
       <Route path="/configuracoes" element={<Settings />} />

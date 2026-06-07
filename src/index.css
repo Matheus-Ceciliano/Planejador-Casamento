@@ -4,22 +4,22 @@
 
 /* ── CSS Variables ──────────────────────────────────────────────── */
 :root {
-  --rose:      #E11D48;
-  --rose-lt:   #FFF1F5;
-  --rose-md:   #FCE4EA;
-  --gold:      #F59E0B;
-  --gold-lt:   #FFFBEB;
-  --green:     #22C55E;
-  --green-lt:  #F0FDF4;
-  --red:       #EF4444;
-  --red-lt:    #FEF2F2;
-  --surface:   #FBFAF8;
-  --card:      #FFFFFF;
-  --border:    #F0EBE6;
+  --rose: #E11D48;
+  --rose-lt: #FFF1F5;
+  --rose-md: #FCE4EA;
+  --gold: #F59E0B;
+  --gold-lt: #FFFBEB;
+  --green: #22C55E;
+  --green-lt: #F0FDF4;
+  --red: #EF4444;
+  --red-lt: #FEF2F2;
+  --surface: #FBFAF8;
+  --card: #FFFFFF;
+  --border: #F0EBE6;
   --border-md: #E5DDD8;
-  --text:      #18181B;
-  --muted:     #71717A;
-  --faint:     #A1A1AA;
+  --text: #18181B;
+  --muted: #71717A;
+  --faint: #A1A1AA;
 
   color: var(--text);
   background: var(--surface);
@@ -39,7 +39,10 @@ body {
   overflow-x: hidden;
 }
 
-button, input, select, textarea {
+button,
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -47,10 +50,12 @@ button, input, select, textarea {
 .app-header-safe {
   padding-top: env(safe-area-inset-top);
 }
+
 .pwa-main-safe {
   /* 100px cobre a bottom nav (~56px) + espaço de respiro + safe-area do iPhone */
   padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
 }
+
 /* Em desktop não há bottom nav — reduz o padding */
 @media (min-width: 1024px) {
   .pwa-main-safe {
@@ -60,26 +65,66 @@ button, input, select, textarea {
 
 /* ── Microanimations ────────────────────────────────────────────── */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to   { opacity: 1; transform: scale(1); }
-}
-@keyframes slideInRight {
-  from { opacity: 0; transform: translateX(-12px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
-.animate-fade-in   { animation: fadeIn  0.2s ease-out both; }
-.animate-slide-up  { animation: slideUp 0.28s cubic-bezier(0.16,1,0.3,1) both; }
-.animate-scale-in  { animation: scaleIn 0.22s cubic-bezier(0.16,1,0.3,1) both; }
-.animate-slide-right { animation: slideInRight 0.2s ease-out both; }
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out both;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-slide-right {
+  animation: slideInRight 0.2s ease-out both;
+}
 
 /* ── Component Layer ────────────────────────────────────────────── */
 @layer components {
@@ -99,6 +144,7 @@ button, input, select, textarea {
     @apply rounded-2xl border border-w-border bg-w-card shadow-card;
     transition: box-shadow 0.2s ease, transform 0.2s ease;
   }
+
   .panel-hover:hover {
     @apply shadow-float -translate-y-0.5;
   }
@@ -110,39 +156,22 @@ button, input, select, textarea {
 
   /* ── Primary button ── */
   .btn-primary {
-    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl
-           bg-w-rose px-4 py-2 text-sm font-semibold text-white shadow-rose
-           transition-all duration-150 ease-out
-           hover:bg-[#C8173F] hover:shadow-[0_4px_20px_rgba(225,29,72,0.35)] hover:-translate-y-px
-           active:translate-y-0 active:shadow-rose
-           disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-w-rose px-4 py-2 text-sm font-semibold text-white shadow-rose transition-all duration-150 ease-out hover:bg-[#C8173F] hover:shadow-[0_4px_20px_rgba(225,29,72,0.35)] hover:-translate-y-px active:translate-y-0 active:shadow-rose disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none;
   }
 
   /* ── Secondary button ── */
   .btn-secondary {
-    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl
-           border border-w-border bg-w-card px-4 py-2 text-sm font-semibold text-w-text
-           shadow-soft transition-all duration-150 ease-out
-           hover:border-w-border-md hover:bg-w-surface hover:shadow-card
-           disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-w-border bg-w-card px-4 py-2 text-sm font-semibold text-w-text shadow-soft transition-all duration-150 ease-out hover:border-w-border-md hover:bg-w-surface hover:shadow-card disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   /* ── Ghost button ── */
   .btn-ghost {
-    @apply inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-3 py-2
-           text-sm font-medium text-w-muted
-           transition-all duration-150 ease-out
-           hover:bg-w-border hover:text-w-text
-           disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-w-muted transition-all duration-150 ease-out hover:bg-w-border hover:text-w-text disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   /* ── Input ── */
   .input {
-    @apply min-h-10 w-full rounded-xl border border-w-border bg-w-card px-3.5 py-2.5
-           text-sm text-w-text shadow-soft outline-none
-           placeholder:text-w-faint
-           transition-all duration-150 ease-out
-           focus:border-w-rose focus:bg-white focus:ring-2 focus:ring-w-rose/10 focus:shadow-card;
+    @apply min-h-10 w-full rounded-xl border border-w-border bg-w-card px-3.5 py-2.5 text-sm text-w-text shadow-soft outline-none placeholder:text-w-faint transition-all duration-150 ease-out focus:border-w-rose focus:bg-white focus:ring-2 focus:ring-w-rose/10 focus:shadow-card;
   }
 
   /* ── Label ── */
@@ -154,15 +183,43 @@ button, input, select, textarea {
   .badge {
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
   }
-  .badge-rose   { @apply badge bg-w-rose-lt text-w-rose; }
-  .badge-green  { @apply badge bg-w-green-lt text-[#16A34A]; }
-  .badge-gold   { @apply badge bg-w-gold-lt text-[#D97706]; }
-  .badge-red    { @apply badge bg-w-red-lt text-[#DC2626]; }
-  .badge-muted  { @apply badge bg-w-border text-w-muted; }
+
+  .badge-rose {
+    @apply badge bg-w-rose-lt text-w-rose;
+  }
+
+  .badge-green {
+    @apply badge bg-w-green-lt text-[#16A34A];
+  }
+
+  .badge-gold {
+    @apply badge bg-w-gold-lt text-[#D97706];
+  }
+
+  .badge-red {
+    @apply badge bg-w-red-lt text-[#DC2626];
+  }
+
+  .badge-muted {
+    @apply badge bg-w-border text-w-muted;
+  }
 }
 
 /* ── Scrollbar ──────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: var(--faint); }
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-md);
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--faint);
+}

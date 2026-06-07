@@ -20,6 +20,7 @@ import {
   X
 } from 'lucide-react';
 import { Fragment, FormEvent, ReactNode, useEffect, useRef, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Modal from '../components/Modal';
 import { useWeddingTable } from '../hooks/useWeddingTable';
@@ -183,8 +184,54 @@ function GuestActionMenu({ row, open, onToggle, onEdit, onDelete, onRefuse, onCo
   onEdit:(r:Guest)=>void; onDelete:(r:Guest)=>void;
   onRefuse:(r:Guest)=>void; onConfirm:(id:string)=>void;
 }) {
-  const ok = row.invite_status === 'confirmado';
+  const ok  = row.invite_status === 'confirmado';
   const bad = row.invite_status === 'recusado';
+
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef    = useRef<HTMLDivElement>(null);
+
+  // Fechar ao clicar/tocar fora do menu
+  useEffect(() => {
+    if (!open) return;
+    function handleOutside(e: MouseEvent | TouchEvent) {
+      const target = (e as MouseEvent).target as Node | null;
+      if (
+        menuRef.current    && !menuRef.current.contains(target) &&
+        triggerRef.current && !triggerRef.current.contains(target)
+      ) {
+        onToggle();
+      }
+    }
+    document.addEventListener('mousedown', handleOutside, true);
+    document.addEventListener('touchstart', handleOutside, true);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside, true);
+      document.removeEventListener('touchstart', handleOutside, true);
+    };
+  }, [open, onToggle]);
+
+  // Calcular posição do menu via getBoundingClientRect (evita corte por overflow)
+  function getMenuStyle(): React.CSSProperties {
+    if (!triggerRef.current) return { position: 'fixed', top: 0, right: 16 };
+    const rect = triggerRef.current.getBoundingClientRect();
+    const MENU_H   = 160; // altura estimada do menu
+    const MENU_W   = 168;
+    const viewH    = window.innerHeight;
+    const viewW    = window.innerWidth;
+    // Espaço abaixo e acima
+    const spaceBelow = viewH - rect.bottom;
+    const openAbove  = spaceBelow < MENU_H + 16 && rect.top > MENU_H;
+    // Posição horizontal: alinhar à direita do trigger; não ultrapassar a margem esquerda
+    const right = Math.max(8, viewW - rect.right);
+    return {
+      position: 'fixed',
+      right,
+      top: openAbove ? undefined : rect.bottom + 6,
+      bottom: openAbove ? viewH - rect.top + 6 : undefined,
+      width: MENU_W,
+      zIndex: 9999,
+    };
+  }
 
   function closeAndRun(action: () => void) {
     onToggle();
@@ -193,30 +240,51 @@ function GuestActionMenu({ row, open, onToggle, onEdit, onDelete, onRefuse, onCo
 
   return (
     <div className="relative">
-      <button type="button" onClick={onToggle}
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onToggle(); }}
         className="flex h-7 w-7 items-center justify-center rounded-md text-stone-400 transition hover:bg-stone-100 hover:text-stone-700"
-        aria-label="Ações do convidado">
+        aria-label="Ações do convidado"
+        aria-expanded={open}
+      >
         <MoreVertical size={15}/>
       </button>
-      {open && (
-        <div className="absolute right-0 top-[calc(100%+0.35rem)] z-30 w-40 rounded-lg border border-stone-200 bg-white p-1.5 shadow-lg">
-          <button type="button" disabled={ok} onClick={()=>closeAndRun(()=>onConfirm(row.id))}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-medium text-stone-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-default disabled:opacity-40">
+
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={getMenuStyle()}
+          onClick={(e) => e.stopPropagation()}
+          className="rounded-xl border border-stone-200 bg-white p-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.14)] ring-1 ring-black/5"
+        >
+          <button type="button" disabled={ok}
+            onClick={() => closeAndRun(() => onConfirm(row.id))}
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-stone-700 transition hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-default disabled:opacity-40"
+          >
             <CheckCircle2 size={13}/> Confirmar
           </button>
-          <button type="button" disabled={bad} onClick={()=>closeAndRun(()=>onRefuse(row))}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-medium text-stone-700 hover:bg-red-50 hover:text-red-600 disabled:cursor-default disabled:opacity-40">
+          <button type="button" disabled={bad}
+            onClick={() => closeAndRun(() => onRefuse(row))}
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-stone-700 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-default disabled:opacity-40"
+          >
             <XCircle size={13}/> Recusar
           </button>
-          <button type="button" onClick={()=>closeAndRun(()=>onEdit(row))}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-medium text-stone-700 hover:bg-stone-50">
+          <button type="button"
+            onClick={() => closeAndRun(() => onEdit(row))}
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-stone-700 transition hover:bg-stone-50"
+          >
             <Edit2 size={13}/> Editar
           </button>
-          <button type="button" onClick={()=>closeAndRun(()=>onDelete(row))}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-xs font-medium text-red-500 hover:bg-red-50">
+          <div className="my-1 h-px bg-stone-100" />
+          <button type="button"
+            onClick={() => closeAndRun(() => onDelete(row))}
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-xs font-semibold text-red-500 transition hover:bg-red-50"
+          >
             <Trash2 size={13}/> Excluir
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
