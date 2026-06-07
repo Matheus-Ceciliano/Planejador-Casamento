@@ -48,7 +48,14 @@ button, input, select, textarea {
   padding-top: env(safe-area-inset-top);
 }
 .pwa-main-safe {
-  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+  /* 100px cobre a bottom nav (~56px) + espaço de respiro + safe-area do iPhone */
+  padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+}
+/* Em desktop não há bottom nav — reduz o padding */
+@media (min-width: 1024px) {
+  .pwa-main-safe {
+    padding-bottom: 2rem;
+  }
 }
 
 /* ── Microanimations ────────────────────────────────────────────── */

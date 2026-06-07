@@ -176,7 +176,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
         </header>
 
         {/* ── Page content ── */}
-        <main className="pwa-main-safe mx-auto max-w-7xl animate-fade-in px-3 pb-28 pt-5 sm:px-6 sm:py-6 lg:pb-8">
+        <main className="pwa-main-safe mx-auto max-w-7xl animate-fade-in px-3 pt-5 sm:px-6 sm:pt-6 lg:pb-8">
           {children ?? <Outlet />}
         </main>
       </div>
