@@ -7,7 +7,6 @@ import AppLayout from './layouts/AppLayout';
 import Agenda from './pages/Agenda';
 import Budget from './pages/Budget';
 import BudgetDueDates from './pages/BudgetDueDates';
-import Categories from './pages/Categories';
 import Dashboard from './pages/Dashboard';
 import Files from './pages/Files';
 import Guests from './pages/Guests';
@@ -47,7 +46,7 @@ function RoutesContent() {
       <Route path="/orcamento" element={<Budget />} />
       <Route path="/orcamento/vencimentos" element={<BudgetDueDates />} />
       <Route path="/orcamento/:category" element={<Budget />} />
-      <Route path="/categorias" element={<Categories />} />
+      <Route path="/categorias" element={<Navigate to="/orcamento" replace />} />
       <Route path="/fornecedores" element={<Vendors />} />
       <Route path="/espacos" element={<Navigate to="/orcamento/espaco" replace />} />
       <Route path="/buffet" element={<Navigate to="/orcamento/buffet" replace />} />

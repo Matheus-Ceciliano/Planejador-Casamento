@@ -1,5 +1,10 @@
+/**
+ * CurrencyInput — wrapper de compatibilidade.
+ * Re-exporta AppCurrencyInput mantendo a API original:
+ *   { label: string; value: number; onValueChange: (value: number) => void }
+ */
 import { InputHTMLAttributes } from 'react';
-import { moneyInput, parseMoney } from '../utils/format';
+import AppCurrencyInput from './ui/AppCurrencyInput';
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> & {
   label: string;
@@ -8,16 +13,5 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> &
 };
 
 export default function CurrencyInput({ label, value, onValueChange, ...props }: Props) {
-  return (
-    <label className="block">
-      <span className="label">{label}</span>
-      <input
-        className="input"
-        inputMode="numeric"
-        value={moneyInput(value)}
-        onChange={(event) => onValueChange(parseMoney(event.target.value))}
-        {...props}
-      />
-    </label>
-  );
+  return <AppCurrencyInput label={label} value={value} onValueChange={onValueChange} {...props} />;
 }

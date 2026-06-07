@@ -1,9 +1,22 @@
-import { CheckCircle2, ChevronDown, Edit2, ExternalLink, Handshake, Plus, Search, Trash2 } from 'lucide-react';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import {
+  CalendarClock,
+  CheckCircle2,
+  ChevronDown,
+  FileText,
+  Handshake,
+  Link as LinkIcon,
+  Mail,
+  MessageCircle,
+  Paperclip,
+  Plus,
+  Search,
+  Trash2,
+  Upload,
+  X
+} from 'lucide-react';
+import { DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import CurrencyInput from '../components/CurrencyInput';
-import EmptyState from '../components/EmptyState';
 import FileUpload from '../components/FileUpload';
 import FormInput from '../components/FormInput';
 import FormSelect from '../components/FormSelect';
@@ -11,15 +24,24 @@ import FormTextarea from '../components/FormTextarea';
 import Modal from '../components/Modal';
 import ResponsiveFilters from '../components/ResponsiveFilters';
 import { useWeddingTable } from '../hooks/useWeddingTable';
-import { BudgetCategory, BudgetItem, Vendor } from '../types';
+import { BudgetCategory, BudgetItem, FileRecord, Vendor } from '../types';
 import { vendorCategories } from '../utils/constants';
-import { categoryToBudgetSlug, getPaymentStatus, getPendingValue, toPrimaryCategory, vendorToBudgetPayload } from '../utils/finance';
+import { getPaymentStatus, getPendingValue, isContractedVendor, normalizeVendorStatus, toPrimaryCategory } from '../utils/finance';
 import { formatDate, formatMoney } from '../utils/format';
+import { syncVendorBudgetItem } from '../utils/vendorBudgetSync';
 import { buildWhatsAppChatLink } from '../utils/whatsappService';
 
-const blank = {
+const statusColumns = [
+  { key: 'pesquisando', label: 'Pesquisando', dot: 'bg-[#EAB308]', tint: 'bg-[#FEFCE8]', ring: 'border-[#FDE68A]' },
+  { key: 'orçamento recebido', label: 'Orçamentos', dot: 'bg-[#F97316]', tint: 'bg-[#FFF7ED]', ring: 'border-[#FED7AA]' },
+  { key: 'em negociação', label: 'Negociação', dot: 'bg-[#2563EB]', tint: 'bg-[#EFF6FF]', ring: 'border-[#BFDBFE]' },
+  { key: 'contratado', label: 'Contratados', dot: 'bg-[#16A34A]', tint: 'bg-[#F0FDF4]', ring: 'border-[#BBF7D0]' },
+  { key: 'cancelado', label: 'Cancelados', dot: 'bg-[#27272A]', tint: 'bg-[#F4F4F5]', ring: 'border-[#D4D4D8]' }
+];
+
+const blankVendor = {
   name: '',
-  category: 'Espaço',
+  category: 'Buffet',
   contact_name: '',
   phone: '',
   email: '',
@@ -33,31 +55,18 @@ const blank = {
   notes: ''
 };
 
-const vendorStatuses = ['pesquisando', 'orçamento recebido', 'em negociação', 'contratado', 'cancelado'];
-const editableVendorStatuses = vendorStatuses.filter((status) => status !== 'contratado');
-
-const vendorStatusStyles: Record<string, string> = {
-  pesquisando: 'bg-[#E7E0D8] text-[#6F6760] ring-[#E7E0D8]',
-  'orçamento recebido': 'bg-[#B76E79]/18 text-[#B76E79] ring-[#B76E79]/30',
-  'em negociação': 'bg-[#D4A373]/15 text-[#B07C45] ring-[#D4A373]/25',
-  contratado: 'bg-[#5F8D6D]/15 text-[#5F8D6D] ring-[#5F8D6D]/25',
-  cancelado: 'bg-[#C46A6A]/15 text-[#C46A6A] ring-[#C46A6A]/25'
+const blankInstallment = {
+  label: 'Entrada',
+  amount: 0,
+  due_date: new Date().toISOString().slice(0, 10)
 };
 
-const paymentStatusStyles: Record<string, string> = {
-  pendente: 'bg-[#E7E0D8] text-[#6F6760] ring-[#E7E0D8]',
-  'pago parcialmente': 'bg-[#D4A373]/15 text-[#B07C45] ring-[#D4A373]/25',
-  pago: 'bg-[#5F8D6D]/15 text-[#5F8D6D] ring-[#5F8D6D]/25',
-  vencido: 'bg-[#C46A6A]/15 text-[#C46A6A] ring-[#C46A6A]/25'
-};
+type VendorForm = typeof blankVendor;
+type InstallmentForm = typeof blankInstallment;
+type DocumentKind = 'Contrato PDF' | 'Comprovante' | 'Orçamento' | 'Foto';
 
-function Badge({ value, type = 'vendor' }: { value: string; type?: 'vendor' | 'payment' }) {
-  const styles = type === 'vendor' ? vendorStatusStyles : paymentStatusStyles;
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ${styles[value] ?? 'bg-stone-100 text-stone-600 ring-stone-200'}`}>{value}</span>;
-}
-
-function isVendorOverdue(vendor: Vendor) {
-  return Boolean(vendor.due_date && getPendingValue(vendor.contracted_value, vendor.paid_value) > 0 && new Date(`${vendor.due_date}T23:59:59`) < new Date());
+function moneyCompact(value: number) {
+  return value >= 1000 ? `R$ ${Math.round(value / 1000).toLocaleString('pt-BR')}k` : formatMoney(value);
 }
 
 function maskPhone(value: string) {
@@ -68,60 +77,219 @@ function maskPhone(value: string) {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 }
 
+function paymentBadge(vendor: Vendor) {
+  const pending = getPendingValue(vendor.contracted_value, vendor.paid_value);
+  if (vendor.due_date && pending > 0 && new Date(`${vendor.due_date}T23:59:59`) < new Date()) return 'Vencido';
+  return getPaymentStatus(vendor.contracted_value, vendor.paid_value);
+}
+
+function CategorySelect({
+  value,
+  options,
+  onChange,
+  onCreate
+}: {
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  onCreate: (name: string) => Promise<void>;
+}) {
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState('');
+
+  async function submit() {
+    const next = toPrimaryCategory(name.trim());
+    if (!next) return;
+    await onCreate(next);
+    onChange(next);
+    setName('');
+    setCreating(false);
+  }
+
+  return (
+    <div className="space-y-2">
+      <FormSelect label="Categoria" value={value} onChange={(event) => onChange(event.target.value)} options={options.map((item) => ({ label: item, value: item }))} />
+      {!creating ? (
+        <button type="button" className="text-xs font-semibold text-w-rose hover:underline" onClick={() => setCreating(true)}>
+          + Criar nova categoria
+        </button>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+          <FormInput label="Nova categoria" value={name} onChange={(event) => setName(event.target.value)} />
+          <button type="button" className="btn-primary self-end" onClick={submit}>Criar</button>
+          <button type="button" className="btn-secondary self-end px-3" onClick={() => setCreating(false)}><X size={15} /></button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VendorCard({
+  vendor,
+  budgetItem,
+  onOpen,
+  onDragStart
+}: {
+  vendor: Vendor;
+  budgetItem?: BudgetItem;
+  onOpen: () => void;
+  onDragStart: (event: DragEvent<HTMLElement>) => void;
+}) {
+  const pending = getPendingValue(vendor.contracted_value, vendor.paid_value);
+  const nextDue = budgetItem?.due_date ?? vendor.due_date;
+  const hasInstallments = Boolean(budgetItem && budgetItem.name !== vendor.name);
+
+  return (
+    <article
+      draggable
+      onDragStart={onDragStart}
+      onClick={onOpen}
+      className="group cursor-pointer rounded-2xl border border-[#ECE7E1] bg-white p-4 shadow-[0_14px_36px_rgba(24,24,27,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_50px_rgba(24,24,27,0.10)]"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-semibold text-w-text">{vendor.name}</h3>
+          <p className="mt-1 text-xs font-medium text-w-muted">{toPrimaryCategory(vendor.category)}</p>
+        </div>
+        <span className="rounded-full bg-w-surface px-2.5 py-1 text-[11px] font-bold capitalize text-w-muted">{vendor.status}</span>
+      </div>
+
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <div>
+          <p className="text-[10px] font-bold uppercase text-w-faint">Valor</p>
+          <p className="mt-1 text-sm font-semibold">{moneyCompact(vendor.contracted_value)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold uppercase text-w-faint">Pago</p>
+          <p className="mt-1 text-sm font-semibold text-[#16A34A]">{moneyCompact(vendor.paid_value)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold uppercase text-w-faint">Falta</p>
+          <p className="mt-1 text-sm font-semibold text-[#D97706]">{moneyCompact(pending)}</p>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-xl bg-[#FAFAFA] p-3">
+        <p className="text-[10px] font-bold uppercase text-w-faint">Próximo vencimento</p>
+        <p className="mt-1 text-sm font-semibold text-w-text">{formatDate(nextDue ?? null)}</p>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {vendor.contract_url && <span className="badge-muted">Contrato</span>}
+        {hasInstallments && <span className="badge-gold">Parcelado</span>}
+        {budgetItem && <span className="badge-green">No orçamento</span>}
+      </div>
+    </article>
+  );
+}
+
+function Timeline({ vendor, budgetItems }: { vendor: Vendor; budgetItems: BudgetItem[] }) {
+  const hasBudget = budgetItems.length > 0;
+  const normalizedStatus = normalizeVendorStatus(vendor.status);
+  const hasQuote = normalizedStatus !== 'pesquisando';
+  const meetingDone = ['em negociacao', 'contratado'].includes(normalizedStatus);
+  const hasContract = normalizedStatus === 'contratado';
+  const nextPayment = budgetItems
+    .filter((item) => getPendingValue(item.contracted_value, item.paid_value) > 0 && item.due_date)
+    .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)))[0];
+
+  const steps = [
+    { label: 'Primeiro contato', done: true },
+    { label: 'Orçamento recebido', done: hasQuote },
+    { label: 'Reunião realizada', done: meetingDone },
+    { label: 'Contratação', done: hasContract || hasBudget },
+    { label: nextPayment ? `Próxima parcela: ${formatDate(nextPayment.due_date)}` : 'Próxima parcela', done: false }
+  ];
+
+  return (
+    <div className="space-y-3">
+      <h3 className="text-sm font-semibold text-w-text">Timeline</h3>
+      <div className="space-y-2">
+        {steps.map((step) => (
+          <div key={step.label} className="flex items-center gap-3 rounded-xl bg-white/70 p-3">
+            <span className={`flex h-7 w-7 items-center justify-center rounded-full ${step.done ? 'bg-[#16A34A] text-white' : 'bg-[#FEF3C7] text-[#D97706]'}`}>
+              {step.done ? <CheckCircle2 size={15} /> : <CalendarClock size={15} />}
+            </span>
+            <p className={`text-sm font-medium ${step.done ? 'text-w-text' : 'text-w-muted'}`}>{step.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Vendors() {
-  const navigate = useNavigate();
   const vendors = useWeddingTable<Vendor>('vendors', 'name');
   const budgetItems = useWeddingTable<BudgetItem>('budget_items', 'due_date');
   const customCategories = useWeddingTable<BudgetCategory>('budget_categories', 'sort_order');
+  const files = useWeddingTable<FileRecord>('files', 'created_at');
+  const [form, setForm] = useState<VendorForm>(blankVendor);
+  const [installments, setInstallments] = useState<InstallmentForm[]>([{ ...blankInstallment }]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Vendor | null>(null);
-  const [confirming, setConfirming] = useState<Vendor | null>(null);
   const [deleting, setDeleting] = useState<Vendor | null>(null);
-  const [message, setMessage] = useState('');
-  const [form, setForm] = useState(blank);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
-  const [status, setStatus] = useState('');
+  const [message, setMessage] = useState('');
+  const syncInFlight = useRef(new Set<string>());
+
+  const categoryOptions = useMemo(() => {
+    const custom = customCategories.rows.map((item) => toPrimaryCategory(item.name)).filter(Boolean);
+    return Array.from(new Set([...vendorCategories, ...custom]));
+  }, [customCategories.rows]);
+
+  const budgetByVendor = useMemo(() => {
+    const map = new Map<string, BudgetItem[]>();
+    budgetItems.rows.forEach((item) => {
+      if (!item.vendor_id) return;
+      map.set(item.vendor_id, [...(map.get(item.vendor_id) ?? []), item]);
+    });
+    return map;
+  }, [budgetItems.rows]);
 
   const rows = useMemo(
     () =>
       vendors.rows.filter(
         (vendor) =>
-          `${vendor.name} ${vendor.phone ?? ''}`.toLowerCase().includes(search.toLowerCase()) &&
-          (!category || toPrimaryCategory(vendor.category) === category) &&
-          (!status || vendor.status === status)
+          `${vendor.name} ${vendor.phone ?? ''} ${vendor.category}`.toLowerCase().includes(search.toLowerCase()) &&
+          (!category || toPrimaryCategory(vendor.category) === category)
       ),
-    [category, search, status, vendors.rows]
+    [category, search, vendors.rows]
   );
 
-  const budgetByVendorId = useMemo(() => new Map(budgetItems.rows.filter((item) => item.vendor_id).map((item) => [item.vendor_id, item])), [budgetItems.rows]);
-  const categoryOptions = useMemo(() => {
-    const custom = customCategories.rows
-      .map((category) => category.name.trim())
-      .filter((name) => name && toPrimaryCategory(name) === name);
-    return Array.from(new Set([...vendorCategories, ...custom]));
-  }, [customCategories.rows]);
+  const activeFilterCount = [search.trim(), category].filter(Boolean).length;
 
-  const activeFilterCount = useMemo(
-    () => [search.trim(), category, status].filter(Boolean).length,
-    [category, search, status]
-  );
+  function existingBudgetItemsFor(vendorId: string) {
+    return budgetByVendor.get(vendorId) ?? [];
+  }
+
+  async function syncContractedVendor(vendor: Vendor, debug = false) {
+    if (!isContractedVendor(vendor)) return;
+    if (syncInFlight.current.has(vendor.id)) return;
+
+    syncInFlight.current.add(vendor.id);
+    try {
+      await syncVendorBudgetItem(vendor, existingBudgetItemsFor(vendor.id), budgetItems, { debug });
+    } finally {
+      syncInFlight.current.delete(vendor.id);
+    }
+  }
 
   useEffect(() => {
     vendors.rows
-      .filter((vendorItem) => vendorItem.category !== toPrimaryCategory(vendorItem.category))
-      .forEach((vendorItem) => {
-        vendors.update(vendorItem.id, { category: toPrimaryCategory(vendorItem.category) } as Partial<Vendor>).catch(console.error);
-      });
-    budgetItems.rows
-      .filter((item) => item.category !== toPrimaryCategory(item.category))
-      .forEach((item) => {
-        budgetItems.update(item.id, { category: toPrimaryCategory(item.category) } as Partial<BudgetItem>).catch(console.error);
-      });
-  }, [budgetItems.rows, vendors.rows]);
+      .filter((vendor) => vendor.category !== toPrimaryCategory(vendor.category))
+      .forEach((vendor) => vendors.update(vendor.id, { category: toPrimaryCategory(vendor.category) } as Partial<Vendor>).catch(console.error));
+  }, [vendors.rows]);
+
+  useEffect(() => {
+    vendors.rows.filter(isContractedVendor).forEach((vendor) => {
+      syncContractedVendor(vendor, true).catch((error) => console.log('[vendor-budget-sync] erro do Supabase', error));
+    });
+  }, [vendors.rows, budgetItems.rows]);
 
   function start(row?: Vendor) {
     setEditing(row ?? null);
+    setInstallments([{ ...blankInstallment, amount: Number(row?.contracted_value ?? 0) }]);
     setForm(
       row
         ? {
@@ -139,9 +307,14 @@ export default function Vendors() {
             contract_url: row.contract_url ?? '',
             notes: row.notes ?? ''
           }
-        : blank
+        : blankVendor
     );
     setOpen(true);
+  }
+
+  async function createCategory(name: string) {
+    if (categoryOptions.includes(name)) return;
+    await customCategories.create({ name, sort_order: customCategories.rows.length + 1 } as Partial<BudgetCategory>);
   }
 
   async function submit(event: FormEvent) {
@@ -149,198 +322,211 @@ export default function Vendors() {
     const payload = {
       ...form,
       category: toPrimaryCategory(form.category),
-      due_date: form.due_date || null
+      status: normalizeVendorStatus(form.status),
+      due_date: form.due_date || null,
+      contract_url: form.contract_url || null
     };
-    if (editing) await vendors.update(editing.id, payload as Partial<Vendor>);
-    else await vendors.create(payload as Partial<Vendor>);
+    const saved = editing ? await vendors.update(editing.id, payload as Partial<Vendor>) : await vendors.create(payload as Partial<Vendor>);
+    await syncContractedVendor(saved, true);
     setOpen(false);
   }
 
-  async function confirmHiring() {
-    if (!confirming) return;
-    const updatedVendor = { ...confirming, status: 'contratado' };
-    await vendors.update(confirming.id, { status: 'contratado' });
-
-    const existing = budgetItems.rows.find((item) => item.vendor_id === confirming.id);
-    const payload = vendorToBudgetPayload(updatedVendor);
-    if (existing) await budgetItems.update(existing.id, payload as Partial<BudgetItem>);
-    else await budgetItems.create(payload as Partial<BudgetItem>);
-
-    setMessage(`Contratação de ${confirming.name} confirmada e orçamento sincronizado.`);
-    setConfirming(null);
+  async function changeStatus(vendor: Vendor, status: string) {
+    const saved = await vendors.update(vendor.id, { status: normalizeVendorStatus(status) } as Partial<Vendor>);
+    await syncContractedVendor(saved, true);
   }
 
-  async function confirmDelete() {
-    if (!deleting) return;
-    await vendors.remove(deleting.id);
-    setDeleting(null);
+  async function confirmHiring(vendor: Vendor) {
+    const saved = await vendors.update(vendor.id, {
+      ...form,
+      status: 'contratado',
+      category: toPrimaryCategory(form.category),
+      due_date: form.due_date || null
+    } as Partial<Vendor>);
+
+    await syncContractedVendor(saved, true);
+
+    setMessage(`${vendor.name} contratado. Financeiro, gráficos, vencimentos e agenda foram sincronizados.`);
+    setOpen(false);
   }
 
-  function clearFilters() {
-    setSearch('');
-    setCategory('');
-    setStatus('');
+  async function addFile(vendor: Vendor, url: string, kind: DocumentKind) {
+    await files.create({
+      name: `${kind} - ${vendor.name}`,
+      category: kind,
+      vendor_id: vendor.id,
+      budget_item_id: null,
+      file_url: url,
+      notes: null,
+      uploaded_by: null
+    } as Partial<FileRecord>);
   }
 
-  function renderActions(row: Vendor) {
-    const alreadyContracted = row.status === 'contratado';
-    return (
-      <div className="flex flex-wrap gap-2">
-        {!alreadyContracted ? (
-          <button type="button" className="btn-secondary border-[#5F8D6D]/30 bg-[#5F8D6D]/10 text-[#5F8D6D]" onClick={() => setConfirming(row)} title="Confirmar Contratação">
-            <CheckCircle2 size={16} /> Confirmar Contratação
-          </button>
-        ) : (
-          <button type="button" className="btn-secondary border-[#E7E0D8] bg-white text-[#2D2A26]" onClick={() => navigate(`/orcamento/${categoryToBudgetSlug(row.category)}`)} title="Ver no orçamento">
-            <ExternalLink size={16} /> Ver no orçamento
-          </button>
-        )}
-        <button type="button" className="btn-secondary px-3" onClick={() => start(row)} title="Editar">
-          <Edit2 size={15} />
-        </button>
-        <button type="button" className="btn-secondary px-3" onClick={() => setDeleting(row)} title="Excluir">
-          <Trash2 size={15} className="text-[#C46A6A]" />
-        </button>
-      </div>
-    );
-  }
+  const selectedBudgetItems = editing ? budgetByVendor.get(editing.id) ?? [] : [];
+  const selectedFiles = editing ? files.rows.filter((file) => file.vendor_id === editing.id) : [];
 
   return (
-    <div className="space-y-6 text-[#2D2A26]">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-5 text-w-text">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="page-title text-[#2D2A26]">Fornecedores</h1>
-          <p className="mt-1 text-sm text-[#6F6760]">Cadastre, pesquise, negocie e confirme contratações para alimentar o orçamento.</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-w-faint">CRM de contratação</p>
+          <h1 className="page-title mt-1">Fornecedores</h1>
+          <p className="mt-1 text-sm text-w-muted">Pesquise, negocie, contrate e gere financeiro sem cadastro duplicado.</p>
         </div>
-        <button className="btn-primary bg-[#B76E79]" onClick={() => start()}>
+        <button className="btn-primary" onClick={() => start()}>
           <Plus size={16} /> Fornecedor
         </button>
       </div>
 
-      {message && <div className="rounded-lg border border-[#5F8D6D]/25 bg-[#5F8D6D]/12 p-3 text-sm text-[#5F8D6D]">{message}</div>}
+      {message && <div className="rounded-2xl border border-[#BBF7D0] bg-[#F0FDF4] p-3 text-sm font-medium text-[#15803D]">{message}</div>}
 
-      <ResponsiveFilters activeFiltersCount={activeFilterCount} onClearFilters={clearFilters} clearLabel="Limpar" gridClassName="lg:grid-cols-[1.6fr_1fr_1fr_auto]">
-          <label className="block">
-            <span className="label text-[#6F6760]">Buscar</span>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#B76E79]" size={18} />
-              <input className="input border-[#E7E0D8] bg-[#FAF8F5] pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nome ou telefone" />
-            </div>
-          </label>
-          <FormSelect label="Categoria" value={category} onChange={(e) => setCategory(e.target.value)} options={[{ label: 'Todas', value: '' }, ...categoryOptions.map((value) => ({ label: value, value }))]} />
-          <FormSelect label="Status" value={status} onChange={(e) => setStatus(e.target.value)} options={[{ label: 'Todos', value: '' }, ...vendorStatuses.map((value) => ({ label: value, value }))]} />
+      <ResponsiveFilters activeFiltersCount={activeFilterCount} onClearFilters={() => { setSearch(''); setCategory(''); }} clearLabel="Limpar" gridClassName="lg:grid-cols-[1.4fr_1fr_auto]">
+        <label className="block">
+          <span className="label">Busca global</span>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-w-faint" size={18} />
+            <input className="input pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Fotógrafo, buffet, contrato, parcela..." />
+          </div>
+        </label>
+        <FormSelect label="Categoria" value={category} onChange={(event) => setCategory(event.target.value)} options={[{ label: 'Todas', value: '' }, ...categoryOptions.map((item) => ({ label: item, value: item }))]} />
       </ResponsiveFilters>
 
-      <section className="grid gap-3">
-        {rows.length ? (
-          rows.map((row) => {
-            const paymentStatus = isVendorOverdue(row) ? 'vencido' : getPaymentStatus(row.contracted_value, row.paid_value);
-            const pending = getPendingValue(row.contracted_value, row.paid_value);
-            return (
-              <article key={row.id} className="rounded-lg border border-[#E7E0D8] bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
-                <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr_auto] xl:items-center">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge value={row.status} />
-                      <Badge value={paymentStatus} type="payment" />
-                      {budgetByVendorId.has(row.id) && <span className="rounded-full bg-[#E7E0D8] px-2.5 py-1 text-xs font-semibold text-[#6F6760]">no orçamento</span>}
-                    </div>
-                    <h3 className="mt-3 text-lg font-semibold text-[#2D2A26]">{row.name}</h3>
-                    <p className="text-sm text-[#6F6760]">
-                      {toPrimaryCategory(row.category)} ·{' '}
-                      {row.phone ? (
-                        <a className="font-medium text-[#2D2A26] transition hover:text-[#B76E79]" href={buildWhatsAppChatLink(row.phone)} target="_blank" rel="noreferrer">
-                          {row.phone}
-                        </a>
-                      ) : 'sem telefone'}
-                    </p>
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-4">
-                    <div><p className="text-xs text-[#6F6760]">Contratado</p><p className="font-semibold">{formatMoney(row.contracted_value)}</p></div>
-                    <div><p className="text-xs text-[#6F6760]">Pago</p><p className="font-semibold text-[#5F8D6D]">{formatMoney(row.paid_value)}</p></div>
-                    <div><p className="text-xs text-[#6F6760]">Pendente</p><p className="font-semibold text-[#B07C45]">{formatMoney(pending)}</p></div>
-                    <div><p className="text-xs text-[#6F6760]">Vencimento</p><p className={`font-semibold ${paymentStatus === 'vencido' ? 'text-[#C46A6A]' : ''}`}>{formatDate(row.due_date)}</p></div>
-                  </div>
-                  <div className="xl:justify-self-end">{renderActions(row)}</div>
+      <section className="grid auto-cols-[minmax(280px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-2 xl:grid-flow-row xl:grid-cols-5 xl:overflow-visible">
+        {statusColumns.map((column) => {
+          const columnRows = rows.filter((vendor) => normalizeVendorStatus(vendor.status) === normalizeVendorStatus(column.key));
+          return (
+            <div
+              key={column.key}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                const id = event.dataTransfer.getData('vendor-id');
+                const vendor = vendors.rows.find((item) => item.id === id);
+                if (vendor) changeStatus(vendor, column.key);
+              }}
+              className={`min-h-[420px] rounded-3xl border ${column.ring} ${column.tint} p-3`}
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className={`h-2.5 w-2.5 rounded-full ${column.dot}`} />
+                  <h2 className="text-sm font-bold">{column.label}</h2>
                 </div>
-              </article>
-            );
-          })
-        ) : (
-          <EmptyState icon={Handshake} title="Nenhum fornecedor encontrado" text="Cadastre fornecedores ou ajuste os filtros." />
-        )}
+                <span className="rounded-full bg-white/80 px-2 py-0.5 text-xs font-bold text-w-muted">{columnRows.length}</span>
+              </div>
+              <div className="space-y-3">
+                {columnRows.map((vendor) => {
+                  const nextItem = (budgetByVendor.get(vendor.id) ?? []).sort((a, b) => String(a.due_date ?? '9999-12-31').localeCompare(String(b.due_date ?? '9999-12-31')))[0];
+                  return (
+                    <VendorCard
+                      key={vendor.id}
+                      vendor={vendor}
+                      budgetItem={nextItem}
+                      onOpen={() => start(vendor)}
+                      onDragStart={(event) => event.dataTransfer.setData('vendor-id', vendor.id)}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </section>
 
-      <Modal open={open} title={editing ? 'Editar fornecedor' : 'Novo fornecedor'} onClose={() => setOpen(false)}>
-        <form className="-m-4 flex min-h-full flex-col [&_.input]:text-sm [&_.label]:mb-0.5 [&_.label]:text-[10px] [&_input.input]:h-9 [&_select.input]:h-9 [&_textarea.input]:min-h-20 sm:-m-5 sm:min-h-0 sm:[&_.label]:mb-1 sm:[&_.label]:text-xs sm:[&_input.input]:h-auto sm:[&_select.input]:h-auto sm:[&_textarea.input]:min-h-24" onSubmit={submit}>
-          <div className="flex-1 space-y-3 overflow-y-auto p-4 pb-24 sm:space-y-4 sm:p-5">
-            <section className="rounded-lg border border-[#E7E0D8] bg-[#FAF8F5] p-2.5 sm:p-4">
-              <h3 className="text-sm font-semibold text-[#2D2A26]">Dados principais</h3>
-              <div className="mt-3 grid gap-3 md:grid-cols-2 md:gap-4">
-                <FormInput label="Nome do fornecedor" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-                <FormSelect label="Categoria" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} options={categoryOptions.map((value) => ({ label: value, value }))} />
-                <FormInput label="Nome do contato" value={form.contact_name} onChange={(e) => setForm({ ...form, contact_name: e.target.value })} />
-                <FormInput label="Telefone" inputMode="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: maskPhone(e.target.value) })} />
-                <CurrencyInput label="Valor contratado" value={form.contracted_value} onValueChange={(value) => setForm({ ...form, contracted_value: value })} />
-                <FormSelect label="Status" value={form.status === 'contratado' ? 'em negociação' : form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} options={editableVendorStatuses.map((value) => ({ label: value, value }))} />
+      <Modal open={open} title={editing ? editing.name : 'Novo fornecedor'} onClose={() => setOpen(false)}>
+        <form className="-m-5 flex max-h-[calc(100dvh-80px)] flex-col overflow-hidden rounded-t-3xl bg-white sm:max-h-[calc(92vh-80px)] sm:rounded-2xl" onSubmit={submit}>
+          <div className="flex-1 space-y-4 overflow-y-auto p-5">
+            <section className="glass rounded-3xl p-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormInput label="Nome do fornecedor" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+                <CategorySelect value={form.category} options={categoryOptions} onChange={(value) => setForm({ ...form, category: value })} onCreate={createCategory} />
+                <FormInput label="Contato" value={form.contact_name} onChange={(event) => setForm({ ...form, contact_name: event.target.value })} />
+                <FormInput label="Telefone" value={form.phone} onChange={(event) => setForm({ ...form, phone: maskPhone(event.target.value) })} />
+                <CurrencyInput label="Valor total" value={form.contracted_value} onValueChange={(value) => setForm({ ...form, contracted_value: value })} />
+                <FormSelect label="Status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} options={statusColumns.map((item) => ({ label: item.label, value: item.key }))} />
               </div>
             </section>
 
-            <details className="group rounded-lg border border-[#E7E0D8] bg-white p-2.5 sm:p-4" open={Boolean(editing)}>
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-[#2D2A26]">
-                Mais detalhes
-                <ChevronDown size={16} className="text-[#6F6760] transition group-open:rotate-180" />
+            {editing && <Timeline vendor={{ ...editing, ...form } as Vendor} budgetItems={selectedBudgetItems} />}
+
+            <details className="rounded-2xl border border-w-border bg-white p-4" open>
+              <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold">
+                Parcelas
+                <ChevronDown size={16} />
               </summary>
-              <div className="mt-3 grid gap-3 md:grid-cols-2 md:gap-4">
-                <FormInput label="E-mail" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-                <FormInput label="Instagram" value={form.instagram} onChange={(e) => setForm({ ...form, instagram: e.target.value })} />
-                <FormInput label="Site" value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} />
-                <CurrencyInput label="Valor pago" value={form.paid_value} onValueChange={(value) => setForm({ ...form, paid_value: value })} />
-                <FormInput label="Data de vencimento" type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
-              </div>
-              <div className="mt-4 flex items-center gap-3">
-                <FileUpload folder="contratos" onUploaded={(url) => setForm({ ...form, contract_url: url })} />
-                {form.contract_url && <a className="text-sm text-rosew-500" href={form.contract_url} target="_blank" rel="noreferrer">Ver contrato</a>}
-              </div>
-              <div className="mt-4">
-                <FormTextarea label="Observações" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              <div className="mt-4 space-y-3">
+                {installments.map((item, index) => (
+                  <div key={index} className="grid gap-3 rounded-2xl bg-w-surface p-3 md:grid-cols-[1fr_1fr_160px_auto]">
+                    <FormInput label="Nome" value={item.label} onChange={(event) => setInstallments((current) => current.map((row, i) => i === index ? { ...row, label: event.target.value } : row))} />
+                    <CurrencyInput label="Valor" value={item.amount} onValueChange={(value) => setInstallments((current) => current.map((row, i) => i === index ? { ...row, amount: value } : row))} />
+                    <FormInput label="Vencimento" type="date" value={item.due_date} onChange={(event) => setInstallments((current) => current.map((row, i) => i === index ? { ...row, due_date: event.target.value } : row))} />
+                    <button type="button" className="btn-secondary self-end px-3" onClick={() => setInstallments((current) => current.filter((_, i) => i !== index))}><Trash2 size={15} /></button>
+                  </div>
+                ))}
+                <button type="button" className="btn-secondary" onClick={() => setInstallments((current) => [...current, { label: `Parcela ${current.length + 1}`, amount: 0, due_date: '' }])}>
+                  <Plus size={15} /> Adicionar parcela
+                </button>
               </div>
             </details>
+
+            <details className="rounded-2xl border border-w-border bg-white p-4" open={Boolean(editing)}>
+              <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold">
+                Documentos
+                <ChevronDown size={16} />
+              </summary>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-dashed border-w-border-md p-4">
+                  <p className="mb-2 text-sm font-semibold">Contrato PDF</p>
+                  <FileUpload folder="contratos" onUploaded={(url) => setForm({ ...form, contract_url: url })} />
+                  {form.contract_url && <a className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-w-rose" href={form.contract_url} target="_blank" rel="noreferrer"><FileText size={15} /> Abrir contrato</a>}
+                </div>
+                {editing && (['Comprovante', 'Orçamento', 'Foto'] as DocumentKind[]).map((kind) => (
+                  <div key={kind} className="rounded-2xl border border-dashed border-w-border-md p-4">
+                    <p className="mb-2 text-sm font-semibold">{kind}</p>
+                    <FileUpload folder="fornecedores" label="Anexar" onUploaded={(url) => addFile(editing, url, kind)} />
+                  </div>
+                ))}
+              </div>
+              {selectedFiles.length > 0 && (
+                <div className="mt-4 grid gap-2">
+                  {selectedFiles.map((file) => (
+                    <a key={file.id} className="flex items-center justify-between rounded-xl bg-w-surface p-3 text-sm font-medium" href={file.file_url} target="_blank" rel="noreferrer">
+                      <span className="flex items-center gap-2"><Paperclip size={15} /> {file.name}</span>
+                      <LinkIcon size={14} />
+                    </a>
+                  ))}
+                </div>
+              )}
+            </details>
+
+            <details className="rounded-2xl border border-w-border bg-white p-4">
+              <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold">
+                Mais detalhes
+                <ChevronDown size={16} />
+              </summary>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <FormInput label="E-mail" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+                <FormInput label="Instagram" value={form.instagram} onChange={(event) => setForm({ ...form, instagram: event.target.value })} />
+                <FormInput label="Site" value={form.site} onChange={(event) => setForm({ ...form, site: event.target.value })} />
+                <FormInput label="Vencimento principal" type="date" value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} />
+              </div>
+              <div className="mt-4">
+                <FormTextarea label="Observações" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+              </div>
+              {editing && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {form.phone && <a className="btn-secondary" href={buildWhatsAppChatLink(form.phone)} target="_blank" rel="noreferrer"><MessageCircle size={15} /> WhatsApp</a>}
+                  {form.email && <a className="btn-secondary" href={`mailto:${form.email}`}><Mail size={15} /> E-mail</a>}
+                  {form.site && <a className="btn-secondary" href={form.site} target="_blank" rel="noreferrer"><Upload size={15} /> Site</a>}
+                </div>
+              )}
+            </details>
           </div>
-          <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-[#E7E0D8] bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+0.6rem)] pt-2.5 sm:flex sm:justify-end sm:px-5 sm:py-4">
-            <button type="button" className="btn-secondary h-9 sm:h-auto" onClick={() => setOpen(false)}>Cancelar</button>
-            <button className="btn-primary h-9 bg-[#B76E79] sm:h-auto">Salvar fornecedor</button>
+          <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-w-border bg-white p-4 sm:flex sm:justify-end">
+            {editing && <button type="button" className="btn-secondary text-[#DC2626]" onClick={() => setDeleting(editing)}>Excluir</button>}
+            <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Cancelar</button>
+            {editing && normalizeVendorStatus(form.status) !== 'contratado' && <button type="button" className="btn-secondary border-[#BBF7D0] bg-[#F0FDF4] text-[#15803D]" onClick={() => confirmHiring(editing)}><CheckCircle2 size={16} /> Contratar</button>}
+            <button className="btn-primary">Salvar</button>
           </div>
         </form>
-      </Modal>
-
-      <Modal open={Boolean(confirming)} title="Confirmar Contratação" onClose={() => setConfirming(null)}>
-        {confirming && (
-          <div className="space-y-5">
-            <p className="text-sm text-[#6F6760]">Deseja realmente confirmar a Contratação de <strong className="text-[#2D2A26]">{confirming.name}</strong>?</p>
-            <div className="grid gap-3 rounded-lg border border-[#E7E0D8] bg-[#FAF8F5] p-4 sm:grid-cols-2">
-              <div><p className="text-xs text-[#6F6760]">Nome</p><p className="font-semibold">{confirming.name}</p></div>
-              <div><p className="text-xs text-[#6F6760]">Categoria</p><p className="font-semibold">{toPrimaryCategory(confirming.category)}</p></div>
-              <div><p className="text-xs text-[#6F6760]">Valor contratado</p><p className="font-semibold">{formatMoney(confirming.contracted_value)}</p></div>
-              <div><p className="text-xs text-[#6F6760]">Vencimento</p><p className="font-semibold">{formatDate(confirming.due_date)}</p></div>
-              <div>
-                <p className="text-xs text-[#6F6760]">Telefone</p>
-                <p className="font-semibold">
-                  {confirming.phone ? (
-                    <a className="text-[#2D2A26] transition hover:text-[#B76E79]" href={buildWhatsAppChatLink(confirming.phone)} target="_blank" rel="noreferrer">
-                      {confirming.phone}
-                    </a>
-                  ) : '-'}
-                </p>
-              </div>
-              <div><p className="text-xs text-[#6F6760]">Status atual</p><p className="font-semibold capitalize">{confirming.status}</p></div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <button className="btn-secondary" onClick={() => setConfirming(null)}>Cancelar</button>
-              <button className="btn-primary bg-[#B76E79]" onClick={confirmHiring}>Confirmar Contratação</button>
-            </div>
-          </div>
-        )}
       </Modal>
 
       <ConfirmDialog
@@ -348,10 +534,13 @@ export default function Vendors() {
         title="Excluir fornecedor"
         message={`Tem certeza que deseja excluir ${deleting?.name ?? 'este fornecedor'}?`}
         onCancel={() => setDeleting(null)}
-        onConfirm={confirmDelete}
+        onConfirm={async () => {
+          if (!deleting) return;
+          await vendors.remove(deleting.id);
+          setDeleting(null);
+          setOpen(false);
+        }}
       />
     </div>
   );
 }
-
-

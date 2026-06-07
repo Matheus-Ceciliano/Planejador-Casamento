@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  ArrowRight,
   CalendarClock,
   CalendarDays,
   CheckCircle2,
@@ -40,8 +41,7 @@ type TimelineItem = {
 
 type AgendaType = 'task' | 'event' | 'payment' | 'reminder';
 type ViewMode = 'list' | 'calendar';
-type PeriodFilter = 'all' | 'today' | 'week' | 'overdue';
-type TypeFilter = 'all' | AgendaType;
+type TypeFilter = 'all' | 'event' | 'task' | 'payment';
 type AgendaSource = 'task' | 'budget' | 'timeline' | 'wedding';
 
 type AgendaItem = {
@@ -85,11 +85,11 @@ const typeLabels: Record<AgendaType, string> = {
   payment: 'Vencimento',
   reminder: 'Lembrete'
 };
-const periodLabels: Record<PeriodFilter, string> = {
-  all: 'Todos',
-  today: 'Hoje',
-  week: '7 dias',
-  overdue: 'Atrasados'
+const typeEmoji: Record<AgendaType, string> = {
+  task: '✅',
+  event: '📅',
+  payment: '💰',
+  reminder: '🔔'
 };
 const taskCategories = ['Documentação', 'Igreja', 'Espaço', 'Buffet', 'Decoração', 'Roupas', 'Convidados', 'Fornecedores', 'Financeiro', 'Lua de mel', 'Outros'];
 const priorities = ['baixa', 'média', 'alta'];
@@ -139,8 +139,8 @@ function longDateLabel(value: string): string {
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }).format(dateFromKey(value));
 }
 
-function compactDateLabel(value: string): string {
-  return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', weekday: 'short' }).format(dateFromKey(value));
+function shortDateLabel(value: string): string {
+  return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(dateFromKey(value));
 }
 
 function numericDateLabel(value: string): string {
@@ -227,7 +227,6 @@ export default function Agenda() {
   const in7Days = dateKey(addDays(new Date(), 7));
   const in30Days = dateKey(addDays(new Date(), 30));
   const [view, setView] = useState<ViewMode>('list');
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [month, setMonth] = useState(() => {
     const base = wedding?.wedding_date ? dateFromKey(wedding.wedding_date) : new Date();
@@ -331,37 +330,30 @@ export default function Agenda() {
 
   const visibleItems = useMemo(() => {
     return agendaItems.filter((item) => {
-      const currentStatus = statusForItem(item, today);
-      const periodMatch =
-        periodFilter === 'all' ||
-        (periodFilter === 'today' && item.date === today) ||
-        (periodFilter === 'week' && item.date > today && item.date <= in7Days) ||
-        (periodFilter === 'overdue' && ['atrasada', 'vencido'].includes(currentStatus));
-      const typeMatch = typeFilter === 'all' || item.type === typeFilter;
-      return periodMatch && typeMatch;
+      if (typeFilter === 'all') return true;
+      if (typeFilter === 'event') return item.type === 'event';
+      if (typeFilter === 'task') return item.type === 'task' || item.type === 'reminder';
+      if (typeFilter === 'payment') return item.type === 'payment';
+      return true;
     });
-  }, [agendaItems, in7Days, periodFilter, today, typeFilter]);
+  }, [agendaItems, typeFilter]);
 
   const counts = useMemo(() => ({
     all: agendaItems.length,
-    today: agendaItems.filter((item) => item.date === today).length,
-    week: agendaItems.filter((item) => item.date > today && item.date <= in7Days).length,
-    overdue: agendaItems.filter((item) => ['atrasada', 'vencido'].includes(statusForItem(item, today))).length,
-    task: agendaItems.filter((item) => item.type === 'task').length,
     event: agendaItems.filter((item) => item.type === 'event').length,
+    task: agendaItems.filter((item) => item.type === 'task' || item.type === 'reminder').length,
     payment: agendaItems.filter((item) => item.type === 'payment').length,
-    reminder: agendaItems.filter((item) => item.type === 'reminder').length
-  }), [agendaItems, in7Days, today]);
+  }), [agendaItems]);
 
   const groups = useMemo(() => {
-    if (periodFilter !== 'all') return null;
     return [
       { label: 'Hoje', items: visibleItems.filter((item) => item.date === today), accent: 'text-[#E11D48]' },
       { label: 'Próximos 7 dias', items: visibleItems.filter((item) => item.date > today && item.date <= in7Days), accent: 'text-[#F59E0B]' },
       { label: 'Próximos 30 dias', items: visibleItems.filter((item) => item.date > in7Days && item.date <= in30Days), accent: 'text-[#1F2937]' },
-      { label: 'Atrasados', items: visibleItems.filter((item) => ['atrasada', 'vencido'].includes(statusForItem(item, today))), accent: 'text-[#EF4444]' }
+      { label: 'Atrasados', items: visibleItems.filter((item) => ['atrasada', 'vencido'].includes(statusForItem(item, today))), accent: 'text-[#EF4444]' },
+      { label: 'Futuro', items: visibleItems.filter((item) => item.date > in30Days), accent: 'text-[#71717A]' }
     ].filter((group) => group.items.length);
-  }, [in30Days, in7Days, periodFilter, today, visibleItems]);
+  }, [in30Days, in7Days, today, visibleItems]);
 
   const monthDays = useMemo(() => buildMonthDays(month), [month]);
   const calendarItems = useMemo(() => visibleItems.filter((item) => sameMonth(item.date, month)), [month, visibleItems]);
@@ -370,32 +362,22 @@ export default function Agenda() {
     return acc;
   }, {}), [calendarItems]);
   const selectedItems = selectedDay ? (itemsByDate[selectedDay] ?? []) : [];
-  const nextCommitment = useMemo(
-    () => agendaItems.find((item) => item.date >= today && item.type !== 'payment' && !['concluída', 'cancelado'].includes(item.status)),
-    [agendaItems, today]
-  );
-  const nextPayment = useMemo(
-    () => agendaItems.find((item) => item.date >= today && item.type === 'payment' && statusForItem(item, today) !== 'pago'),
-    [agendaItems, today]
-  );
-  const completedTasks = useMemo(
-    () => agendaItems.filter((item) => ['task', 'reminder'].includes(item.type) && item.status === 'concluída').length,
-    [agendaItems]
-  );
-  const lateTasks = useMemo(
-    () => agendaItems.filter((item) => ['task', 'reminder'].includes(item.type) && statusForItem(item, today) === 'atrasada').length,
-    [agendaItems, today]
-  );
-  const weddingDaysLeft = wedding?.wedding_date ? daysBetween(today, wedding.wedding_date) : null;
-  const weddingStatus = wedding?.wedding_date
-    ? weddingDaysLeft !== null && weddingDaysLeft > 0
-      ? `Faltam ${weddingDaysLeft} dias para o casamento`
-      : weddingDaysLeft === 0
-        ? 'Hoje é o grande dia'
-        : `Casamento em ${numericDateLabel(wedding.wedding_date)}`
-    : 'Data do casamento ainda não definida';
 
-  function openCreate(date = selectedDay ?? today, type: AgendaType = typeFilter !== 'all' ? typeFilter : 'task') {
+  const nextAction = useMemo(
+    () => agendaItems.find((item) => item.date >= today && !['concluída', 'cancelado', 'realizado', 'pago'].includes(statusForItem(item, today))),
+    [agendaItems, today]
+  );
+
+  const weddingDaysLeft = wedding?.wedding_date ? daysBetween(today, wedding.wedding_date) : null;
+  const weddingCountdown = wedding?.wedding_date
+    ? weddingDaysLeft !== null && weddingDaysLeft > 0
+      ? `💍 Faltam ${weddingDaysLeft} dias`
+      : weddingDaysLeft === 0
+        ? '💍 Hoje é o grande dia!'
+        : `💍 Casamento em ${numericDateLabel(wedding.wedding_date)}`
+    : null;
+
+  function openCreate(date = selectedDay ?? today, type: AgendaType = typeFilter !== 'all' ? (typeFilter === 'task' ? 'task' : typeFilter === 'event' ? 'event' : 'payment') : 'task') {
     setSelectedDay(date);
     setEditingItem(null);
     setForm(formForDate(date, type));
@@ -496,18 +478,24 @@ export default function Agenda() {
     setView('calendar');
   }
 
+  const filterTabs: { key: TypeFilter; label: string }[] = [
+    { key: 'all', label: `Todos${counts.all ? ` · ${counts.all}` : ''}` },
+    { key: 'event', label: `Eventos${counts.event ? ` · ${counts.event}` : ''}` },
+    { key: 'task', label: `Tarefas${counts.task ? ` · ${counts.task}` : ''}` },
+    { key: 'payment', label: `Vencimentos${counts.payment ? ` · ${counts.payment}` : ''}` },
+  ];
+
   return (
     <div className="space-y-5 text-[#1F2937]">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      {/* Header */}
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="page-title text-[#1F2937]">Central de Planejamento do Casamento</h1>
-          <p className="mt-1 inline-flex items-center gap-2 text-sm font-semibold text-[#E11D48]">
-            <span aria-hidden="true">💍</span>
-            {weddingStatus}
-          </p>
-          <p className="mt-1 text-sm text-[#71717A]">Eventos, tarefas, vencimentos, lembretes e compromissos em um só lugar.</p>
+          <h1 className="page-title text-[#1F2937]">Central de Planejamento</h1>
+          {weddingCountdown && (
+            <p className="mt-1 text-sm font-semibold text-[#E11D48]">{weddingCountdown}</p>
+          )}
         </div>
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <div className="flex items-center gap-2">
           <div className="flex shrink-0 rounded-xl border border-[#F0EBE6] bg-white p-1 shadow-soft">
             <button type="button" onClick={() => setView('list')} className={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold ${view === 'list' ? 'bg-[#E11D48] text-white' : 'text-[#71717A]'}`}>
               <List size={16} /> Lista
@@ -519,72 +507,31 @@ export default function Agenda() {
           <button type="button" className="btn-secondary shrink-0" onClick={goToToday}>
             <CalendarDays size={17} /> Hoje
           </button>
-          <button type="button" className="btn-primary shrink-0 bg-[#E11D48] hover:bg-[#BE123C]" onClick={() => openCreate(selectedDay ?? today)}>
-            <Plus size={17} /> Novo item
-          </button>
         </div>
       </div>
 
-      <section className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          title="Próximo compromisso"
-          value={nextCommitment?.title ?? 'Nada agendado'}
-          meta={nextCommitment ? numericDateLabel(nextCommitment.date) : 'Agenda livre'}
-          icon={<CalendarClock size={17} />}
-          tone="rose"
-        />
-        <SummaryCard
-          title="Próximo vencimento"
-          value={nextPayment?.title ?? 'Sem vencimentos'}
-          meta={nextPayment ? `${numericDateLabel(nextPayment.date)}${nextPayment.amount ? ` · ${formatMoney(nextPayment.amount)}` : ''}` : 'Pagamentos em dia'}
-          icon={<WalletCards size={17} />}
-          tone="warning"
-        />
-        <SummaryCard
-          title="Tarefas concluídas"
-          value={String(completedTasks)}
-          meta="Itens finalizados"
-          icon={<CheckCircle2 size={17} />}
-          tone="success"
-        />
-        <SummaryCard
-          title="Tarefas atrasadas"
-          value={String(lateTasks)}
-          meta={lateTasks ? 'Precisam de atenção' : 'Tudo sob controle'}
-          icon={<AlertTriangle size={17} />}
-          tone={lateTasks ? 'danger' : 'success'}
-        />
-      </section>
+      {/* Next Action Card */}
+      <NextActionCard item={nextAction} today={today} onOpen={openEdit} />
 
-      <div className="grid gap-3 rounded-lg border border-[#F0EBE6] bg-white p-3 shadow-[0_10px_24px_rgba(31,41,55,0.04)] lg:grid-cols-2">
-        <FilterRow label="Período">
-          {(Object.keys(periodLabels) as PeriodFilter[]).map((filter) => (
-            <button
-              key={filter}
-              type="button"
-              onClick={() => setPeriodFilter(filter)}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold transition ${periodFilter === filter ? 'border-[#E11D48] bg-[#E11D48] text-white shadow-rose' : 'border-[#F0EBE6] bg-[#FAFAFA] text-[#71717A] hover:border-[#E11D48]/40'}`}
-            >
-              {periodLabels[filter]} · {counts[filter]}
-            </button>
-          ))}
-        </FilterRow>
-
-        <FilterRow label="Tipo">
-          {(['all', 'event', 'task', 'payment', 'reminder'] as TypeFilter[]).map((filter) => (
-            <button
-              key={filter}
-              type="button"
-              onClick={() => setTypeFilter(filter)}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition ${typeFilter === filter ? 'border-[#1F2937] bg-[#1F2937] text-white' : 'border-[#F0EBE6] bg-[#FAFAFA] text-[#71717A]'}`}
-            >
-              {filter !== 'all' && <span className={`h-2 w-2 rounded-full ${typeDotColor(filter)}`} />}
-              {filter === 'all' ? 'Todos' : typeLabels[filter]} · {filter === 'all' ? counts.all : counts[filter]}
-            </button>
-          ))}
-        </FilterRow>
+      {/* Filter Tabs — single row */}
+      <div className="flex gap-1.5 overflow-x-auto rounded-xl border border-[#F0EBE6] bg-white p-1.5 shadow-soft">
+        {filterTabs.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setTypeFilter(tab.key)}
+            className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+              typeFilter === tab.key
+                ? 'bg-[#E11D48] text-white shadow-sm'
+                : 'text-[#71717A] hover:bg-[#F9F5F3] hover:text-[#1F2937]'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
+      {/* Content */}
       {view === 'list' ? (
         <AgendaList groups={groups} items={visibleItems} today={today} onEdit={openEdit} onToggle={toggleDone} onCreate={() => openCreate(today)} />
       ) : (
@@ -596,10 +543,8 @@ export default function Agenda() {
           itemsByDate={itemsByDate}
           selectedItems={selectedItems}
           weddingDate={wedding?.wedding_date ?? null}
-          weddingStatus={weddingStatus}
-          nextCommitment={nextCommitment}
-          nextPayment={nextPayment}
-          lateTasks={lateTasks}
+          weddingCountdown={weddingCountdown}
+          nextAction={nextAction}
           onMoveMonth={moveMonth}
           onSelectDay={selectDay}
           onCreate={openCreate}
@@ -608,14 +553,17 @@ export default function Agenda() {
         />
       )}
 
+      {/* FAB */}
       <button
         type="button"
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] right-4 z-20 inline-flex min-h-12 items-center gap-2 rounded-full bg-[#E11D48] px-4 text-sm font-bold text-white shadow-rose transition hover:bg-[#BE123C] lg:bottom-6"
+        id="agenda-fab-novo"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] right-4 z-20 inline-flex min-h-12 items-center gap-2 rounded-full bg-[#E11D48] px-5 text-sm font-bold text-white shadow-rose transition hover:bg-[#BE123C] lg:bottom-6"
         onClick={() => openCreate(selectedDay ?? today)}
       >
         <Plus size={18} /> Novo
       </button>
 
+      {/* Modal */}
       <Modal open={modalOpen} title={editingItem ? 'Editar item da agenda' : 'Novo item da agenda'} onClose={() => setModalOpen(false)}>
         <form onSubmit={saveItem} className="space-y-4">
           {error && <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</div>}
@@ -629,7 +577,7 @@ export default function Agenda() {
                   onClick={() => setForm({ ...form, type, status: statusesByType[type][0], category: type === 'payment' ? 'Outros' : type === 'event' ? 'Evento' : type === 'reminder' ? 'Lembrete' : 'Documentação' })}
                   className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-bold transition ${form.type === type ? 'border-[#E11D48] bg-[#E11D48] text-white shadow-rose' : 'border-[#F0EBE6] bg-[#FAFAFA] text-[#1F2937]'}`}
                 >
-                  <Icon size={16} /> + {typeLabels[type]}
+                  <Icon size={16} /> {typeLabels[type]}
                 </button>
               );
             })}
@@ -690,36 +638,49 @@ export default function Agenda() {
   );
 }
 
-function SummaryCard({ title, value, meta, icon, tone }: { title: string; value: string; meta: string; icon: ReactNode; tone: 'rose' | 'warning' | 'success' | 'danger' }) {
-  const styles = {
-    rose: 'bg-rose-50 text-[#E11D48]',
-    warning: 'bg-amber-50 text-[#F59E0B]',
-    success: 'bg-green-50 text-[#22C55E]',
-    danger: 'bg-red-50 text-[#EF4444]'
-  }[tone];
-  return (
-    <article className="rounded-lg border border-[#F0EBE6] bg-white p-3 shadow-[0_10px_24px_rgba(31,41,55,0.045)]">
-      <div className="flex items-start gap-3">
-        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${styles}`}>{icon}</span>
-        <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-[#71717A]">{title}</p>
-          <p className="mt-1 truncate text-sm font-bold text-[#1F2937]">{value}</p>
-          <p className="mt-0.5 truncate text-xs text-[#71717A]">{meta}</p>
+/* ─── Next Action Card ─── */
+function NextActionCard({ item, today, onOpen }: { item?: AgendaItem; today: string; onOpen: (item: AgendaItem) => void }) {
+  if (!item) {
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-[#F0EBE6] bg-white px-4 py-3.5 shadow-soft">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F9F5F3] text-xl">🎉</span>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wide text-[#71717A]">Próxima ação</p>
+          <p className="mt-0.5 text-sm font-semibold text-[#1F2937]">Nenhuma atividade próxima</p>
         </div>
       </div>
-    </article>
-  );
-}
+    );
+  }
 
-function FilterRow({ label, children }: { label: string; children: ReactNode }) {
+  const currentStatus = statusForItem(item, today);
+  const isOverdue = ['atrasada', 'vencido'].includes(currentStatus);
+
   return (
-    <section className="min-w-0">
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[#71717A]">{label}</p>
-      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">{children}</div>
-    </section>
+    <div className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 shadow-soft transition ${isOverdue ? 'border-red-200 bg-red-50/60' : 'border-[#F0EBE6] bg-white'}`}>
+      <span className="text-2xl">{typeEmoji[item.type]}</span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-[#71717A]">Próxima ação</p>
+        <p className="mt-0.5 truncate text-sm font-bold text-[#1F2937]">{item.title}</p>
+        <p className="mt-0.5 text-xs text-[#71717A]">
+          {shortDateLabel(item.date)}{item.time ? ` · ${item.time}` : ''}{item.location ? ` · ${item.location}` : ''}
+        </p>
+      </div>
+      {(item.source === 'task' || item.source === 'budget') && (
+        <button
+          type="button"
+          onClick={() => onOpen(item)}
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[#F0EBE6] bg-white px-3 py-2 text-xs font-bold text-[#1F2937] shadow-sm transition hover:border-[#E11D48] hover:text-[#E11D48]"
+        >
+          Abrir <ArrowRight size={13} />
+        </button>
+      )}
+    </div>
   );
 }
 
+/* ─── Filter not needed anymore ─── */
+
+/* ─── Agenda List ─── */
 function AgendaList({
   groups,
   items,
@@ -728,7 +689,7 @@ function AgendaList({
   onToggle,
   onCreate
 }: {
-  groups: { label: string; items: AgendaItem[]; accent: string }[] | null;
+  groups: { label: string; items: AgendaItem[]; accent: string }[];
   items: AgendaItem[];
   today: string;
   onEdit: (item: AgendaItem) => void;
@@ -736,64 +697,86 @@ function AgendaList({
   onCreate: () => void;
 }) {
   if (!items.length) return <EmptyAgenda onCreate={onCreate} />;
-  if (groups?.length) {
-    return (
-      <div className="space-y-6">
-        {groups.map((group) => (
-          <section key={group.label}>
-            <div className="mb-3 flex items-center gap-2">
-              <h2 className={`text-xs font-bold uppercase tracking-widest ${group.accent}`}>{group.label}</h2>
-              <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-[#71717A] ring-1 ring-[#F0EBE6]">{group.items.length}</span>
-              <div className="h-px flex-1 bg-[#F0EBE6]" />
-            </div>
-            <div className="grid gap-2">
-              {group.items.map((item) => <AgendaCard key={item.id} item={item} today={today} onEdit={onEdit} onToggle={onToggle} />)}
-            </div>
-          </section>
-        ))}
-      </div>
-    );
-  }
-  return <div className="grid gap-2">{items.map((item) => <AgendaCard key={item.id} item={item} today={today} onEdit={onEdit} onToggle={onToggle} />)}</div>;
+
+  return (
+    <div className="space-y-6">
+      {groups.map((group) => (
+        <section key={group.label}>
+          <div className="mb-3 flex items-center gap-2">
+            <h2 className={`text-xs font-bold uppercase tracking-widest ${group.accent}`}>{group.label}</h2>
+            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-[#71717A] ring-1 ring-[#F0EBE6]">{group.items.length}</span>
+            <div className="h-px flex-1 bg-[#F0EBE6]" />
+          </div>
+          <div className="space-y-2">
+            {group.items.map((item) => <AgendaCard key={item.id} item={item} today={today} onEdit={onEdit} onToggle={onToggle} />)}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
 }
 
+/* ─── Agenda Card ─── */
 function AgendaCard({ item, today, onEdit, onToggle }: { item: AgendaItem; today: string; onEdit: (item: AgendaItem) => void; onToggle: (item: AgendaItem) => void }) {
-  const Icon = typeIcon(item.type);
   const currentStatus = statusForItem(item, today);
   const actionable = item.source === 'task' || item.source === 'budget';
+  const isDone = ['concluída', 'pago', 'realizado'].includes(currentStatus);
+  const isOverdue = ['atrasada', 'vencido'].includes(currentStatus);
+
   return (
-    <article className="grid gap-3 rounded-lg border border-[#F0EBE6] bg-white p-3 shadow-[0_10px_24px_rgba(31,41,55,0.045)] sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-      <div className={`flex h-11 w-11 items-center justify-center rounded-lg border ${typeTone(item.type)}`}>
-        <Icon size={19} />
-      </div>
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${typeTone(item.type)}`}>{typeLabels[item.type]}</span>
-          <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${['atrasada', 'vencido'].includes(currentStatus) ? 'bg-red-50 text-red-700' : currentStatus === 'concluída' || currentStatus === 'pago' || currentStatus === 'realizado' ? 'bg-green-50 text-green-700' : 'bg-zinc-100 text-zinc-600'}`}>{currentStatus}</span>
-          {item.priority && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">{item.priority}</span>}
-        </div>
-        <h3 className="mt-1 truncate text-sm font-bold text-[#1F2937]">{item.title}</h3>
-        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#71717A]">
-          <span className="inline-flex items-center gap-1"><CalendarDays size={13} /> {compactDateLabel(item.date)}{item.time ? ` · ${item.time}` : ''}</span>
-          {item.location && <span className="inline-flex items-center gap-1"><MapPin size={13} /> {item.location}</span>}
-          {item.responsible && <span className="inline-flex items-center gap-1"><User size={13} /> {item.responsible}</span>}
-          {item.amount !== undefined && <span className="inline-flex items-center gap-1"><Receipt size={13} /> {formatMoney(item.amount)}</span>}
-        </div>
-        {item.description && <p className="mt-1 line-clamp-2 text-xs text-[#71717A]">{item.description}</p>}
-      </div>
-      <div className="flex flex-wrap gap-2 sm:justify-end">
-        {actionable && (
-          <>
-            <button type="button" className="btn-secondary min-h-9 px-3 text-xs" onClick={() => onToggle(item)}><CheckCircle2 size={15} /> {item.type === 'payment' ? 'Pagar' : 'Concluir'}</button>
-            <button type="button" className="btn-secondary min-h-9 px-3 text-xs" onClick={() => onEdit(item)}>Editar</button>
-          </>
+    <article className={`group flex items-center gap-3 rounded-xl border px-4 py-3.5 transition ${isOverdue ? 'border-red-200 bg-red-50/40' : isDone ? 'border-[#F0EBE6] bg-[#FAFAFA] opacity-70' : 'border-[#F0EBE6] bg-white hover:border-[#E11D48]/30 hover:shadow-[0_4px_16px_rgba(225,29,72,0.06)]'}`}>
+      {/* Emoji icon */}
+      <span className="shrink-0 text-xl leading-none">{typeEmoji[item.type]}</span>
+
+      {/* Main content */}
+      <div className="min-w-0 flex-1">
+        <p className={`text-sm font-bold leading-snug ${isDone ? 'text-[#A1A1AA] line-through' : 'text-[#1F2937]'}`}>{item.title}</p>
+        <p className="mt-0.5 text-xs text-[#71717A]">
+          {shortDateLabel(item.date)}
+          {item.time ? ` · ${item.time}` : ''}
+          {item.location ? ` · ${item.location}` : ''}
+          {item.amount !== undefined ? ` · ${formatMoney(item.amount)}` : ''}
+        </p>
+        {isOverdue && (
+          <span className="mt-1 inline-block rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-700">Atrasado</span>
         )}
-        <Link className="btn-secondary min-h-9 px-3 text-xs" to={item.href}>Abrir <ExternalLink size={14} /></Link>
+      </div>
+
+      {/* Actions */}
+      <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition group-hover:opacity-100">
+        {actionable && (
+          <button
+            type="button"
+            title={item.type === 'payment' ? 'Marcar como pago' : 'Marcar como concluído'}
+            onClick={() => onToggle(item)}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${isDone ? 'border-green-200 bg-green-50 text-green-600' : 'border-[#F0EBE6] bg-white text-[#71717A] hover:border-green-300 hover:bg-green-50 hover:text-green-600'}`}
+          >
+            <CheckCircle2 size={16} />
+          </button>
+        )}
+        {actionable && (
+          <button
+            type="button"
+            title="Editar"
+            onClick={() => onEdit(item)}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#F0EBE6] bg-white text-[#71717A] transition hover:border-[#E11D48]/40 hover:text-[#E11D48]"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+        )}
+        <Link
+          to={item.href}
+          title="Abrir"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#F0EBE6] bg-white text-[#71717A] transition hover:border-[#E11D48]/40 hover:text-[#E11D48]"
+        >
+          <ExternalLink size={14} />
+        </Link>
       </div>
     </article>
   );
 }
 
+/* ─── Calendar Panel ─── */
 function CalendarPanel({
   month,
   monthDays,
@@ -802,10 +785,8 @@ function CalendarPanel({
   itemsByDate,
   selectedItems,
   weddingDate,
-  weddingStatus,
-  nextCommitment,
-  nextPayment,
-  lateTasks,
+  weddingCountdown,
+  nextAction,
   onMoveMonth,
   onSelectDay,
   onCreate,
@@ -819,10 +800,8 @@ function CalendarPanel({
   itemsByDate: Record<string, AgendaItem[]>;
   selectedItems: AgendaItem[];
   weddingDate: string | null;
-  weddingStatus: string;
-  nextCommitment?: AgendaItem;
-  nextPayment?: AgendaItem;
-  lateTasks: number;
+  weddingCountdown: string | null;
+  nextAction?: AgendaItem;
   onMoveMonth: (offset: number) => void;
   onSelectDay: (key: string) => void;
   onCreate: (date: string, type?: AgendaType) => void;
@@ -830,8 +809,8 @@ function CalendarPanel({
   onToggle: (item: AgendaItem) => void;
 }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <section className="overflow-hidden rounded-lg border border-[#F0EBE6] bg-white shadow-[0_16px_36px_rgba(31,41,55,0.06)]">
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <section className="overflow-hidden rounded-xl border border-[#F0EBE6] bg-white shadow-[0_16px_36px_rgba(31,41,55,0.06)]">
         <div className="flex items-center justify-between gap-2 border-b border-[#F0EBE6] px-3 py-3">
           <button type="button" className="btn-secondary min-h-9 px-3" onClick={() => onMoveMonth(-1)} aria-label="Mês anterior"><ChevronLeft size={16} /></button>
           <h2 className="min-w-0 truncate text-center text-sm font-bold capitalize text-[#1F2937]">{monthLabel(month)}</h2>
@@ -855,57 +834,47 @@ function CalendarPanel({
                 type="button"
                 onClick={() => onSelectDay(key)}
                 title={tooltip || 'Clique para criar um item'}
-                className={`relative min-h-[68px] border-b border-r border-[#F0EBE6] p-1.5 text-left transition sm:min-h-[104px] ${isSelected ? 'bg-rose-50 ring-2 ring-inset ring-[#E11D48]/35' : 'hover:bg-[#FAFAFA]'} ${isCurrentMonth ? 'text-[#1F2937]' : 'bg-[#FAFAFA] text-[#A1A1AA]'}`}
+                className={`relative min-h-[68px] border-b border-r border-[#F0EBE6] p-1.5 text-left transition sm:min-h-[96px] ${isSelected ? 'bg-rose-50 ring-2 ring-inset ring-[#E11D48]/35' : 'hover:bg-[#FAFAFA]'} ${isCurrentMonth ? 'text-[#1F2937]' : 'bg-[#FAFAFA] text-[#A1A1AA]'}`}
               >
                 <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${isToday ? 'bg-[#E11D48] text-white' : isSelected ? 'bg-white text-[#E11D48]' : ''}`}>{day.getDate()}</span>
                 {!!types.length && <div className="mt-1 flex flex-wrap gap-1">{types.map((type) => <span key={type} className={`h-2 w-2 rounded-full ${typeDotColor(type)}`} />)}</div>}
                 <div className="mt-1 hidden space-y-1 sm:block">
-                  {dayItems.slice(0, 3).map((item) => <div key={item.id} className={`truncate rounded-md border px-1.5 py-1 text-[10px] font-semibold ${typeTone(item.type)}`}>● {typeLabels[item.type]}</div>)}
-                  {dayItems.length > 3 && <p className="px-1 text-[10px] font-semibold text-[#71717A]">+{dayItems.length - 3} itens</p>}
+                  {dayItems.slice(0, 2).map((item) => <div key={item.id} className={`truncate rounded-md border px-1.5 py-1 text-[10px] font-semibold ${typeTone(item.type)}`}>{typeEmoji[item.type]} {item.title}</div>)}
+                  {dayItems.length > 2 && <p className="px-1 text-[10px] font-semibold text-[#71717A]">+{dayItems.length - 2} mais</p>}
                 </div>
-                <button
-                  type="button"
-                  className="absolute right-1 top-1 hidden h-7 w-7 items-center justify-center rounded-full bg-[#E11D48] text-white shadow-rose sm:group-hover:flex"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onCreate(key);
-                  }}
-                  aria-label="Novo item neste dia"
-                >
-                  <Plus size={14} />
-                </button>
               </button>
             );
           })}
         </div>
       </section>
 
-      <aside className="hidden rounded-lg border border-[#F0EBE6] bg-white p-4 shadow-[0_16px_36px_rgba(31,41,55,0.06)] xl:block">
+      <aside className="hidden rounded-xl border border-[#F0EBE6] bg-white p-4 shadow-[0_16px_36px_rgba(31,41,55,0.06)] xl:block">
         {selectedDay ? (
           <DayItemsPanel selectedDay={selectedDay} items={selectedItems} today={today} onCreate={onCreate} onEdit={onEdit} onToggle={onToggle} />
         ) : (
-          <CalendarSummaryPanel weddingDate={weddingDate} weddingStatus={weddingStatus} nextCommitment={nextCommitment} nextPayment={nextPayment} lateTasks={lateTasks} />
+          <CalendarSidePanel weddingDate={weddingDate} weddingCountdown={weddingCountdown} nextAction={nextAction} />
         )}
       </aside>
 
-      <section className="rounded-lg border border-[#F0EBE6] bg-white p-4 shadow-[0_-8px_26px_rgba(31,41,55,0.06)] xl:hidden">
+      <section className="rounded-xl border border-[#F0EBE6] bg-white p-4 shadow-[0_-8px_26px_rgba(31,41,55,0.06)] xl:hidden">
         {selectedDay ? (
           <DayItemsPanel selectedDay={selectedDay} items={selectedItems} today={today} onCreate={onCreate} onEdit={onEdit} onToggle={onToggle} />
         ) : (
-          <CalendarSummaryPanel weddingDate={weddingDate} weddingStatus={weddingStatus} nextCommitment={nextCommitment} nextPayment={nextPayment} lateTasks={lateTasks} />
+          <CalendarSidePanel weddingDate={weddingDate} weddingCountdown={weddingCountdown} nextAction={nextAction} />
         )}
       </section>
     </div>
   );
 }
 
+/* ─── Day Items Panel ─── */
 function DayItemsPanel({ selectedDay, items, today, onCreate, onEdit, onToggle }: { selectedDay: string; items: AgendaItem[]; today: string; onCreate: (date: string, type?: AgendaType) => void; onEdit: (item: AgendaItem) => void; onToggle: (item: AgendaItem) => void }) {
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-bold text-[#1F2937]">Compromissos de {longDateLabel(selectedDay)}</h2>
-          <p className="mt-1 text-xs text-[#71717A]">{items.length ? `${items.length} item(ns) neste dia` : 'Nenhum item neste dia'}</p>
+          <h2 className="text-sm font-bold text-[#1F2937]">{longDateLabel(selectedDay)}</h2>
+          <p className="mt-1 text-xs text-[#71717A]">{items.length ? `${items.length} item(ns)` : 'Dia livre'}</p>
         </div>
         <button type="button" className="btn-primary min-h-9 shrink-0 bg-[#E11D48] px-3 text-xs hover:bg-[#BE123C]" onClick={() => onCreate(selectedDay)}><Plus size={15} /> Novo</button>
       </div>
@@ -913,10 +882,10 @@ function DayItemsPanel({ selectedDay, items, today, onCreate, onEdit, onToggle }
         {items.length ? items.map((item) => (
           <AgendaCard key={item.id} item={item} today={today} onEdit={onEdit} onToggle={onToggle} />
         )) : (
-          <div className="rounded-lg border border-dashed border-[#F0EBE6] bg-[#FAFAFA] px-4 py-8 text-center">
+          <div className="rounded-xl border border-dashed border-[#F0EBE6] bg-[#FAFAFA] px-4 py-8 text-center">
             <Clock3 className="mx-auto text-[#A1A1AA]" size={28} />
             <p className="mt-2 text-sm font-semibold text-[#1F2937]">Dia livre</p>
-            <p className="mt-1 text-xs text-[#71717A]">Use o botão acima para criar tarefa, evento, vencimento ou lembrete.</p>
+            <p className="mt-1 text-xs text-[#71717A]">Clique em "Novo" para criar um item neste dia.</p>
           </div>
         )}
       </div>
@@ -924,66 +893,62 @@ function DayItemsPanel({ selectedDay, items, today, onCreate, onEdit, onToggle }
   );
 }
 
-function CalendarSummaryPanel({
+/* ─── Calendar Side Panel ─── */
+function CalendarSidePanel({
   weddingDate,
-  weddingStatus,
-  nextCommitment,
-  nextPayment,
-  lateTasks
+  weddingCountdown,
+  nextAction
 }: {
   weddingDate: string | null;
-  weddingStatus: string;
-  nextCommitment?: AgendaItem;
-  nextPayment?: AgendaItem;
-  lateTasks: number;
+  weddingCountdown: string | null;
+  nextAction?: AgendaItem;
 }) {
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-sm font-bold text-[#1F2937]">Resumo</h2>
-        <p className="mt-1 text-xs text-[#71717A]">Central operacional do casamento</p>
-      </div>
-      <div className="rounded-lg border border-rose-100 bg-rose-50/70 p-3">
-        <div className="flex items-start gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-[#E11D48]">
-            <Heart size={17} />
-          </span>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-[#E11D48]">Casamento</p>
-            <p className="mt-1 text-sm font-bold text-[#1F2937]">{weddingDate ? numericDateLabel(weddingDate) : 'Sem data definida'}</p>
-            <p className="mt-0.5 text-xs text-[#71717A]">{weddingStatus}</p>
+      {weddingDate && (
+        <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[#E11D48] shadow-sm">
+              <Heart size={18} />
+            </span>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-[#E11D48]">Casamento</p>
+              <p className="mt-0.5 text-sm font-bold text-[#1F2937]">{numericDateLabel(weddingDate)}</p>
+              {weddingCountdown && <p className="mt-0.5 text-xs font-semibold text-[#E11D48]">{weddingCountdown}</p>}
+            </div>
           </div>
         </div>
+      )}
+
+      <div>
+        <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-[#71717A]">Próxima ação</p>
+        {nextAction ? (
+          <div className="rounded-xl border border-[#F0EBE6] bg-[#FAFAFA] p-3">
+            <p className="text-xl">{typeEmoji[nextAction.type]}</p>
+            <p className="mt-1.5 text-sm font-bold text-[#1F2937]">{nextAction.title}</p>
+            <p className="mt-0.5 text-xs text-[#71717A]">{shortDateLabel(nextAction.date)}{nextAction.time ? ` · ${nextAction.time}` : ''}</p>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-[#F0EBE6] bg-[#FAFAFA] p-3 text-center">
+            <p className="text-xs text-[#71717A]">Nenhuma atividade próxima</p>
+          </div>
+        )}
       </div>
-      <PanelSummaryLine icon={<CalendarClock size={15} />} label="Próximo compromisso" value={nextCommitment?.title ?? 'Nada agendado'} meta={nextCommitment ? numericDateLabel(nextCommitment.date) : 'Sem próximos compromissos'} />
-      <PanelSummaryLine icon={<WalletCards size={15} />} label="Próximo vencimento" value={nextPayment?.title ?? 'Sem vencimentos'} meta={nextPayment ? numericDateLabel(nextPayment.date) : 'Pagamentos em dia'} />
-      <PanelSummaryLine icon={<AlertTriangle size={15} />} label="Tarefas atrasadas" value={String(lateTasks)} meta={lateTasks ? 'Itens precisam de atenção' : 'Nenhuma tarefa atrasada'} danger={lateTasks > 0} />
+
+      <p className="text-center text-xs text-[#A1A1AA]">Clique em um dia para ver ou criar itens</p>
     </div>
   );
 }
 
-function PanelSummaryLine({ icon, label, value, meta, danger = false }: { icon: ReactNode; label: string; value: string; meta: string; danger?: boolean }) {
-  return (
-    <div className="rounded-lg border border-[#F0EBE6] bg-[#FAFAFA] p-3">
-      <div className="flex items-start gap-3">
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${danger ? 'bg-red-50 text-[#EF4444]' : 'bg-white text-[#E11D48]'}`}>{icon}</span>
-        <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-[#71717A]">{label}</p>
-          <p className="mt-1 truncate text-sm font-bold text-[#1F2937]">{value}</p>
-          <p className="mt-0.5 truncate text-xs text-[#71717A]">{meta}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
+/* ─── Empty State ─── */
 function EmptyAgenda({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="rounded-lg border border-dashed border-[#F0EBE6] bg-white px-4 py-12 text-center">
+    <div className="rounded-xl border border-dashed border-[#F0EBE6] bg-white px-4 py-16 text-center">
       <CalendarDays className="mx-auto text-[#E11D48]" size={36} />
       <h3 className="mt-3 text-base font-bold text-[#1F2937]">Nenhum item encontrado</h3>
       <p className="mx-auto mt-1 max-w-sm text-sm text-[#71717A]">Crie tarefas, eventos, vencimentos ou lembretes diretamente na Agenda.</p>
-      <button type="button" className="btn-primary mt-4 bg-[#E11D48] hover:bg-[#BE123C]" onClick={onCreate}><Plus size={16} /> Criar item</button>
+      <button type="button" className="btn-primary mt-5 bg-[#E11D48] hover:bg-[#BE123C]" onClick={onCreate}><Plus size={16} /> Criar item</button>
     </div>
   );
 }
+

@@ -4,18 +4,19 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  MoreHorizontal,
   DollarSign,
-  Edit2,
   ExternalLink,
   FileText,
   Plus,
   Receipt,
   Search,
+  Sparkles,
   Trash2,
-  WalletCards
+  WalletCards,
+  X
 } from 'lucide-react';
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useNavigate, useParams } from 'react-router-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
 import CurrencyInput from '../components/CurrencyInput';
@@ -29,12 +30,17 @@ import { useWedding } from '../hooks/useWedding';
 import { useWeddingTable } from '../hooks/useWeddingTable';
 import { BudgetCategory, BudgetItem, Vendor } from '../types';
 import { budgetCategories, categorySlugMap } from '../utils/constants';
-import { getPaymentStatus, getPendingValue, isBudgetOverdue, toPrimaryCategory } from '../utils/finance';
+import { getPaymentStatus, getPendingValue, isBudgetOverdue, isContractedVendor, toPrimaryCategory } from '../utils/finance';
 import { formatDate, formatMoney } from '../utils/format';
+import { syncVendorBudgetItem } from '../utils/vendorBudgetSync';
+
+const preferredTabs = ['Todos', 'Buffet', 'Decoração', 'Foto e Vídeo', 'Música / DJ', 'Cerimonial', 'Espaço', 'Bebidas', 'Outros'];
+const paymentStatuses = ['pendente', 'pago parcialmente', 'pago', 'vencido', 'cancelado'];
+const chartColors = ['#E11D48', '#2563EB', '#16A34A', '#F97316', '#7C3AED', '#0F766E', '#D97706', '#52525B'];
 
 const blank = {
   name: '',
-  category: 'Espaço',
+  category: 'Buffet',
   description: '',
   estimated_value: 0,
   contracted_value: 0,
@@ -48,63 +54,13 @@ const blank = {
   notes: ''
 };
 
-const preferredTabs = ['Espaço', 'Buffet', 'Bebidas', 'Decoração', 'Foto e Vídeo', 'Música / DJ', 'Cerimonial', 'Roupas dos Noivos', 'Doces e Bolo', 'Outros'];
-const paymentStatuses = ['pendente', 'pago parcialmente', 'pago', 'vencido', 'cancelado'];
-const paymentBlank = { amount: 0, payment_date: new Date().toISOString().slice(0, 10), payment_method: '', receipt_url: '', notes: '' };
-
-const statusStyles: Record<string, string> = {
-  pendente: 'bg-[#E7E0D8] text-[#6F6760] ring-[#E7E0D8]',
-  'pago parcialmente': 'bg-[#D4A373]/15 text-[#B07C45] ring-[#D4A373]/25',
-  pago: 'bg-[#5F8D6D]/15 text-[#5F8D6D] ring-[#5F8D6D]/25',
-  vencido: 'bg-[#C46A6A]/15 text-[#C46A6A] ring-[#C46A6A]/25',
-  cancelado: 'bg-stone-100 text-stone-500 ring-stone-200'
+const paymentBlank = {
+  amount: 0,
+  payment_date: new Date().toISOString().slice(0, 10),
+  payment_method: '',
+  receipt_url: '',
+  notes: ''
 };
-
-function statusBadge(status: string) {
-  return (
-    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ring-1 ${statusStyles[status] ?? 'bg-stone-100 text-stone-600 ring-stone-200'}`}>
-      {status}
-    </span>
-  );
-}
-
-function isOverdue(item: BudgetItem) {
-  return isBudgetOverdue(item);
-}
-
-function paymentPercent(item: BudgetItem) {
-  const contracted = Number(item.contracted_value ?? 0);
-  if (contracted <= 0) return 0;
-  return Math.min(100, Math.round((Number(item.paid_value ?? 0) / contracted) * 100));
-}
-
-function SummaryCard({ label, value, icon, tone }: { label: string; value: string | number; icon: ReactNode; tone: string }) {
-  return (
-    <div className="rounded-lg border border-[#E7E0D8] bg-white p-3 shadow-[0_10px_24px_rgba(58,43,39,0.045)]">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6F6760]">{label}</p>
-          <p className="mt-1 truncate text-xl font-semibold text-[#2D2A26]">{value}</p>
-        </div>
-        <span className={`rounded-lg p-1.5 ${tone}`}>{icon}</span>
-      </div>
-    </div>
-  );
-}
-
-function MobileSummaryCard({ label, value, icon, tone }: { label: string; value: string | number; icon: ReactNode; tone: string }) {
-  return (
-    <div className="rounded-lg border border-[#E7E0D8] bg-white p-2.5 shadow-[0_8px_18px_rgba(58,43,39,0.04)]">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#6F6760]">{label}</p>
-          <p className="mt-1 truncate text-base font-semibold text-[#2D2A26]">{value}</p>
-        </div>
-        <span className={`rounded-lg p-1.5 ${tone}`}>{icon}</span>
-      </div>
-    </div>
-  );
-}
 
 function compactMoney(value: number) {
   const abs = Math.abs(value);
@@ -113,96 +69,162 @@ function compactMoney(value: number) {
   return formatMoney(value).replace(',00', '');
 }
 
-function BudgetEmptyState({ onVendors, onAdd }: { onVendors: () => void; onAdd: () => void }) {
+function percent(value: number, total: number) {
+  if (!total) return 0;
+  return Math.max(0, Math.min(100, Math.round((value / total) * 100)));
+}
+
+function dueBucket(item: BudgetItem) {
+  if (!item.due_date || getPendingValue(item.contracted_value, item.paid_value) <= 0) return '';
+  const today = new Date();
+  const due = new Date(`${item.due_date}T12:00:00`);
+  const start = new Date(today.toISOString().slice(0, 10));
+  const inSeven = new Date(start);
+  inSeven.setDate(start.getDate() + 7);
+  if (isBudgetOverdue(item)) return 'overdue';
+  if (due.toISOString().slice(0, 10) === start.toISOString().slice(0, 10)) return 'today';
+  if (due <= inSeven) return 'next7';
+  return '';
+}
+
+function CategorySelect({
+  value,
+  options,
+  onChange,
+  onCreate
+}: {
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+  onCreate: (name: string) => Promise<void>;
+}) {
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState('');
+
+  async function submit() {
+    const next = toPrimaryCategory(name.trim());
+    if (!next) return;
+    await onCreate(next);
+    onChange(next);
+    setCreating(false);
+    setName('');
+  }
+
   return (
-    <div className="rounded-lg border border-[#E7E0D8] bg-white px-4 py-6 text-center shadow-[0_10px_24px_rgba(58,43,39,0.04)] sm:px-6 sm:py-8">
-      <span className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg bg-[#E7E0D8] text-[#6F6760] sm:h-11 sm:w-11">
-        <Receipt size={18} />
-      </span>
-      <h3 className="mt-2 font-semibold text-[#2D2A26] sm:mt-3 sm:text-lg">Nenhum item financeiro encontrado</h3>
-      <p className="mx-auto mt-1 max-w-md text-sm leading-snug text-[#6F6760]">Contrate um fornecedor para gerar um item financeiro automaticamente ou adicione um gasto avulso.</p>
-      <div className="mt-4 grid gap-2 sm:flex sm:justify-center">
-        <button type="button" className="btn-primary h-9 bg-[#B76E79] px-3 sm:h-auto" onClick={onVendors}>
-          <ExternalLink size={15} /> Ver fornecedores
+    <div className="space-y-2">
+      <FormSelect label="Categoria" value={value} onChange={(event) => onChange(event.target.value)} options={options.map((item) => ({ label: item, value: item }))} />
+      {!creating ? (
+        <button type="button" className="text-xs font-semibold text-w-rose hover:underline" onClick={() => setCreating(true)}>
+          + Nova categoria
         </button>
-        <button type="button" className="btn-secondary h-9 border-[#E7E0D8] bg-white px-3 text-[#2D2A26] sm:h-auto" onClick={onAdd}>
-          <Plus size={15} /> Adicionar gasto avulso
-        </button>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+          <FormInput label="Nova categoria" value={name} onChange={(event) => setName(event.target.value)} />
+          <button type="button" className="btn-primary self-end" onClick={submit}>Criar</button>
+          <button type="button" className="btn-secondary self-end px-3" onClick={() => setCreating(false)}><X size={15} /></button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Kpi({ label, value, helper, tone }: { label: string; value: string; helper: string; tone: string }) {
+  return (
+    <div className="glass rounded-3xl p-4 shadow-[0_18px_55px_rgba(24,24,27,0.08)]">
+      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-w-faint">{label}</p>
+      <p className="mt-2 truncate text-2xl font-bold text-w-text">{value}</p>
+      <p className={`mt-2 text-xs font-semibold ${tone}`}>{helper}</p>
+    </div>
+  );
+}
+
+function ProgressLine({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between text-sm">
+        <span className="font-semibold text-w-text">{label}</span>
+        <span className="font-bold text-w-muted">{value}%</span>
+      </div>
+      <div className="h-3 overflow-hidden rounded-full bg-white/70 ring-1 ring-white/70">
+        <div className="h-full rounded-full" style={{ width: `${value}%`, background: color }} />
       </div>
     </div>
   );
 }
 
-function IconButton({ title, children, onClick }: { title: string; children: ReactNode; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      title={title}
-      aria-label={title}
-      onClick={onClick}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#E7E0D8] bg-white text-[#2D2A26] transition hover:border-[#B76E79] hover:bg-[#FAF8F5]"
-    >
-      {children}
-    </button>
-  );
-}
-
 export default function Budget() {
-  const params = useParams();
   const navigate = useNavigate();
+  const params = useParams();
   const { wedding } = useWedding();
-  const initial = params.category ? categorySlugMap[params.category] ?? 'Outros' : 'Todos';
   const items = useWeddingTable<BudgetItem>('budget_items', 'due_date');
   const vendors = useWeddingTable<Vendor>('vendors', 'name');
-  const customCategories = useWeddingTable<BudgetCategory>('budget_categories', 'sort_order');
+  const categories = useWeddingTable<BudgetCategory>('budget_categories', 'sort_order');
+  const initial = params.category ? categorySlugMap[params.category] ?? 'Outros' : 'Todos';
   const [active, setActive] = useState(initial);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<BudgetItem | null>(null);
-  const [paying, setPaying] = useState<BudgetItem | null>(null);
   const [deleting, setDeleting] = useState<BudgetItem | null>(null);
-  const [form, setForm] = useState({ ...blank, category: initial });
+  const [paying, setPaying] = useState<BudgetItem | null>(null);
+  const [form, setForm] = useState({ ...blank, category: initial === 'Todos' ? 'Buffet' : initial });
   const [paymentForm, setPaymentForm] = useState(paymentBlank);
-  const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
-  const [vendor, setVendor] = useState('');
   const [dueFilter, setDueFilter] = useState('');
-  const [actionsOpen, setActionsOpen] = useState(false);
+  const [message, setMessage] = useState('');
+  const syncInFlight = useRef(new Set<string>());
 
-  const vendorById = useMemo(() => new Map(vendors.rows.map((item) => [item.id, item.name])), [vendors.rows]);
+  const vendorById = useMemo(() => new Map(vendors.rows.map((vendor) => [vendor.id, vendor])), [vendors.rows]);
+  const budgetItemsByVendorId = useMemo(() => {
+    const map = new Map<string, BudgetItem[]>();
+    items.rows.forEach((item) => {
+      if (!item.vendor_id) return;
+      map.set(item.vendor_id, [...(map.get(item.vendor_id) ?? []), item]);
+    });
+    return map;
+  }, [items.rows]);
 
   useEffect(() => {
     items.rows
       .filter((item) => item.category !== toPrimaryCategory(item.category))
-      .forEach((item) => {
-        items.update(item.id, { category: toPrimaryCategory(item.category) } as Partial<BudgetItem>).catch(console.error);
-      });
-    vendors.rows
-      .filter((vendorItem) => vendorItem.category !== toPrimaryCategory(vendorItem.category))
-      .forEach((vendorItem) => {
-        vendors.update(vendorItem.id, { category: toPrimaryCategory(vendorItem.category) } as Partial<Vendor>).catch(console.error);
-      });
-  }, [items.rows, vendors.rows]);
-
-  const tabCategories = useMemo(() => {
-    const categoriesWithData = items.rows.map((item) => toPrimaryCategory(item.category)).filter(Boolean);
-    const custom = customCategories.rows
-      .map((category) => category.name.trim())
-      .filter((name) => name && toPrimaryCategory(name) === name);
-    return Array.from(new Set(['Todos', ...preferredTabs, ...budgetCategories, ...custom, ...categoriesWithData]));
+      .forEach((item) => items.update(item.id, { category: toPrimaryCategory(item.category) } as Partial<BudgetItem>).catch(console.error));
   }, [items.rows]);
 
-  const categoryTotals = useMemo(
-    () =>
-      items.rows.reduce<Record<string, number>>((acc, item) => {
-        const primary = toPrimaryCategory(item.category);
-        acc[primary] = (acc[primary] ?? 0) + Number(item.contracted_value ?? 0);
-        return acc;
-      }, {}),
-    [items.rows]
-  );
+  useEffect(() => {
+    vendors.rows.filter(isContractedVendor).forEach((vendor) => {
+      if (syncInFlight.current.has(vendor.id)) return;
+      syncInFlight.current.add(vendor.id);
+      syncVendorBudgetItem(vendor, budgetItemsByVendorId.get(vendor.id) ?? [], items, { debug: true })
+        .catch((error) => console.log('[vendor-budget-sync] erro do Supabase', error))
+        .finally(() => syncInFlight.current.delete(vendor.id));
+    });
+  }, [budgetItemsByVendorId, vendors.rows]);
 
-  const filteredRows = useMemo(() => {
+  const categoryOptions = useMemo(() => {
+    const custom = categories.rows.map((item) => toPrimaryCategory(item.name)).filter(Boolean);
+    const withData = items.rows.map((item) => toPrimaryCategory(item.category)).filter(Boolean);
+    return Array.from(new Set([...preferredTabs.filter((item) => item !== 'Todos'), ...budgetCategories, ...custom, ...withData]));
+  }, [categories.rows, items.rows]);
+
+  const tabs = useMemo(() => Array.from(new Set([...preferredTabs, ...categoryOptions])), [categoryOptions]);
+
+  const totals = useMemo(() => {
+    const planned = Number(wedding?.planned_budget ?? 0);
+    const committed = items.rows.reduce((sum, item) => sum + Number(item.contracted_value ?? 0), 0);
+    const paid = items.rows.reduce((sum, item) => sum + Number(item.paid_value ?? 0), 0);
+    const remaining = Math.max(0, planned - committed);
+    const pending = Math.max(0, committed - paid);
+    return {
+      planned,
+      committed,
+      paid,
+      remaining,
+      pending,
+      committedPct: percent(committed, planned),
+      paidPct: percent(paid, planned)
+    };
+  }, [items.rows, wedding?.planned_budget]);
+
+  const rows = useMemo(() => {
     const now = new Date();
     const inSeven = new Date(now);
     inSeven.setDate(now.getDate() + 7);
@@ -211,41 +233,65 @@ export default function Budget() {
 
     return items.rows.filter((item) => {
       const due = item.due_date ? new Date(`${item.due_date}T12:00:00`) : null;
-      const matchDue =
+      const vendor = vendorById.get(item.vendor_id ?? '');
+      const haystack = `${item.name} ${item.category} ${vendor?.name ?? ''} ${item.notes ?? ''}`.toLowerCase();
+      const dueMatch =
         !dueFilter ||
-        (dueFilter === 'overdue' && isOverdue(item)) ||
+        (dueFilter === 'today' && dueBucket(item) === 'today') ||
+        (dueFilter === 'overdue' && isBudgetOverdue(item)) ||
         (dueFilter === 'next7' && due && due >= now && due <= inSeven) ||
         (dueFilter === 'next30' && due && due >= now && due <= inThirty) ||
         (dueFilter === 'no_due' && !due);
-
       return (
         (active === 'Todos' || toPrimaryCategory(item.category) === active) &&
-        item.name.toLowerCase().includes(search.toLowerCase()) &&
-        (!status || item.payment_status === status) &&
-        (!vendor || item.vendor_id === vendor) &&
-        matchDue
+        haystack.includes(search.toLowerCase()) &&
+        (!status || (status === 'vencido' ? isBudgetOverdue(item) : item.payment_status === status)) &&
+        dueMatch
       );
     });
-  }, [active, dueFilter, items.rows, search, status, vendor]);
+  }, [active, dueFilter, items.rows, search, status, vendorById]);
 
-  const allTotals = useMemo(() => {
-    const contracted = items.rows.reduce((sum, item) => sum + Number(item.contracted_value ?? 0), 0);
-    const paid = items.rows.reduce((sum, item) => sum + Number(item.paid_value ?? 0), 0);
-    const contractedVendors = vendors.rows.filter((vendor) => vendor.status === 'contratado').length;
-    return {
-      planned: Number(wedding?.planned_budget ?? 0),
-      contracted,
-      paid,
-      pending: Math.max(0, contracted - paid),
-      overdue: items.rows.filter(isOverdue).length,
-      contractedVendors
-    };
-  }, [items.rows, vendors.rows, wedding?.planned_budget]);
+  const categoryData = useMemo(() => {
+    const grouped = items.rows.reduce<Record<string, number>>((acc, item) => {
+      const key = toPrimaryCategory(item.category);
+      acc[key] = (acc[key] ?? 0) + Number(item.contracted_value ?? 0);
+      return acc;
+    }, {});
+    return Object.entries(grouped).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+  }, [items.rows]);
 
-  const activeFilterCount = useMemo(
-    () => [search.trim(), status, vendor, dueFilter].filter(Boolean).length,
-    [dueFilter, search, status, vendor]
+  const plannedPaidData = [
+    { name: 'Planejado', value: totals.planned },
+    { name: 'Comprometido', value: totals.committed },
+    { name: 'Pago', value: totals.paid }
+  ];
+
+  const evolutionData = useMemo(() => {
+    const monthly = items.rows.reduce<Record<string, number>>((acc, item) => {
+      const key = (item.due_date ?? 'Sem data').slice(0, 7);
+      acc[key] = (acc[key] ?? 0) + Number(item.contracted_value ?? 0);
+      return acc;
+    }, {});
+    return Object.entries(monthly)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, value]) => ({ month, value }));
+  }, [items.rows]);
+
+  const nextDue = useMemo(
+    () =>
+      items.rows
+        .filter((item) => item.due_date && getPendingValue(item.contracted_value, item.paid_value) > 0)
+        .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)))[0],
+    [items.rows]
   );
+
+  const expensiveCategory = categoryData[0];
+  const activeFilterCount = [search.trim(), status, dueFilter].filter(Boolean).length;
+
+  async function createCategory(name: string) {
+    if (categoryOptions.includes(name)) return;
+    await categories.create({ name, sort_order: categories.rows.length + 1 } as Partial<BudgetCategory>);
+  }
 
   function start(row?: BudgetItem) {
     setEditing(row ?? null);
@@ -266,7 +312,7 @@ export default function Budget() {
             receipt_url: row.receipt_url ?? '',
             notes: row.notes ?? ''
           }
-        : { ...blank, category: active === 'Todos' ? 'Espaço' : active }
+        : { ...blank, category: active === 'Todos' ? 'Buffet' : active }
     );
     setOpen(true);
   }
@@ -277,6 +323,8 @@ export default function Budget() {
       ...form,
       category: toPrimaryCategory(form.category),
       vendor_id: form.vendor_id || null,
+      due_date: form.due_date || null,
+      payment_date: form.payment_date || null,
       receipt_url: form.receipt_url || null,
       payment_status: getPaymentStatus(form.contracted_value, form.paid_value)
     };
@@ -285,389 +333,264 @@ export default function Budget() {
     setOpen(false);
   }
 
-  function startPayment(item: BudgetItem) {
-    setPaying(item);
-    setPaymentForm(paymentBlank);
-  }
-
   async function submitPayment(event: FormEvent) {
     event.preventDefault();
     if (!paying) return;
-
     const nextPaid = Number(paying.paid_value ?? 0) + Number(paymentForm.amount ?? 0);
-    const nextStatus = getPaymentStatus(Number(paying.contracted_value ?? 0), nextPaid);
-    const nextReceipt = paymentForm.receipt_url || paying.receipt_url;
-    const nextNotes = [paying.notes, paymentForm.notes].filter(Boolean).join('\n');
-
     await items.update(paying.id, {
       paid_value: nextPaid,
-      payment_status: nextStatus,
-      payment_date: paymentForm.payment_date || new Date().toISOString().slice(0, 10),
+      payment_status: getPaymentStatus(paying.contracted_value, nextPaid),
+      payment_date: paymentForm.payment_date,
       payment_method: paymentForm.payment_method || paying.payment_method,
-      receipt_url: nextReceipt,
-      notes: nextNotes
+      receipt_url: paymentForm.receipt_url || paying.receipt_url,
+      notes: [paying.notes, paymentForm.notes].filter(Boolean).join('\n')
     } as Partial<BudgetItem>);
-
     if (paying.vendor_id) {
-      await vendors.update(paying.vendor_id, {
-        paid_value: nextPaid,
-        due_date: paying.due_date
-      } as Partial<Vendor>);
+      await vendors.update(paying.vendor_id, { paid_value: nextPaid, due_date: paying.due_date } as Partial<Vendor>);
     }
-
     setMessage(`Pagamento registrado para ${paying.name}.`);
     setPaying(null);
   }
 
-  async function confirmDelete() {
-    if (!deleting) return;
-    await items.remove(deleting.id);
-    setDeleting(null);
-  }
-
-  function clearFilters() {
-    setActive('Todos');
-    setSearch('');
-    setStatus('');
-    setVendor('');
-    setDueFilter('');
-  }
-
-  function renderExpenseCard(item: BudgetItem) {
-    const percent = paymentPercent(item);
-    const pending = getPendingValue(item.contracted_value, item.paid_value);
-    return (
-      <article key={item.id} className="rounded-lg border border-[#E7E0D8] bg-white px-4 py-2.5 shadow-[0_14px_32px_rgba(58,43,39,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(58,43,39,0.09)]">
-        <div className="space-y-2.5">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-[#B76E79]/18 px-2.5 py-1 text-xs font-semibold text-[#B76E79]">{toPrimaryCategory(item.category)}</span>
-              {statusBadge(isOverdue(item) ? 'vencido' : item.payment_status)}
-            </div>
-            <div className="grid gap-x-3 gap-y-1 text-[13px] sm:grid-cols-2 lg:grid-cols-4 lg:text-right">
-              <div className="whitespace-nowrap"><span className="text-[11px] text-[#6F6760]">Contratado: </span><strong className="text-[#2D2A26]">{formatMoney(item.contracted_value)}</strong></div>
-              <div className="whitespace-nowrap"><span className="text-[11px] text-[#6F6760]">Pago: </span><strong className="text-[#5F8D6D]">{formatMoney(item.paid_value)}</strong></div>
-              <div className="whitespace-nowrap"><span className="text-[11px] text-[#6F6760]">Pendente: </span><strong className="text-[#B07C45]">{formatMoney(pending)}</strong></div>
-              <div className="whitespace-nowrap"><span className="text-[11px] text-[#6F6760]">Vencimento: </span><strong className={isOverdue(item) ? 'text-[#C46A6A]' : 'text-[#2D2A26]'}>{formatDate(item.due_date)}</strong></div>
-            </div>
-          </div>
-
-          <div className="min-w-0">
-            <button type="button" className="line-clamp-1 text-left text-base font-semibold leading-snug text-[#2D2A26] hover:text-[#B76E79] sm:text-lg" onClick={() => start(item)}>
-              {item.name}
-            </button>
-            <p className="mt-0.5 line-clamp-1 text-sm text-[#6F6760]">Fornecedor: {vendorById.get(item.vendor_id ?? '') ?? '-'}</p>
-          </div>
-
-          <div className="grid gap-2.5 lg:grid-cols-[minmax(260px,640px)_auto] lg:items-end lg:justify-between">
-            <div className="w-full max-w-[640px]">
-              <div className="text-xs font-medium text-[#6F6760]">
-                Progresso do pagamento · <span className="font-semibold text-[#2D2A26]">{percent}%</span>
-              </div>
-              <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-[#E7E0D8]">
-                <div className="h-full rounded-full bg-[#5F8D6D]" style={{ width: `${percent}%` }} />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-start gap-2 lg:justify-end">
-              <button type="button" className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-[#5F8D6D]/30 bg-[#5F8D6D]/10 px-2.5 text-xs font-medium text-[#5F8D6D] transition hover:bg-[#5F8D6D]/15" onClick={() => startPayment(item)} title="Registrar pagamento">
-                <DollarSign size={15} /> Registrar pagamento
-              </button>
-              <FileUpload folder="comprovantes" compact label="Anexar" onUploaded={(url) => items.update(item.id, { receipt_url: url } as Partial<BudgetItem>)} />
-              {item.receipt_url && (
-                <a
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[#E7E0D8] bg-white text-[#2D2A26] transition hover:border-[#B76E79] hover:bg-[#FAF8F5]"
-                  href={item.receipt_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  title="Abrir comprovante"
-                  aria-label="Abrir comprovante"
-                >
-                  <FileText size={15} />
-                </a>
-              )}
-              <IconButton title="Editar financeiro" onClick={() => start(item)}>
-                <Edit2 size={15} />
-              </IconButton>
-              <IconButton title="Excluir gasto" onClick={() => setDeleting(item)}>
-                <Trash2 size={15} className="text-[#C46A6A]" />
-              </IconButton>
-            </div>
-          </div>
-        </div>
-      </article>
-    );
-  }
-
-  const formPending = getPendingValue(form.contracted_value, form.paid_value);
-
-  const resultText = useMemo(() => {
-    const count = filteredRows.length;
-    if (status) return `Mostrando ${count} ${count === 1 ? 'pagamento' : 'pagamentos'} ${status}`;
-    if (active !== 'Todos') return `Mostrando ${count} ${count === 1 ? 'gasto' : 'gastos'} em ${active}`;
-    return `Mostrando ${count} ${count === 1 ? 'gasto' : 'gastos'}`;
-  }, [active, filteredRows.length, status]);
+  const dueGroups = {
+    today: items.rows.filter((item) => dueBucket(item) === 'today'),
+    next7: items.rows.filter((item) => dueBucket(item) === 'next7'),
+    overdue: items.rows.filter((item) => dueBucket(item) === 'overdue')
+  };
 
   return (
-    <div className="space-y-3 text-[#2D2A26] sm:space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
+    <div className="space-y-5 text-w-text">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="page-title text-[#2D2A26]">Financeiro</h1>
-          <p className="mt-1 text-sm text-[#6F6760]">Controle de contratos, pagamentos e vencimentos do casamento.</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-w-faint">Central financeira</p>
+          <h1 className="page-title mt-1">Orçamento</h1>
+          <p className="mt-1 text-sm text-w-muted">Contratos, parcelas, comprovantes e vencimentos em uma única visão.</p>
         </div>
-        <div className="grid grid-cols-[1fr_auto] gap-2 sm:flex sm:flex-wrap">
-          <button className="btn-primary h-9 bg-[#B76E79] px-3 sm:h-auto sm:px-4" onClick={() => navigate('/fornecedores')}>
-            <ExternalLink size={16} /> Ver fornecedores
-          </button>
-          <div className="relative">
-            <button className="btn-secondary h-9 border-[#E7E0D8] bg-white px-3 text-[#2D2A26] sm:h-auto" onClick={() => setActionsOpen((current) => !current)}>
-              <MoreHorizontal size={16} />
-              <span>Mais ações</span>
-            </button>
-            {actionsOpen && (
-              <div className="absolute right-0 top-11 z-20 w-56 rounded-lg border border-[#E7E0D8] bg-white p-1.5 shadow-[0_18px_45px_rgba(92,64,51,0.12)]">
-                <button className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[#2D2A26] transition hover:bg-[#FAF8F5]" onClick={() => { setActionsOpen(false); navigate('/orcamento/vencimentos'); }}>
-                  <CalendarClock size={16} /> Ver vencimentos
-                </button>
-                <button className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-[#2D2A26] transition hover:bg-[#FAF8F5]" onClick={() => { setActionsOpen(false); start(); }}>
-                  <Plus size={16} /> Adicionar gasto avulso
-                </button>
-              </div>
-            )}
-          </div>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-secondary" onClick={() => navigate('/fornecedores')}><ExternalLink size={16} /> Fornecedores</button>
+          <button className="btn-primary" onClick={() => start()}><Plus size={16} /> Gasto</button>
         </div>
       </div>
 
-      {message && <div className="rounded-lg border border-[#5F8D6D]/25 bg-[#5F8D6D]/12 p-3 text-sm text-[#5F8D6D]">{message}</div>}
+      {message && <div className="rounded-2xl border border-[#BBF7D0] bg-[#F0FDF4] p-3 text-sm font-medium text-[#15803D]">{message}</div>}
 
-      <section className="grid grid-cols-2 gap-2 sm:hidden">
-        <MobileSummaryCard label="Contratado" value={compactMoney(allTotals.contracted)} icon={<WalletCards size={15} />} tone="bg-[#B76E79]/20 text-[#B76E79]" />
-        <MobileSummaryCard label="Pago" value={compactMoney(allTotals.paid)} icon={<CheckCircle2 size={15} />} tone="bg-[#5F8D6D]/15 text-[#5F8D6D]" />
-        <MobileSummaryCard label="Pendente" value={compactMoney(allTotals.pending)} icon={<CalendarClock size={15} />} tone="bg-[#D4A373]/15 text-[#B07C45]" />
-        <MobileSummaryCard label="Vencidos" value={allTotals.overdue} icon={<AlertTriangle size={15} />} tone="bg-[#C46A6A]/15 text-[#C46A6A]" />
-        <p className="col-span-2 text-xs text-[#6F6760]">Fornecedores contratados: <strong className="text-[#2D2A26]">{allTotals.contractedVendors}</strong></p>
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Kpi label="Orçamento total" value={formatMoney(totals.planned)} helper="Planejado nas configurações" tone="text-w-muted" />
+        <Kpi label="Comprometido" value={formatMoney(totals.committed)} helper={`${totals.committedPct}% contratado`} tone="text-w-rose" />
+        <Kpi label="Pago" value={formatMoney(totals.paid)} helper={`${totals.paidPct}% pago`} tone="text-[#16A34A]" />
+        <Kpi label="Restante" value={formatMoney(totals.remaining)} helper={`${formatMoney(totals.pending)} em aberto`} tone="text-[#D97706]" />
       </section>
 
-      <section className="hidden gap-2 sm:grid sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard label="Contratado" value={formatMoney(allTotals.contracted)} icon={<WalletCards size={16} />} tone="bg-[#B76E79]/20 text-[#B76E79]" />
-        <SummaryCard label="Pago" value={formatMoney(allTotals.paid)} icon={<CheckCircle2 size={16} />} tone="bg-[#5F8D6D]/15 text-[#5F8D6D]" />
-        <SummaryCard label="Pendente" value={formatMoney(allTotals.pending)} icon={<CalendarClock size={16} />} tone="bg-[#D4A373]/15 text-[#B07C45]" />
-        <SummaryCard label="Vencidos" value={allTotals.overdue} icon={<AlertTriangle size={16} />} tone="bg-[#C46A6A]/15 text-[#C46A6A]" />
-        <p className="sm:col-span-2 lg:col-span-4 text-xs text-[#6F6760]">Fornecedores contratados: <strong className="text-[#2D2A26]">{allTotals.contractedVendors}</strong></p>
+      <section className="glass rounded-3xl p-4 shadow-[0_20px_70px_rgba(24,24,27,0.08)]">
+        <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+          <div className="space-y-5">
+            <ProgressLine label="Contratado" value={totals.committedPct} color="linear-gradient(90deg,#E11D48,#FB7185)" />
+            <ProgressLine label="Pago" value={totals.paidPct} color="linear-gradient(90deg,#16A34A,#86EFAC)" />
+          </div>
+          <div className="rounded-2xl bg-white/70 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <Sparkles size={17} className="text-w-rose" />
+              <h2 className="text-sm font-bold">Insights automáticos</h2>
+            </div>
+            <div className="space-y-2 text-sm text-w-muted">
+              <p><strong className="text-w-text">Atenção:</strong> você já comprometeu {totals.committedPct}% do orçamento.</p>
+              <p><strong className="text-w-text">Disponível:</strong> ainda restam {formatMoney(totals.remaining)} do planejado.</p>
+              <p><strong className="text-w-text">Próximo vencimento:</strong> {nextDue ? `${nextDue.name} em ${formatDate(nextDue.due_date)}` : 'nenhum vencimento pendente'}.</p>
+              <p><strong className="text-w-text">Categoria mais cara:</strong> {expensiveCategory ? `${expensiveCategory.name} (${formatMoney(expensiveCategory.value)})` : 'sem dados'}.</p>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <section className="rounded-lg border border-[#E7E0D8] bg-white px-2 py-1.5 shadow-[0_8px_18px_rgba(58,43,39,0.04)] sm:py-2 sm:shadow-[0_12px_28px_rgba(58,43,39,0.05)]">
+      <section className="grid gap-3 lg:grid-cols-3">
+        <div className="rounded-3xl border border-w-border bg-white p-4 shadow-card">
+          <h2 className="text-sm font-bold">Gastos por categoria</h2>
+          <div className="mt-3 h-60">
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie data={categoryData} dataKey="value" nameKey="name" innerRadius={52} outerRadius={82} paddingAngle={3}>
+                  {categoryData.map((_, index) => <Cell key={index} fill={chartColors[index % chartColors.length]} />)}
+                </Pie>
+                <Tooltip formatter={(value: number) => formatMoney(value)} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-w-border bg-white p-4 shadow-card">
+          <h2 className="text-sm font-bold">Planejado x Pago</h2>
+          <div className="mt-3 h-60">
+            <ResponsiveContainer>
+              <BarChart data={plannedPaidData} layout="vertical" margin={{ left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" hide />
+                <YAxis dataKey="name" type="category" width={96} tickLine={false} axisLine={false} />
+                <Tooltip formatter={(value: number) => formatMoney(value)} />
+                <Bar dataKey="value" radius={[0, 10, 10, 0]} fill="#E11D48" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div className="rounded-3xl border border-w-border bg-white p-4 shadow-card">
+          <h2 className="text-sm font-bold">Evolução dos gastos</h2>
+          <div className="mt-3 h-60">
+            <ResponsiveContainer>
+              <LineChart data={evolutionData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} />
+                <YAxis hide />
+                <Tooltip formatter={(value: number) => formatMoney(value)} />
+                <Line type="monotone" dataKey="value" stroke="#2563EB" strokeWidth={3} dot={{ r: 4 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-3 lg:grid-cols-3">
+        {[
+          { label: 'Vence hoje', rows: dueGroups.today, tone: 'border-[#FDE68A] bg-[#FEFCE8]', icon: CalendarClock },
+          { label: 'Vence em 7 dias', rows: dueGroups.next7, tone: 'border-[#BFDBFE] bg-[#EFF6FF]', icon: WalletCards },
+          { label: 'Vencidos', rows: dueGroups.overdue, tone: 'border-[#FECACA] bg-[#FEF2F2]', icon: AlertTriangle }
+        ].map(({ label, rows: groupRows, tone, icon: Icon }) => (
+          <button key={label} type="button" className={`rounded-3xl border p-4 text-left ${tone}`} onClick={() => setDueFilter(label === 'Vencidos' ? 'overdue' : label === 'Vence hoje' ? 'today' : 'next7')}>
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2 text-sm font-bold"><Icon size={17} /> {label}</span>
+              <span className="rounded-full bg-white/80 px-2 py-0.5 text-xs font-bold">{groupRows.length}</span>
+            </div>
+            <p className="mt-3 text-xl font-bold">{formatMoney(groupRows.reduce((sum, item) => sum + getPendingValue(item.contracted_value, item.paid_value), 0))}</p>
+          </button>
+        ))}
+      </section>
+
+      <section className="rounded-3xl border border-w-border bg-white p-2 shadow-card">
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
-          <button
-            type="button"
-            className="hidden h-8 w-8 items-center justify-center rounded-full border border-[#E7E0D8] bg-[#FAF8F5] text-[#6F6760] transition hover:border-[#B76E79] hover:text-[#2D2A26] sm:inline-flex"
-            onClick={() => document.getElementById('budget-category-scroll')?.scrollBy({ left: -260, behavior: 'smooth' })}
-            aria-label="Rolar categorias para esquerda"
-          >
+          <button type="button" className="hidden h-9 w-9 items-center justify-center rounded-full bg-w-surface sm:inline-flex" onClick={() => document.getElementById('budget-tabs')?.scrollBy({ left: -260, behavior: 'smooth' })}>
             <ChevronLeft size={16} />
           </button>
-          <div id="budget-category-scroll" className="flex scroll-smooth gap-1.5 overflow-x-auto py-0.5 [scrollbar-width:none] sm:gap-2 sm:py-1 [&::-webkit-scrollbar]:hidden">
-            {tabCategories.map((category) => (
-              <button
-                key={category}
-                type="button"
-                onClick={() => setActive(category)}
-                className={`shrink-0 rounded-full border px-2.5 py-1 text-left transition sm:px-3 sm:py-1.5 ${
-                  active === category ? 'border-[#B76E79] bg-[#B76E79] text-white shadow-sm' : 'border-[#E7E0D8] bg-[#FAF8F5] text-[#2D2A26] hover:border-[#B76E79]'
-                }`}
-              >
-                <span className="whitespace-nowrap text-xs font-semibold leading-4">
-                  {category}
-                  {(category === 'Todos' ? allTotals.contracted : categoryTotals[category] ?? 0) > 0 && (
-                    <>
-                      <span className={active === category ? 'text-white/60' : 'text-[#6F6760]'}> · </span>
-                      <span className={active === category ? 'text-white/80' : 'text-[#6F6760]'}>
-                        <span className="sm:hidden">{compactMoney(category === 'Todos' ? allTotals.contracted : categoryTotals[category] ?? 0)}</span>
-                        <span className="hidden sm:inline">{compactMoney(category === 'Todos' ? allTotals.contracted : categoryTotals[category] ?? 0)}</span>
-                      </span>
-                    </>
-                  )}
-                </span>
+          <div id="budget-tabs" className="flex gap-2 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {tabs.map((tab) => (
+              <button key={tab} type="button" onClick={() => setActive(tab)} className={`shrink-0 rounded-full px-3 py-2 text-xs font-bold transition ${active === tab ? 'bg-w-text text-white' : 'bg-w-surface text-w-muted hover:text-w-text'}`}>
+                {tab}
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            className="hidden h-8 w-8 items-center justify-center rounded-full border border-[#E7E0D8] bg-[#FAF8F5] text-[#6F6760] transition hover:border-[#B76E79] hover:text-[#2D2A26] sm:inline-flex"
-            onClick={() => document.getElementById('budget-category-scroll')?.scrollBy({ left: 260, behavior: 'smooth' })}
-            aria-label="Rolar categorias para direita"
-          >
+          <button type="button" className="hidden h-9 w-9 items-center justify-center rounded-full bg-w-surface sm:inline-flex" onClick={() => document.getElementById('budget-tabs')?.scrollBy({ left: 260, behavior: 'smooth' })}>
             <ChevronRight size={16} />
           </button>
         </div>
       </section>
 
-      <ResponsiveFilters
-        activeFiltersCount={activeFilterCount}
-        onClearFilters={clearFilters}
-        className="p-2.5 sm:p-3 [&_select.input]:h-9 [&_select.input]:text-sm"
-        gridClassName="lg:grid-cols-[1.6fr_0.9fr_1fr_0.95fr_auto]"
-        footer={
-          <p className="mt-1.5 text-sm text-[#6F6760] sm:mt-2">
-            {resultText}
-          </p>
-        }
-      >
-          <label className="block">
-            <span className="label text-[#6F6760]">Buscar gasto</span>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#B76E79]" size={18} />
-              <input
-                className="input h-9 border-[#E7E0D8] bg-[#FAF8F5] pl-10 text-sm text-[#2D2A26] placeholder:text-[#6F6760]/60 focus:border-[#B76E79] focus:ring-[#B76E79]/20"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Nome do gasto"
-              />
-            </div>
-          </label>
-          <FormSelect label="Status" value={status} onChange={(event) => setStatus(event.target.value)} options={[{ label: 'Todos', value: '' }, ...paymentStatuses.map((value) => ({ label: value, value }))]} />
-          <FormSelect label="Fornecedor" value={vendor} onChange={(event) => setVendor(event.target.value)} options={[{ label: 'Todos', value: '' }, ...vendors.rows.map((item) => ({ label: item.name, value: item.id }))]} />
-          <FormSelect
-            label="Vencimento"
-            value={dueFilter}
-            onChange={(event) => setDueFilter(event.target.value)}
-            options={[
-              { label: 'Todos', value: '' },
-              { label: 'Vencidos', value: 'overdue' },
-              { label: 'Próximos 7 dias', value: 'next7' },
-              { label: 'Próximos 30 dias', value: 'next30' },
-              { label: 'Sem vencimento', value: 'no_due' }
-            ]}
-          />
+      <ResponsiveFilters activeFiltersCount={activeFilterCount} onClearFilters={() => { setSearch(''); setStatus(''); setDueFilter(''); }} gridClassName="lg:grid-cols-[1.6fr_1fr_1fr_auto]">
+        <label className="block">
+          <span className="label">Busca global</span>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-w-faint" size={18} />
+            <input className="input pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buffet, contrato, parcela, decoração..." />
+          </div>
+        </label>
+        <FormSelect label="Status" value={status} onChange={(event) => setStatus(event.target.value)} options={[{ label: 'Todos', value: '' }, ...paymentStatuses.map((item) => ({ label: item, value: item }))]} />
+        <FormSelect label="Vencimento" value={dueFilter} onChange={(event) => setDueFilter(event.target.value)} options={[
+          { label: 'Todos', value: '' },
+          { label: 'Hoje', value: 'today' },
+          { label: 'Vencidos', value: 'overdue' },
+          { label: 'Próximos 7 dias', value: 'next7' },
+          { label: 'Próximos 30 dias', value: 'next30' },
+          { label: 'Sem vencimento', value: 'no_due' }
+        ]} />
       </ResponsiveFilters>
 
-      {filteredRows.some(isOverdue) && (
-        <div className="flex items-center gap-2 rounded-lg border border-[#C46A6A]/20 bg-[#C46A6A]/10 p-3 text-sm text-[#C46A6A]">
-          <AlertTriangle size={16} />
-          Há pagamentos vencidos {active === 'Todos' ? 'nos itens filtrados' : 'nesta categoria'}.
-        </div>
-      )}
-
       <section className="grid gap-3">
-        {filteredRows.length ? filteredRows.map(renderExpenseCard) : <BudgetEmptyState onVendors={() => navigate('/fornecedores')} onAdd={() => start()} />}
+        {rows.length ? rows.map((item) => {
+          const pending = getPendingValue(item.contracted_value, item.paid_value);
+          const vendor = vendorById.get(item.vendor_id ?? '');
+          const paidPct = percent(item.paid_value, item.contracted_value);
+          const overdue = isBudgetOverdue(item);
+          return (
+            <article key={item.id} className="rounded-3xl border border-w-border bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-float">
+              <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap gap-2">
+                    <span className="badge-rose">{toPrimaryCategory(item.category)}</span>
+                    <span className={overdue ? 'badge-red' : item.payment_status === 'pago' ? 'badge-green' : 'badge-gold'}>{overdue ? 'vencido' : item.payment_status}</span>
+                  </div>
+                  <h3 className="mt-3 truncate text-lg font-bold">{item.name}</h3>
+                  <p className="mt-1 text-sm text-w-muted">Fornecedor: {vendor?.name ?? '-'}</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-4 lg:min-w-[560px]">
+                  <div><p className="text-[10px] font-bold uppercase text-w-faint">Contratado</p><p className="font-semibold">{formatMoney(item.contracted_value)}</p></div>
+                  <div><p className="text-[10px] font-bold uppercase text-w-faint">Pago</p><p className="font-semibold text-[#16A34A]">{formatMoney(item.paid_value)}</p></div>
+                  <div><p className="text-[10px] font-bold uppercase text-w-faint">Falta</p><p className="font-semibold text-[#D97706]">{formatMoney(pending)}</p></div>
+                  <div><p className="text-[10px] font-bold uppercase text-w-faint">Vencimento</p><p className={`font-semibold ${overdue ? 'text-[#DC2626]' : ''}`}>{formatDate(item.due_date)}</p></div>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+                <div className="h-2 overflow-hidden rounded-full bg-w-surface">
+                  <div className="h-full rounded-full bg-[#16A34A]" style={{ width: `${paidPct}%` }} />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className="btn-secondary border-[#BBF7D0] bg-[#F0FDF4] text-[#15803D]" onClick={() => { setPaying(item); setPaymentForm(paymentBlank); }}><DollarSign size={15} /> Pagar</button>
+                  <FileUpload folder="comprovantes" compact label="Comprovante" onUploaded={(url) => items.update(item.id, { receipt_url: url } as Partial<BudgetItem>)} />
+                  {item.receipt_url && <a className="btn-secondary px-3" href={item.receipt_url} target="_blank" rel="noreferrer"><FileText size={15} /></a>}
+                  <button type="button" className="btn-secondary" onClick={() => start(item)}>Editar</button>
+                  <button type="button" className="btn-secondary px-3 text-[#DC2626]" onClick={() => setDeleting(item)}><Trash2 size={15} /></button>
+                </div>
+              </div>
+            </article>
+          );
+        }) : (
+          <div className="rounded-3xl border border-dashed border-w-border-md bg-white p-8 text-center">
+            <Receipt className="mx-auto text-w-faint" />
+            <h3 className="mt-3 font-bold">Nenhum item financeiro encontrado</h3>
+            <p className="mt-1 text-sm text-w-muted">Contrate um fornecedor ou adicione um gasto avulso.</p>
+          </div>
+        )}
       </section>
 
-      <Modal open={open} title={editing ? 'Editar financeiro' : 'Adicionar gasto avulso'} onClose={() => setOpen(false)}>
-        <form className="-m-5 flex max-h-[calc(92vh-73px)] flex-col" onSubmit={submit}>
-          <div className="flex-1 space-y-5 overflow-y-auto p-5">
-            <section className="rounded-lg border border-[#E7E0D8] bg-[#FAF8F5] p-4">
-              <h3 className="text-sm font-semibold text-[#2D2A26]">Dados principais</h3>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <FormInput label="Nome do gasto" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
-                <FormSelect label="Categoria" value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} options={tabCategories.map((value) => ({ label: value, value }))} />
-              </div>
-              <div className="mt-4">
-                <FormTextarea label="Descrição" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
-              </div>
-            </section>
-
-            <section className="rounded-lg border border-[#E7E0D8] bg-white p-4">
-              <h3 className="text-sm font-semibold text-[#2D2A26]">Valores</h3>
-              <div className="mt-4 grid gap-4 md:grid-cols-3">
-                <div className="rounded-lg border border-[#E7E0D8] bg-[#FAF8F5] p-3">
-                  <CurrencyInput label="Valor estimado" value={form.estimated_value} onValueChange={(value) => setForm({ ...form, estimated_value: value })} />
-                </div>
-                <div className="rounded-lg border border-[#E7E0D8] bg-[#FAF8F5] p-3">
-                  <CurrencyInput label="Valor contratado" value={form.contracted_value} onValueChange={(value) => setForm({ ...form, contracted_value: value })} />
-                </div>
-                <div className="rounded-lg border border-[#E7E0D8] bg-[#FAF8F5] p-3">
-                  <CurrencyInput label="Valor pago" value={form.paid_value} onValueChange={(value) => setForm({ ...form, paid_value: value })} />
-                </div>
-              </div>
-              <div className="mt-4 rounded-lg border border-[#D4A373]/25 bg-[#D4A373]/10 p-3 text-sm text-[#6F6760]">
-                Valor pendente calculado: <strong className="text-[#2D2A26]">{formatMoney(formPending)}</strong>
-              </div>
-            </section>
-
-            <section className="rounded-lg border border-[#E7E0D8] bg-white p-4">
-              <h3 className="text-sm font-semibold text-[#2D2A26]">Pagamento</h3>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <FormSelect label="Status" value={form.payment_status} onChange={(event) => setForm({ ...form, payment_status: event.target.value })} options={paymentStatuses.map((value) => ({ label: value, value }))} />
-                <FormSelect label="Fornecedor relacionado" value={form.vendor_id} onChange={(event) => setForm({ ...form, vendor_id: event.target.value })} options={[{ label: 'Nenhum', value: '' }, ...vendors.rows.map((item) => ({ label: item.name, value: item.id }))]} />
+      <Modal open={open} title={editing ? 'Editar gasto' : 'Novo gasto'} onClose={() => setOpen(false)}>
+        <form className="-m-5 flex max-h-[calc(92vh-80px)] flex-col" onSubmit={submit}>
+          <div className="flex-1 space-y-4 overflow-y-auto p-5">
+            <section className="glass rounded-3xl p-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormInput label="Nome" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+                <CategorySelect value={form.category} options={categoryOptions} onChange={(value) => setForm({ ...form, category: value })} onCreate={createCategory} />
+                <CurrencyInput label="Valor estimado" value={form.estimated_value} onValueChange={(value) => setForm({ ...form, estimated_value: value })} />
+                <CurrencyInput label="Valor contratado" value={form.contracted_value} onValueChange={(value) => setForm({ ...form, contracted_value: value })} />
+                <CurrencyInput label="Valor pago" value={form.paid_value} onValueChange={(value) => setForm({ ...form, paid_value: value })} />
+                <FormSelect label="Fornecedor" value={form.vendor_id} onChange={(event) => setForm({ ...form, vendor_id: event.target.value })} options={[{ label: 'Nenhum', value: '' }, ...vendors.rows.map((vendor) => ({ label: vendor.name, value: vendor.id }))]} />
                 <FormInput label="Vencimento" type="date" value={form.due_date} onChange={(event) => setForm({ ...form, due_date: event.target.value })} />
-                <FormInput label="Data de pagamento" type="date" value={form.payment_date} onChange={(event) => setForm({ ...form, payment_date: event.target.value })} />
                 <FormInput label="Forma de pagamento" value={form.payment_method} onChange={(event) => setForm({ ...form, payment_method: event.target.value })} />
               </div>
             </section>
-
-            <section className="rounded-lg border border-[#E7E0D8] bg-white p-4">
-              <h3 className="text-sm font-semibold text-[#2D2A26]">Arquivos e observações</h3>
-              <div className="mt-4 rounded-lg border border-dashed border-[#B76E79] bg-[#FAF8F5] p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-[#2D2A26]">Comprovante de pagamento</p>
-                    <p className="text-xs text-[#6F6760]">Anexe recibos, notas ou comprovantes relacionados a este gasto.</p>
-                  </div>
-                  <FileUpload folder="comprovantes" onUploaded={(url) => setForm({ ...form, receipt_url: url })} />
-                </div>
-                {form.receipt_url && (
-                  <a className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-[#5F8D6D] hover:underline" href={form.receipt_url} target="_blank" rel="noreferrer">
-                    <FileText size={15} /> Ver comprovante anexado
-                  </a>
-                )}
-              </div>
-              <div className="mt-4">
-                <FormTextarea label="observações" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
-              </div>
-            </section>
+            <FormTextarea label="Descrição" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+            <FormTextarea label="Observações" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+            <div className="rounded-2xl border border-dashed border-w-border-md p-4">
+              <FileUpload folder="comprovantes" onUploaded={(url) => setForm({ ...form, receipt_url: url })} />
+              {form.receipt_url && <a className="ml-3 text-sm font-semibold text-w-rose" href={form.receipt_url} target="_blank" rel="noreferrer">Comprovante anexado</a>}
+            </div>
           </div>
-
-          <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-[#E7E0D8] bg-white px-5 py-4">
-            <button type="button" className="btn-secondary border-[#E7E0D8] bg-white text-[#2D2A26]" onClick={() => setOpen(false)}>
-              Cancelar
-            </button>
-            <button className="btn-primary bg-[#B76E79]">Salvar gasto</button>
+          <div className="sticky bottom-0 flex justify-end gap-2 border-t border-w-border bg-white p-4">
+            <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Cancelar</button>
+            <button className="btn-primary">Salvar</button>
           </div>
         </form>
       </Modal>
 
       <Modal open={Boolean(paying)} title="Registrar pagamento" onClose={() => setPaying(null)}>
         {paying && (
-          <form className="-m-5 flex max-h-[calc(92vh-73px)] flex-col" onSubmit={submitPayment}>
-            <div className="flex-1 space-y-5 overflow-y-auto p-5">
-              <section className="rounded-lg border border-[#E7E0D8] bg-[#FAF8F5] p-4">
-                <p className="text-sm text-[#6F6760]">Item financeiro</p>
-                <h3 className="mt-1 text-lg font-semibold text-[#2D2A26]">{paying.name}</h3>
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                  <div><p className="text-xs text-[#6F6760]">Contratado</p><p className="font-semibold">{formatMoney(paying.contracted_value)}</p></div>
-                  <div><p className="text-xs text-[#6F6760]">Pago atual</p><p className="font-semibold text-[#5F8D6D]">{formatMoney(paying.paid_value)}</p></div>
-                  <div><p className="text-xs text-[#6F6760]">Pendente atual</p><p className="font-semibold text-[#B07C45]">{formatMoney(getPendingValue(paying.contracted_value, paying.paid_value))}</p></div>
-                </div>
-              </section>
-
-              <section className="rounded-lg border border-[#E7E0D8] bg-white p-4">
-                <h3 className="text-sm font-semibold text-[#2D2A26]">Dados do pagamento</h3>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <div className="rounded-lg border border-[#E7E0D8] bg-[#FAF8F5] p-3">
-                    <CurrencyInput label="Valor do pagamento" value={paymentForm.amount} onValueChange={(value) => setPaymentForm({ ...paymentForm, amount: value })} />
-                  </div>
-                  <FormInput label="Data do pagamento" type="date" value={paymentForm.payment_date} onChange={(event) => setPaymentForm({ ...paymentForm, payment_date: event.target.value })} />
-                  <FormInput label="Forma de pagamento" value={paymentForm.payment_method} onChange={(event) => setPaymentForm({ ...paymentForm, payment_method: event.target.value })} />
-                </div>
-              </section>
-
-              <section className="rounded-lg border border-[#E7E0D8] bg-white p-4">
-                <h3 className="text-sm font-semibold text-[#2D2A26]">Comprovante e observação</h3>
-                <div className="mt-4 rounded-lg border border-dashed border-[#B76E79] bg-[#FAF8F5] p-4">
-                  <FileUpload folder="comprovantes" onUploaded={(url) => setPaymentForm({ ...paymentForm, receipt_url: url })} />
-                  {paymentForm.receipt_url && <a className="ml-3 text-sm font-medium text-[#5F8D6D] hover:underline" href={paymentForm.receipt_url} target="_blank" rel="noreferrer">Comprovante anexado</a>}
-                </div>
-                <div className="mt-4">
-                  <FormTextarea label="Observação" value={paymentForm.notes} onChange={(event) => setPaymentForm({ ...paymentForm, notes: event.target.value })} />
-                </div>
-              </section>
+          <form className="space-y-4" onSubmit={submitPayment}>
+            <div className="glass rounded-3xl p-4">
+              <p className="text-sm text-w-muted">{paying.name}</p>
+              <p className="mt-2 text-2xl font-bold">{formatMoney(getPendingValue(paying.contracted_value, paying.paid_value))}</p>
+              <p className="text-xs font-semibold text-w-muted">pendente</p>
             </div>
-
-            <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-[#E7E0D8] bg-white px-5 py-4">
-              <button type="button" className="btn-secondary border-[#E7E0D8] bg-white text-[#2D2A26]" onClick={() => setPaying(null)}>
-                Cancelar
-              </button>
-              <button className="btn-primary bg-[#B76E79]" disabled={paymentForm.amount <= 0}>Salvar pagamento</button>
+            <CurrencyInput label="Valor do pagamento" value={paymentForm.amount} onValueChange={(value) => setPaymentForm({ ...paymentForm, amount: value })} />
+            <FormInput label="Data" type="date" value={paymentForm.payment_date} onChange={(event) => setPaymentForm({ ...paymentForm, payment_date: event.target.value })} />
+            <FormInput label="Forma de pagamento" value={paymentForm.payment_method} onChange={(event) => setPaymentForm({ ...paymentForm, payment_method: event.target.value })} />
+            <FileUpload folder="comprovantes" onUploaded={(url) => setPaymentForm({ ...paymentForm, receipt_url: url })} />
+            <FormTextarea label="Observação" value={paymentForm.notes} onChange={(event) => setPaymentForm({ ...paymentForm, notes: event.target.value })} />
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn-secondary" onClick={() => setPaying(null)}>Cancelar</button>
+              <button className="btn-primary" disabled={paymentForm.amount <= 0}>Salvar pagamento</button>
             </div>
           </form>
         )}
@@ -678,10 +601,12 @@ export default function Budget() {
         title="Excluir gasto"
         message={`Tem certeza que deseja excluir ${deleting?.name ?? 'este gasto'}?`}
         onCancel={() => setDeleting(null)}
-        onConfirm={confirmDelete}
+        onConfirm={async () => {
+          if (!deleting) return;
+          await items.remove(deleting.id);
+          setDeleting(null);
+        }}
       />
     </div>
   );
 }
-
-

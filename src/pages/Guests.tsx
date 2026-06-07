@@ -8,7 +8,6 @@ import {
   LayoutGrid,
   MoreVertical,
   Plus,
-  Search,
   Table2,
   Trash2,
   UserCheck,
@@ -23,6 +22,10 @@ import { Fragment, FormEvent, ReactNode, useEffect, useRef, useMemo, useState } 
 import { createPortal } from 'react-dom';
 import ConfirmDialog from '../components/ConfirmDialog';
 import Modal from '../components/Modal';
+import AppInput from '../components/ui/AppInput';
+import AppSelect from '../components/ui/AppSelect';
+import AppTextarea from '../components/ui/AppTextarea';
+import AppSearchInput from '../components/ui/AppSearchInput';
 import { useWeddingTable } from '../hooks/useWeddingTable';
 import { Guest, GuestGroup } from '../types';
 import { buildWhatsAppChatLink } from '../utils/whatsappService';
@@ -605,47 +608,57 @@ function EditGuestForm({ initial, groups, onSave, onClose }: {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="label">Nome completo *</span>
-          <input className="input" required value={form.full_name}
-            onChange={e => setForm(f=>({...f, full_name: e.target.value}))} placeholder="Ex: João Silva"/>
-        </label>
-        <label className="block">
-          <span className="label">Telefone</span>
-          <input className="input" inputMode="tel" value={form.phone}
-            onChange={e => setForm(f=>({...f, phone: maskPhone(e.target.value)}))} placeholder="(00) 00000-0000"/>
-        </label>
-        <label className="block">
-          <span className="label">Tipo</span>
-          <select className="input" value={form.guest_type} onChange={e => setForm(f=>({...f, guest_type: e.target.value}))}>
-            {GUEST_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
-        </label>
-        <label className="block">
-          <span className="label">Status</span>
-          <select className="input" value={form.invite_status} onChange={e => setForm(f=>({...f, invite_status: e.target.value}))}>
-            <option value="pendente">Pendente</option>
-            <option value="confirmado">Confirmado</option>
-            <option value="recusado">Recusado</option>
-          </select>
-        </label>
-        <label className="block">
-          <span className="label">Família / Grupo</span>
-          <select className="input" value={form.group_id} onChange={e => setForm(f=>({...f, group_id: e.target.value}))}>
-            <option value="">Sem família</option>
-            {groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-        </label>
-        <label className="col-span-full block">
-          <span className="label">Restrição alimentar</span>
-          <input className="input" value={form.food_restriction}
-            onChange={e => setForm(f=>({...f, food_restriction: e.target.value}))} placeholder="Ex: Vegetariano..."/>
-        </label>
-        <label className="col-span-full block">
-          <span className="label">Observações</span>
-          <textarea className="input min-h-20 resize-y" value={form.notes}
-            onChange={e => setForm(f=>({...f, notes: e.target.value}))}/>
-        </label>
+        <AppInput
+          label="Nome completo"
+          required
+          value={form.full_name}
+          onChange={e => setForm(f=>({...f, full_name: e.target.value}))}
+          placeholder="Ex: João Silva"
+        />
+        <AppInput
+          label="Telefone"
+          inputMode="tel"
+          value={form.phone}
+          onChange={e => setForm(f=>({...f, phone: maskPhone(e.target.value)}))}
+          placeholder="(00) 00000-0000"
+        />
+        <AppSelect
+          label="Tipo"
+          value={form.guest_type}
+          onValueChange={v => setForm(f=>({...f, guest_type: v}))}
+          options={GUEST_TYPES}
+        />
+        <AppSelect
+          label="Status"
+          value={form.invite_status}
+          onValueChange={v => setForm(f=>({...f, invite_status: v}))}
+          options={[
+            { label: 'Pendente', value: 'pendente' },
+            { label: 'Confirmado', value: 'confirmado' },
+            { label: 'Recusado', value: 'recusado' },
+          ]}
+        />
+        <AppSelect
+          label="Família / Grupo"
+          value={form.group_id}
+          onValueChange={v => setForm(f=>({...f, group_id: v}))}
+          options={[{ label: 'Sem família', value: '' }, ...groups.map(g=>({ label: g.name, value: g.id }))]}
+        />
+        <div className="col-span-full">
+          <AppInput
+            label="Restrição alimentar"
+            value={form.food_restriction}
+            onChange={e => setForm(f=>({...f, food_restriction: e.target.value}))}
+            placeholder="Ex: Vegetariano..."
+          />
+        </div>
+        <div className="col-span-full">
+          <AppTextarea
+            label="Observações"
+            value={form.notes}
+            onChange={e => setForm(f=>({...f, notes: e.target.value}))}
+          />
+        </div>
       </div>
       <div className="flex justify-end gap-2 border-t border-stone-100 pt-4">
         <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
@@ -679,34 +692,40 @@ function IndividualGuestForm({ groups, onSave, onClose, onBack }: {
     <form onSubmit={handleSubmit} className="space-y-4">
       <button type="button" onClick={onBack} className="text-xs text-stone-400 hover:text-stone-600">← Voltar</button>
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block">
-          <span className="label">Nome completo *</span>
-          <input className="input" required autoFocus value={form.full_name}
-            onChange={e => setForm(f=>({...f, full_name: e.target.value}))} placeholder="Ex: João Silva"/>
-        </label>
-        <label className="block">
-          <span className="label">Telefone</span>
-          <input className="input" inputMode="tel" value={form.phone}
-            onChange={e => setForm(f=>({...f, phone: maskPhone(e.target.value)}))} placeholder="(00) 00000-0000"/>
-        </label>
-        <label className="block">
-          <span className="label">Tipo</span>
-          <select className="input" value={form.guest_type} onChange={e => setForm(f=>({...f, guest_type: e.target.value}))}>
-            {GUEST_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
-        </label>
-        <label className="block">
-          <span className="label">Família / Grupo</span>
-          <select className="input" value={form.group_id} onChange={e => setForm(f=>({...f, group_id: e.target.value}))}>
-            <option value="">Sem família</option>
-            {groups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-        </label>
-        <label className="col-span-full block">
-          <span className="label">Observações</span>
-          <textarea className="input min-h-20 resize-y" value={form.notes}
-            onChange={e => setForm(f=>({...f, notes: e.target.value}))}/>
-        </label>
+        <AppInput
+          label="Nome completo"
+          required
+          autoFocus
+          value={form.full_name}
+          onChange={e => setForm(f=>({...f, full_name: e.target.value}))}
+          placeholder="Ex: João Silva"
+        />
+        <AppInput
+          label="Telefone"
+          inputMode="tel"
+          value={form.phone}
+          onChange={e => setForm(f=>({...f, phone: maskPhone(e.target.value)}))}
+          placeholder="(00) 00000-0000"
+        />
+        <AppSelect
+          label="Tipo"
+          value={form.guest_type}
+          onValueChange={v => setForm(f=>({...f, guest_type: v}))}
+          options={GUEST_TYPES}
+        />
+        <AppSelect
+          label="Família / Grupo"
+          value={form.group_id}
+          onValueChange={v => setForm(f=>({...f, group_id: v}))}
+          options={[{ label: 'Sem família', value: '' }, ...groups.map(g=>({ label: g.name, value: g.id }))]}
+        />
+        <div className="col-span-full">
+          <AppTextarea
+            label="Observações"
+            value={form.notes}
+            onChange={e => setForm(f=>({...f, notes: e.target.value}))}
+          />
+        </div>
       </div>
       <div className="flex justify-end gap-2 border-t border-stone-100 pt-4">
         <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
@@ -756,16 +775,21 @@ function FamilyForm({ onSave, onClose, onBack }: {
       <section className="space-y-3 rounded-xl border border-stone-200 bg-stone-50 p-4">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500">Responsável</h3>
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="label">Nome completo *</span>
-            <input className="input bg-white" required autoFocus value={resp.name}
-              onChange={e => setResp(r=>({...r, name: e.target.value}))} placeholder="Ex: João Silva"/>
-          </label>
-          <label className="block">
-            <span className="label">Telefone</span>
-            <input className="input bg-white" inputMode="tel" value={resp.phone}
-              onChange={e => setResp(r=>({...r, phone: maskPhone(e.target.value)}))} placeholder="(00) 00000-0000"/>
-          </label>
+          <AppInput
+            label="Nome completo"
+            required
+            autoFocus
+            value={resp.name}
+            onChange={e => setResp(r=>({...r, name: e.target.value}))}
+            placeholder="Ex: João Silva"
+          />
+          <AppInput
+            label="Telefone"
+            inputMode="tel"
+            value={resp.phone}
+            onChange={e => setResp(r=>({...r, phone: maskPhone(e.target.value)}))}
+            placeholder="(00) 00000-0000"
+          />
         </div>
       </section>
 
@@ -780,23 +804,29 @@ function FamilyForm({ onSave, onClose, onBack }: {
             {deps.map((dep, i) => (
               <div key={dep.id} className="grid grid-cols-[1fr_auto] gap-2 rounded-xl border border-stone-200 bg-stone-50 p-3">
                 <div className="grid gap-2 sm:grid-cols-3">
-                  <label className="block sm:col-span-2">
-                    <span className="label">Nome completo</span>
-                    <input className="input bg-white" placeholder={`Dependente ${i+1}`}
-                      value={dep.name} onChange={e => updateDep(dep.id,'name',e.target.value)}/>
-                  </label>
-                  <label className="block">
-                    <span className="label">Tipo</span>
-                    <select className="input bg-white" value={dep.guest_type}
-                      onChange={e => updateDep(dep.id,'guest_type',e.target.value)}>
-                      {GUEST_TYPES.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
-                    </select>
-                  </label>
-                  <label className="block sm:col-span-3">
-                    <span className="label">Telefone (opcional)</span>
-                    <input className="input bg-white" inputMode="tel" placeholder="(00) 00000-0000"
-                      value={dep.phone} onChange={e => updateDep(dep.id,'phone',e.target.value)}/>
-                  </label>
+                  <div className="sm:col-span-2">
+                    <AppInput
+                      label="Nome completo"
+                      placeholder={`Dependente ${i+1}`}
+                      value={dep.name}
+                      onChange={e => updateDep(dep.id,'name',e.target.value)}
+                    />
+                  </div>
+                  <AppSelect
+                    label="Tipo"
+                    value={dep.guest_type}
+                    onValueChange={v => updateDep(dep.id,'guest_type',v)}
+                    options={GUEST_TYPES}
+                  />
+                  <div className="sm:col-span-3">
+                    <AppInput
+                      label="Telefone (opcional)"
+                      inputMode="tel"
+                      placeholder="(00) 00000-0000"
+                      value={dep.phone}
+                      onChange={e => updateDep(dep.id,'phone',e.target.value)}
+                    />
+                  </div>
                 </div>
                 <button type="button" onClick={()=>removeDep(dep.id)}
                   className="mt-5 flex h-8 w-8 self-start items-center justify-center rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600">
@@ -1080,29 +1110,22 @@ export default function Guests() {
       {/* ── Search + Filter bar ── */}
       <section className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-2.5 shadow-sm lg:flex-row lg:items-center">
         {/* Search */}
-        <div className="relative min-w-[220px] flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" size={15}/>
-          <input
-            className="w-full rounded-lg border border-stone-200 bg-stone-50 py-1.5 pl-9 pr-8 text-sm text-event-text outline-none transition placeholder:text-stone-400 focus:border-stone-400 focus:bg-white focus:ring-2 focus:ring-stone-200"
-            value={search} onChange={e=>setSearch(e.target.value)}
-            placeholder="Buscar convidado, telefone ou família..."/>
-          {search && (
-            <button type="button" onClick={()=>setSearch('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-stone-400 hover:text-stone-600">
-              <X size={13}/>
-            </button>
-          )}
+        <div className="min-w-[220px] flex-1">
+          <AppSearchInput
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onClear={() => setSearch('')}
+            placeholder="Buscar convidado, telefone ou família..."
+          />
         </div>
 
         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] lg:flex lg:items-center lg:justify-end">
-          <label className="relative">
-            <select className="h-8 w-full appearance-none rounded-lg border border-stone-200 bg-white pl-3 pr-8 text-xs font-medium text-stone-600 outline-none transition hover:border-stone-300 focus:border-stone-400 focus:ring-2 focus:ring-stone-200"
-              value={groupFilter} onChange={e=>setGroupFilter(e.target.value)}>
-              <option value="">Família</option>
-              {groups.rows.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
-            </select>
-            <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400"/>
-          </label>
+          <AppSelect
+            value={groupFilter}
+            onValueChange={setGroupFilter}
+            placeholder="Todas as famílias"
+            options={[{ label: 'Todas as famílias', value: '' }, ...groups.rows.map(g=>({ label: g.name, value: g.id }))]}
+          />
 
           <div className="flex h-8 rounded-lg border border-stone-200 bg-stone-50 p-0.5">
             <button type="button" onClick={()=>setViewMode('cards')}

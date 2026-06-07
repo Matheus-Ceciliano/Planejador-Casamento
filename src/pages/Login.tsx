@@ -1,8 +1,8 @@
-import { Heart } from 'lucide-react';
+import { Heart, Mail } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../layouts/AuthLayout';
-import FormInput from '../components/FormInput';
+import AppInput from '../components/ui/AppInput';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Login() {
@@ -57,24 +57,27 @@ export default function Login() {
         )}
 
         <form className="mt-8 space-y-4" onSubmit={submit}>
-          <FormInput
+          <AppInput
             label="E-mail"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            leftIcon={<Mail size={17} />}
+            placeholder="seu@email.com"
             required
           />
-          <FormInput
+          <AppInput
             label="Senha"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
             required
           />
           {message && (
             <p className="rounded-xl bg-w-surface p-3 text-sm text-w-muted">{message}</p>
           )}
-          <button className="btn-primary w-full py-3" disabled={loading || !configured}>
+          <button className="btn-primary w-full py-3 text-base" disabled={loading || !configured}>
             {loading ? 'Entrando…' : 'Entrar'}
           </button>
         </form>

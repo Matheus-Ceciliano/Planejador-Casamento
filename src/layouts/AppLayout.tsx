@@ -1,7 +1,7 @@
 import {
   CalendarDays, ChevronDown, Clock3, Files, Handshake,
   Heart, Home, LogOut, Menu, MoreHorizontal,
-  Send, Settings, Tags, Users, WalletCards, X,
+  Send, Settings, Users, WalletCards, X,
 } from 'lucide-react';
 import { ReactNode, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
@@ -14,7 +14,6 @@ const nav = [
   { to: '/agenda',       label: 'Agenda',          icon: CalendarDays },
   { to: '/convidados',   label: 'Convidados',      icon: Users },
   { to: '/orcamento',    label: 'Orçamento',       icon: WalletCards },
-  { to: '/categorias',   label: 'Categorias',      icon: Tags },
   { to: '/fornecedores', label: 'Fornecedores',    icon: Handshake },
   { to: '/cronograma',   label: 'Cronograma',      icon: Clock3 },
   { to: '/arquivos',     label: 'Arquivos',        icon: Files },

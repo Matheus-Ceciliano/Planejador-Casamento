@@ -22,6 +22,14 @@ export function isBudgetOverdue(item: Pick<BudgetItem, 'due_date' | 'payment_sta
   );
 }
 
+export function normalizeVendorStatus(status?: string | null) {
+  return String(status ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
+export function isContractedVendor(vendor: Pick<Vendor, 'status'>) {
+  return normalizeVendorStatus(vendor.status) === 'contratado';
+}
+
 export function vendorToBudgetPayload(vendor: Vendor) {
   return {
     name: vendor.name,
