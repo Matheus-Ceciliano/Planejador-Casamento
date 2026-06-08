@@ -199,6 +199,38 @@ create unique index if not exists budget_items_wedding_vendor_unique
   on public.budget_items(wedding_id, vendor_id)
   where vendor_id is not null;
 
+create table if not exists public.payment_installments (
+  id uuid primary key default uuid_generate_v4(),
+  wedding_id uuid not null references public.weddings(id) on delete cascade,
+  vendor_id uuid references public.vendors(id) on delete cascade,
+  budget_item_id uuid references public.budget_items(id) on delete cascade,
+  number integer not null,
+  amount numeric(12,2) not null default 0,
+  due_date date,
+  paid_amount numeric(12,2) not null default 0,
+  paid_at date,
+  payment_method text,
+  receipt_url text,
+  status text not null default 'pendente',
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint payment_installments_status_check check (status in ('pendente','pago','vencido','cancelado'))
+);
+
+create index if not exists payment_installments_wedding_id_idx
+  on public.payment_installments(wedding_id);
+
+create index if not exists payment_installments_vendor_id_idx
+  on public.payment_installments(vendor_id);
+
+create index if not exists payment_installments_budget_item_id_idx
+  on public.payment_installments(budget_item_id);
+
+create unique index if not exists payment_installments_budget_item_number_unique
+  on public.payment_installments(budget_item_id, number)
+  where budget_item_id is not null;
+
 create table if not exists public.venues (
   id uuid primary key default uuid_generate_v4(),
   wedding_id uuid not null references public.weddings(id) on delete cascade,
@@ -316,7 +348,7 @@ declare
 begin
   foreach table_name in array array[
     'profiles','weddings','wedding_members','guest_groups','guests','tables','table_guests',
-    'budget_categories','budget_items','vendors','venues','buffet_proposals','drink_items',
+    'budget_categories','budget_items','payment_installments','vendors','venues','buffet_proposals','drink_items',
     'tasks','task_checklist_items','timeline_items','files'
   ]
   loop
@@ -334,6 +366,7 @@ alter table public.tables enable row level security;
 alter table public.table_guests enable row level security;
 alter table public.budget_categories enable row level security;
 alter table public.budget_items enable row level security;
+alter table public.payment_installments enable row level security;
 alter table public.vendors enable row level security;
 alter table public.venues enable row level security;
 alter table public.buffet_proposals enable row level security;
@@ -362,7 +395,7 @@ declare
   table_name text;
 begin
   foreach table_name in array array[
-    'guest_groups','guests','tables','table_guests','budget_categories','budget_items','vendors',
+    'guest_groups','guests','tables','table_guests','budget_categories','budget_items','payment_installments','vendors',
     'venues','buffet_proposals','drink_items','tasks','task_checklist_items','timeline_items','files'
   ]
   loop

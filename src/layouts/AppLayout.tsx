@@ -225,7 +225,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
               key={to}
               to={to}
               className={({ isActive }) =>
-                `flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-2xl px-1 text-[9px] font-bold uppercase tracking-wide transition-all duration-150 ${
+                `flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-0.5 text-[8px] font-bold uppercase tracking-normal transition-all duration-150 min-[390px]:px-1 min-[390px]:text-[9px] ${
                   isActive
                     ? 'bg-w-rose text-white shadow-rose'
                     : 'text-w-faint hover:bg-w-surface hover:text-w-muted'
@@ -233,7 +233,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
               }
             >
               <Icon size={20} />
-              <span className="max-w-full truncate">{label}</span>
+              <span className="max-w-full truncate leading-none">{label}</span>
             </NavLink>
           ))}
         </div>

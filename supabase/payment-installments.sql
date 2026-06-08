@@ -1,3 +1,5 @@
+create extension if not exists "uuid-ossp";
+
 create table if not exists public.payment_installments (
   id uuid primary key default uuid_generate_v4(),
   wedding_id uuid not null references public.weddings(id) on delete cascade,

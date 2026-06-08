@@ -116,19 +116,19 @@ function KpiCard({
     <button
       type="button"
       onClick={onClick}
-      className={`group rounded-2xl border bg-w-card p-3.5 text-left shadow-card transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-float sm:p-4 ${t.ring}`}
+      className={`group min-w-0 overflow-hidden rounded-2xl border bg-w-card p-3 text-left shadow-card transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-float min-[380px]:p-3.5 sm:p-4 ${t.ring}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-w-faint sm:hidden">
+          <p className="truncate text-[9px] font-bold uppercase tracking-wider text-w-faint min-[380px]:text-[10px] sm:hidden">
             {mobileTitle ?? title}
           </p>
           <p className="hidden text-[10px] font-bold uppercase tracking-widest text-w-faint sm:block">
             {title}
           </p>
-          <p className={`mt-1 text-xl font-bold sm:text-2xl ${t.value}`}>
-            <span className="sm:hidden">
-              {numericValue !== undefined ? <AnimatedNumber value={numericValue} format={formatValue} /> : mobileValue ?? value}
+          <p className={`mt-1 min-w-0 truncate text-lg font-bold leading-tight tabular-nums min-[380px]:text-xl sm:text-2xl ${t.value}`}>
+            <span className="block min-w-0 truncate sm:hidden">
+              {mobileValue ?? (numericValue !== undefined ? <AnimatedNumber value={numericValue} format={formatValue} /> : value)}
             </span>
             <span className="hidden sm:inline">
               {numericValue !== undefined ? <AnimatedNumber value={numericValue} format={formatValue} /> : value}
@@ -141,7 +141,7 @@ function KpiCard({
             {helper}
           </p>
         </div>
-        <span className={`shrink-0 rounded-xl p-2 ${t.icon} transition-transform duration-150 group-hover:scale-110`}>
+        <span className={`shrink-0 rounded-xl p-1.5 min-[380px]:p-2 ${t.icon} transition-transform duration-150 group-hover:scale-110`}>
           {icon}
         </span>
       </div>
