@@ -1,4 +1,4 @@
-export type MemberRole = 'owner' | 'bride' | 'groom' | 'planner';
+export type MemberRole = 'owner' | 'bride' | 'groom' | 'planner' | 'viewer';
 
 export type WeddingMember = {
   id: string;
@@ -8,6 +8,7 @@ export type WeddingMember = {
   email: string;
   role: MemberRole;
   can_edit: boolean;
+  permissions?: Record<string, boolean> | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -95,6 +96,24 @@ export type BudgetCategory = {
   wedding_id: string;
   name: string;
   sort_order: number;
+};
+
+export type PaymentInstallment = {
+  id: string;
+  wedding_id: string;
+  vendor_id: string | null;
+  budget_item_id: string | null;
+  number: number;
+  amount: number;
+  due_date: string | null;
+  paid_amount: number;
+  paid_at: string | null;
+  payment_method: string | null;
+  receipt_url: string | null;
+  status: string;
+  notes: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type Vendor = {

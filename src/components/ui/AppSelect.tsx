@@ -119,7 +119,7 @@ export default function AppSelect({
 
         <Select.Portal>
           <Select.Content
-            className="radix-select-content z-[200] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-2xl border border-[#E9ECEF] bg-white shadow-[0_8px_40px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.06)]"
+            className="radix-select-content z-[10000] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-2xl border border-[#E9ECEF] bg-white shadow-[0_8px_40px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.06)]"
             position="popper"
             sideOffset={6}
             align="start"

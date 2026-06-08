@@ -19,7 +19,9 @@ export default function Login() {
     setMessage('');
     try {
       await signIn(email, password);
-      navigate('/dashboard');
+      const redirect = localStorage.getItem('post_login_redirect');
+      if (redirect) localStorage.removeItem('post_login_redirect');
+      navigate(redirect || '/dashboard');
     } catch (error: any) {
       setMessage(error.message);
     } finally {

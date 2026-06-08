@@ -3,16 +3,18 @@ import {
   Heart, Home, LogOut, Menu, MoreHorizontal,
   Send, Settings, Users, WalletCards, X,
 } from 'lucide-react';
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import InstallPWAButton from '../components/InstallPWAButton';
 import { useAuth } from '../hooks/useAuth';
 import { useWedding } from '../hooks/useWedding';
+import { isAnyModalOpen } from '../utils/modalLayer';
 
 const nav = [
   { to: '/dashboard',    label: 'Início',         icon: Home },
   { to: '/agenda',       label: 'Agenda',          icon: CalendarDays },
   { to: '/convidados',   label: 'Convidados',      icon: Users },
+  { to: '/membros',      label: 'Membros',         icon: Users },
   { to: '/orcamento',    label: 'Orçamento',       icon: WalletCards },
   { to: '/fornecedores', label: 'Fornecedores',    icon: Handshake },
   { to: '/cronograma',   label: 'Cronograma',      icon: Clock3 },
@@ -24,8 +26,8 @@ const mobileNav = [
   { to: '/dashboard',   label: 'Início',     icon: Home },
   { to: '/convidados',  label: 'Convidados', icon: Users },
   { to: '/agenda',      label: 'Agenda',     icon: Send },
+  { to: '/membros',     label: 'Membros',    icon: Users },
   { to: '/orcamento',   label: 'Orçamento',  icon: WalletCards },
-  { to: '/configuracoes',label: 'Mais',      icon: MoreHorizontal },
 ];
 
 /* ── Logo mark ────────────────────────────────────────────────────── */
@@ -86,14 +88,26 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 /* ── Main Layout ──────────────────────────────────────────────────── */
 export default function AppLayout({ children }: { children?: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const { signOut, user } = useAuth();
   const { wedding, weddings, selectWedding } = useWedding();
+
+  useEffect(() => {
+    const syncModalState = (event?: Event) => {
+      const detail = (event as CustomEvent<{ isOpen: boolean }> | undefined)?.detail;
+      setModalOpen(detail?.isOpen ?? isAnyModalOpen());
+    };
+
+    syncModalState();
+    window.addEventListener('app:modal-state', syncModalState);
+    return () => window.removeEventListener('app:modal-state', syncModalState);
+  }, []);
 
   return (
     <div className="min-h-[100dvh] overflow-x-hidden bg-w-surface">
 
       {/* ── Desktop Sidebar ── */}
-      <div className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-w-border bg-white lg:block">
+      <div className={`fixed inset-y-0 left-0 z-50 hidden w-64 border-r border-w-border bg-white lg:block ${modalOpen ? 'hidden lg:hidden' : ''}`}>
         <Sidebar />
       </div>
 
@@ -122,7 +136,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
       <div className="lg:pl-64">
 
         {/* ── Header ── */}
-        <header className="app-header-safe sticky top-0 z-20 flex min-h-16 items-center justify-between border-b border-w-border/70 bg-white/90 px-4 shadow-soft backdrop-blur-xl sm:px-6">
+        <header className={`app-header-safe sticky top-0 z-40 min-h-16 items-center justify-between border-b border-w-border/70 bg-white/90 px-4 shadow-soft backdrop-blur-xl sm:px-6 ${modalOpen ? 'hidden' : 'flex'}`}>
           <div className="flex min-w-0 items-center gap-3">
             {/* Mobile menu button */}
             <button
@@ -179,7 +193,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
       </div>
 
       {/* ── Mobile Bottom Nav ── */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-w-border/80 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-xl lg:hidden">
+      <nav className={`fixed inset-x-0 bottom-0 z-[60] border-t border-w-border/80 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-xl lg:hidden ${modalOpen ? 'hidden' : ''}`}>
         <div className="mx-auto grid max-w-md grid-cols-5 gap-0.5">
           {mobileNav.map(({ to, label, icon: Icon }) => (
             <NavLink

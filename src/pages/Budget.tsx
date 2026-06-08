@@ -10,7 +10,6 @@ import {
   Plus,
   Receipt,
   Search,
-  Trash2,
   Wallet,
   X
 } from 'lucide-react';
@@ -26,11 +25,11 @@ import Modal from '../components/Modal';
 import ResponsiveFilters from '../components/ResponsiveFilters';
 import { useWedding } from '../hooks/useWedding';
 import { useWeddingTable } from '../hooks/useWeddingTable';
-import { BudgetCategory, BudgetItem, Vendor } from '../types';
+import { BudgetCategory, BudgetItem, PaymentInstallment, Vendor } from '../types';
 import { budgetCategories, categorySlugMap } from '../utils/constants';
 import { getPaymentStatus, getPendingValue, isBudgetOverdue, isContractedVendor, toPrimaryCategory } from '../utils/finance';
 import { formatDate, formatMoney } from '../utils/format';
-import { syncVendorBudgetItem } from '../utils/vendorBudgetSync';
+import { clearVendorBudgetAutoCreateSuppression, syncVendorBudgetItem } from '../utils/vendorBudgetSync';
 
 const preferredTabs = ['Todos', 'Buffet', 'Decoração', 'Foto e Vídeo', 'Música / DJ', 'Cerimonial', 'Espaço', 'Bebidas', 'Outros'];
 const paymentStatuses = ['pendente', 'pago parcialmente', 'pago', 'vencido', 'cancelado'];
@@ -119,31 +118,31 @@ function CategorySelect({
 
 function Kpi({ label, value, helper, tone, icon: Icon }: { label: string; value: string; helper: string; tone: string; icon: typeof Wallet }) {
   return (
-    <div className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-soft">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-w-faint">{label}</p>
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl bg-w-surface ${tone}`}>
-          <Icon size={16} />
+    <div className="card-metric p-3 sm:p-3">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-w-faint sm:text-[11px]">{label}</p>
+        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-w-surface ${tone}`}>
+          <Icon size={13} />
         </span>
       </div>
-      <p className="mt-3 truncate text-2xl font-bold text-w-text">{value}</p>
-      <p className={`mt-2 text-xs font-semibold ${tone}`}>{helper}</p>
+      <p className="mt-1.5 truncate text-[21px] font-bold leading-tight text-w-text sm:text-[24px]">{value}</p>
+      <p className={`mt-1 text-xs font-semibold ${tone}`}>{helper}</p>
     </div>
   );
 }
 
 function BudgetProgress({ committed, planned, pct }: { committed: number; planned: number; pct: number }) {
   return (
-    <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-soft">
-      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+    <section className="card-hover-soft rounded-3xl border border-[#E5E7EB] bg-white p-3.5 shadow-soft sm:p-4">
+      <div className="mb-2.5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="text-sm font-bold text-w-text">OrÃ§amento utilizado</h2>
+          <h2 className="text-sm font-bold text-w-text">Orçamento utilizado</h2>
           <p className="mt-1 text-sm text-w-muted">{formatMoney(committed)} de {formatMoney(planned)}</p>
         </div>
         <p className="text-sm font-bold text-w-rose">{pct}% comprometido</p>
       </div>
-      <div className="h-3 overflow-hidden rounded-full bg-[#F3F4F6]">
-        <div className="h-full rounded-full bg-[#E11D48]" style={{ width: `${pct}%` }} />
+      <div className="h-2.5 overflow-hidden rounded-full bg-[#F3F4F6]">
+        <div className="h-full rounded-full bg-[#E11D48] transition-[width] duration-300 ease-out" style={{ width: `${pct}%` }} />
       </div>
     </section>
   );
@@ -154,14 +153,18 @@ export default function Budget() {
   const params = useParams();
   const { wedding } = useWedding();
   const items = useWeddingTable<BudgetItem>('budget_items', 'due_date');
+  const installments = useWeddingTable<PaymentInstallment>('payment_installments', 'due_date');
   const vendors = useWeddingTable<Vendor>('vendors', 'name');
   const categories = useWeddingTable<BudgetCategory>('budget_categories', 'sort_order');
   const initial = params.category ? categorySlugMap[params.category] ?? 'Outros' : 'Todos';
   const [active, setActive] = useState(initial);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<BudgetItem | null>(null);
+  const [detailItem, setDetailItem] = useState<BudgetItem | null>(null);
+  const [detailNotes, setDetailNotes] = useState('');
   const [deleting, setDeleting] = useState<BudgetItem | null>(null);
   const [paying, setPaying] = useState<BudgetItem | null>(null);
+  const [selectedInstallmentId, setSelectedInstallmentId] = useState('');
   const [form, setForm] = useState({ ...blank, category: initial === 'Todos' ? 'Buffet' : initial });
   const [paymentForm, setPaymentForm] = useState(paymentBlank);
   const [search, setSearch] = useState('');
@@ -171,6 +174,21 @@ export default function Budget() {
   const syncInFlight = useRef(new Set<string>());
 
   const vendorById = useMemo(() => new Map(vendors.rows.map((vendor) => [vendor.id, vendor])), [vendors.rows]);
+  const installmentsByBudgetItemId = useMemo(() => {
+    const map = new Map<string, PaymentInstallment[]>();
+    installments.rows.forEach((installment) => {
+      if (!installment.budget_item_id) return;
+      map.set(installment.budget_item_id, [...(map.get(installment.budget_item_id) ?? []), installment]);
+    });
+    return map;
+  }, [installments.rows]);
+  const selectedDetailItem = detailItem ? items.rows.find((item) => item.id === detailItem.id) ?? detailItem : null;
+  const selectedDetailVendor = selectedDetailItem?.vendor_id ? vendorById.get(selectedDetailItem.vendor_id) : undefined;
+  const selectedDetailInstallments = selectedDetailItem ? installmentsByBudgetItemId.get(selectedDetailItem.id) ?? [] : [];
+
+  useEffect(() => {
+    setDetailNotes(selectedDetailItem?.notes ?? '');
+  }, [selectedDetailItem?.id, selectedDetailItem?.notes]);
   const budgetItemsByVendorId = useMemo(() => {
     const map = new Map<string, BudgetItem[]>();
     items.rows.forEach((item) => {
@@ -194,7 +212,7 @@ export default function Budget() {
         .catch((error) => console.log('[vendor-budget-sync] erro do Supabase', error))
         .finally(() => syncInFlight.current.delete(vendor.id));
     });
-  }, [budgetItemsByVendorId, vendors.rows]);
+  }, [vendors.rows]);
 
   const categoryOptions = useMemo(() => {
     const custom = categories.rows.map((item) => toPrimaryCategory(item.name)).filter(Boolean);
@@ -299,14 +317,72 @@ export default function Budget() {
       receipt_url: form.receipt_url || null,
       payment_status: getPaymentStatus(form.contracted_value, form.paid_value)
     };
-    if (editing) await items.update(editing.id, payload as Partial<BudgetItem>);
-    else await items.create(payload as Partial<BudgetItem>);
+    const existingVendorItem = form.vendor_id
+      ? items.rows.find((item) => item.wedding_id === wedding?.id && item.vendor_id === form.vendor_id && item.id !== editing?.id)
+      : null;
+
+    if (existingVendorItem) {
+      if (editing) {
+        setMessage('Já existe um item financeiro para este fornecedor. Edite o fornecedor na aba Fornecedores.');
+        return;
+      }
+
+      const saved = await items.update(existingVendorItem.id, payload as Partial<BudgetItem>);
+      if (saved.vendor_id) clearVendorBudgetAutoCreateSuppression(saved.wedding_id, saved.vendor_id);
+      setOpen(false);
+      return;
+    }
+
+    const saved = editing ? await items.update(editing.id, payload as Partial<BudgetItem>) : await items.create(payload as Partial<BudgetItem>);
+    if (saved.vendor_id) clearVendorBudgetAutoCreateSuppression(saved.wedding_id, saved.vendor_id);
     setOpen(false);
   }
 
   async function submitPayment(event: FormEvent) {
     event.preventDefault();
     if (!paying) return;
+
+    const itemInstallments = installmentsByBudgetItemId.get(paying.id) ?? [];
+    const selectedInstallment = itemInstallments.find((installment) => installment.id === selectedInstallmentId);
+    if (selectedInstallment) {
+      const paidAmount = Number(paymentForm.amount || selectedInstallment.amount || 0);
+      await installments.update(selectedInstallment.id, {
+        paid_amount: paidAmount,
+        paid_at: paymentForm.payment_date,
+        payment_method: paymentForm.payment_method || selectedInstallment.payment_method,
+        receipt_url: paymentForm.receipt_url || selectedInstallment.receipt_url,
+        status: 'pago',
+        notes: [selectedInstallment.notes, paymentForm.notes].filter(Boolean).join('\n') || null
+      } as Partial<PaymentInstallment>);
+
+      const nextInstallments = itemInstallments.map((installment) =>
+        installment.id === selectedInstallment.id
+          ? { ...installment, paid_amount: paidAmount, status: 'pago', paid_at: paymentForm.payment_date }
+          : installment
+      );
+      const nextPaid = nextInstallments.reduce((sum, installment) => sum + (installment.status === 'pago' ? Number(installment.paid_amount || installment.amount || 0) : 0), 0);
+      const nextDue = nextInstallments
+        .filter((installment) => installment.status !== 'pago' && installment.due_date)
+        .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)))[0]?.due_date ?? paying.due_date;
+
+      await items.update(paying.id, {
+        paid_value: nextPaid,
+        payment_status: getPaymentStatus(paying.contracted_value, nextPaid),
+        payment_date: paymentForm.payment_date,
+        payment_method: paymentForm.payment_method || paying.payment_method,
+        receipt_url: paymentForm.receipt_url || paying.receipt_url,
+        due_date: nextDue,
+        notes: [paying.notes, paymentForm.notes].filter(Boolean).join('\n') || null
+      } as Partial<BudgetItem>);
+      if (paying.vendor_id) {
+        await vendors.update(paying.vendor_id, { paid_value: nextPaid, due_date: nextDue } as Partial<Vendor>);
+      }
+      setMessage(`Parcela registrada para ${paying.name}.`);
+      setPaying(null);
+      setSelectedInstallmentId('');
+      return;
+    }
+
     const nextPaid = Number(paying.paid_value ?? 0) + Number(paymentForm.amount ?? 0);
     await items.update(paying.id, {
       paid_value: nextPaid,
@@ -321,11 +397,26 @@ export default function Budget() {
     }
     setMessage(`Pagamento registrado para ${paying.name}.`);
     setPaying(null);
+    setSelectedInstallmentId('');
+  }
+
+  function startPayment(item: BudgetItem) {
+    const pendingInstallments = (installmentsByBudgetItemId.get(item.id) ?? [])
+      .filter((installment) => installment.status !== 'pago')
+      .sort((a, b) => String(a.due_date ?? '').localeCompare(String(b.due_date ?? ''), 'pt-BR', { numeric: true }));
+    const firstInstallment = pendingInstallments[0];
+    setPaying(item);
+    setSelectedInstallmentId(firstInstallment?.id ?? '');
+    setPaymentForm({
+      ...paymentBlank,
+      amount: firstInstallment ? Number(firstInstallment.amount ?? 0) : 0,
+      payment_method: firstInstallment?.payment_method ?? ''
+    });
   }
 
   return (
-    <div className="space-y-5 text-w-text">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="space-y-4 text-w-text">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-w-faint">Central financeira</p>
           <h1 className="page-title mt-1">Orçamento</h1>
@@ -334,13 +425,13 @@ export default function Budget() {
         <div className="flex flex-wrap gap-2">
           <button className="btn-secondary" onClick={() => navigate('/fornecedores')}><ExternalLink size={16} /> Fornecedores</button>
           <button className="btn-primary" onClick={() => start()}><Plus size={16} /> Gasto</button>
-          <button className="btn-secondary" onClick={() => navigate('/orcamento/analise')}><BarChart3 size={16} /> Ver analise financeira</button>
+          <button className="btn-secondary" onClick={() => navigate('/orcamento/analise')}><BarChart3 size={16} /> Ver análise financeira</button>
         </div>
       </div>
 
       {message && <div className="rounded-2xl border border-[#BBF7D0] bg-[#F0FDF4] p-3 text-sm font-medium text-[#15803D]">{message}</div>}
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi label="Orcamento total" value={formatMoney(totals.planned)} helper="Planejado" tone="text-w-muted" icon={Wallet} />
+      <section className="grid grid-cols-1 gap-2.5 min-[380px]:grid-cols-2 lg:grid-cols-4">
+        <Kpi label="Orçamento total" value={formatMoney(totals.planned)} helper="Planejado" tone="text-w-muted" icon={Wallet} />
         <Kpi label="Comprometido" value={formatMoney(totals.committed)} helper={`${totals.committedPct}% do total`} tone="text-w-rose" icon={CreditCard} />
         <Kpi label="Pago" value={formatMoney(totals.paid)} helper={`${totals.paidPct}% pago`} tone="text-[#22C55E]" icon={DollarSign} />
         <Kpi label="Em aberto" value={formatMoney(totals.pending)} helper="A pagar" tone="text-[#F59E0B]" icon={CalendarClock} />
@@ -348,14 +439,14 @@ export default function Budget() {
 
       <BudgetProgress committed={totals.committed} planned={totals.planned} pct={totals.committedPct} />
 
-      <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-soft">
+      <section className="card-hover-soft rounded-3xl border border-[#E5E7EB] bg-white p-3.5 shadow-soft sm:p-4">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-sm font-bold text-w-text">Proximos vencimentos</h2>
           <button type="button" className="btn-ghost" onClick={() => navigate('/orcamento/vencimentos')}>Ver todos</button>
         </div>
         <div className="mt-3 grid gap-2">
           {upcomingDue.length ? upcomingDue.map((item) => (
-            <button key={item.id} type="button" className="grid gap-2 rounded-2xl border border-[#E5E7EB] p-3 text-left sm:grid-cols-[1fr_auto_auto] sm:items-center" onClick={() => setDueFilter('next30')}>
+            <button key={item.id} type="button" className="card-hover-soft grid gap-2 rounded-2xl border border-[#E5E7EB] p-3 text-left sm:grid-cols-[1fr_auto_auto] sm:items-center" onClick={() => setDueFilter('next30')}>
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-w-text">{item.name}</p>
                 <p className="text-xs font-semibold text-w-muted">{toPrimaryCategory(item.category)}</p>
@@ -369,14 +460,14 @@ export default function Budget() {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-w-border bg-white p-2 shadow-card">
+      <section className="rounded-3xl border border-w-border bg-white p-1.5 shadow-soft">
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
           <button type="button" className="hidden h-9 w-9 items-center justify-center rounded-full bg-w-surface sm:inline-flex" onClick={() => document.getElementById('budget-tabs')?.scrollBy({ left: -260, behavior: 'smooth' })}>
             <ChevronLeft size={16} />
           </button>
           <div id="budget-tabs" className="flex gap-2 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {tabs.map((tab) => (
-              <button key={tab} type="button" onClick={() => setActive(tab)} className={`shrink-0 rounded-full px-3 py-2 text-xs font-bold transition ${active === tab ? 'bg-w-text text-white' : 'bg-w-surface text-w-muted hover:text-w-text'}`}>
+              <button key={tab} type="button" onClick={() => setActive(tab)} className={`chip-category shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${active === tab ? 'bg-w-text text-white shadow-soft' : 'bg-w-surface text-w-muted hover:bg-[#FCE4EA] hover:text-w-text'}`}>
                 {tab}
               </button>
             ))}
@@ -413,8 +504,12 @@ export default function Budget() {
           const paidPct = percent(item.paid_value, item.contracted_value);
           const overdue = isBudgetOverdue(item);
           return (
-            <article key={item.id} className="rounded-3xl border border-w-border bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:shadow-float">
-              <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+            <article
+              key={item.id}
+              className="cursor-pointer rounded-3xl border border-w-border bg-white p-4 shadow-card transition duration-200 hover:-translate-y-0.5 hover:border-[rgba(225,29,72,0.20)] hover:shadow-[0_18px_40px_rgba(15,23,42,0.10)]"
+              onClick={() => setDetailItem(item)}
+            >
+              <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
                 <div className="min-w-0">
                   <div className="flex flex-wrap gap-2">
                     <span className="badge-rose">{toPrimaryCategory(item.category)}</span>
@@ -423,23 +518,38 @@ export default function Budget() {
                   <h3 className="mt-3 truncate text-lg font-bold">{item.name}</h3>
                   <p className="mt-1 text-sm text-w-muted">Fornecedor: {vendor?.name ?? '-'}</p>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-4 lg:min-w-[560px]">
+                <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[560px] lg:grid-cols-4">
                   <div><p className="text-[10px] font-bold uppercase text-w-faint">Contratado</p><p className="font-semibold">{formatMoney(item.contracted_value)}</p></div>
                   <div><p className="text-[10px] font-bold uppercase text-w-faint">Pago</p><p className="font-semibold text-[#16A34A]">{formatMoney(item.paid_value)}</p></div>
-                  <div><p className="text-[10px] font-bold uppercase text-w-faint">Falta</p><p className="font-semibold text-[#D97706]">{formatMoney(pending)}</p></div>
+                  <div><p className="text-[10px] font-bold uppercase text-w-faint">Em aberto</p><p className="font-semibold text-[#D97706]">{formatMoney(pending)}</p></div>
                   <div><p className="text-[10px] font-bold uppercase text-w-faint">Vencimento</p><p className={`font-semibold ${overdue ? 'text-[#DC2626]' : ''}`}>{formatDate(item.due_date)}</p></div>
                 </div>
               </div>
               <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
-                <div className="h-2 overflow-hidden rounded-full bg-w-surface">
+                <div className="h-1.5 overflow-hidden rounded-full bg-w-surface">
                   <div className="h-full rounded-full bg-[#16A34A]" style={{ width: `${paidPct}%` }} />
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" className="btn-secondary border-[#BBF7D0] bg-[#F0FDF4] text-[#15803D]" onClick={() => { setPaying(item); setPaymentForm(paymentBlank); }}><DollarSign size={15} /> Pagar</button>
-                  <FileUpload folder="comprovantes" compact label="Comprovante" onUploaded={(url) => items.update(item.id, { receipt_url: url } as Partial<BudgetItem>)} />
-                  {item.receipt_url && <a className="btn-secondary px-3" href={item.receipt_url} target="_blank" rel="noreferrer"><FileText size={15} /></a>}
-                  <button type="button" className="btn-secondary" onClick={() => start(item)}>Editar</button>
-                  <button type="button" className="btn-secondary px-3 text-[#DC2626]" onClick={() => setDeleting(item)}><Trash2 size={15} /></button>
+                  <button
+                    type="button"
+                    className="btn-secondary border-[#BBF7D0] bg-[#F0FDF4] text-[#15803D]"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      startPayment(item);
+                    }}
+                  >
+                    <DollarSign size={15} /> Pagar
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setDetailItem(item);
+                    }}
+                  >
+                    Ver detalhes
+                  </button>
                 </div>
               </div>
             </article>
@@ -452,6 +562,99 @@ export default function Budget() {
           </div>
         )}
       </section>
+
+      <Modal open={Boolean(selectedDetailItem)} title="Detalhes financeiros" onClose={() => setDetailItem(null)}>
+        {selectedDetailItem && (
+          <div className="space-y-4">
+            {selectedDetailItem.vendor_id && (
+              <div className="rounded-2xl border border-w-gold/30 bg-w-gold-lt p-3 text-sm font-semibold text-[#92400E]">
+                Este item foi gerado a partir de um fornecedor. Para alterar nome, categoria, valor contratado ou vencimento, edite o fornecedor na aba Fornecedores.
+              </div>
+            )}
+
+            <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
+              <div className="mb-3 flex flex-wrap gap-2">
+                <span className="badge-rose">{toPrimaryCategory(selectedDetailItem.category)}</span>
+                <span className={isBudgetOverdue(selectedDetailItem) ? 'badge-red' : selectedDetailItem.payment_status === 'pago' ? 'badge-green' : 'badge-gold'}>
+                  {isBudgetOverdue(selectedDetailItem) ? 'vencido' : selectedDetailItem.payment_status}
+                </span>
+              </div>
+              <h3 className="text-lg font-bold text-w-text">{selectedDetailItem.name}</h3>
+              <p className="mt-1 text-sm text-w-muted">Fornecedor: {selectedDetailVendor?.name ?? '-'}</p>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-xl bg-w-surface p-3"><p className="text-[10px] font-bold uppercase text-w-faint">Contratado</p><p className="mt-1 font-bold">{formatMoney(selectedDetailItem.contracted_value)}</p></div>
+                <div className="rounded-xl bg-w-surface p-3"><p className="text-[10px] font-bold uppercase text-w-faint">Pago</p><p className="mt-1 font-bold text-[#16A34A]">{formatMoney(selectedDetailItem.paid_value)}</p></div>
+                <div className="rounded-xl bg-w-surface p-3"><p className="text-[10px] font-bold uppercase text-w-faint">Em aberto</p><p className="mt-1 font-bold text-[#D97706]">{formatMoney(getPendingValue(selectedDetailItem.contracted_value, selectedDetailItem.paid_value))}</p></div>
+                <div className="rounded-xl bg-w-surface p-3"><p className="text-[10px] font-bold uppercase text-w-faint">Vencimento</p><p className="mt-1 font-bold">{formatDate(selectedDetailItem.due_date)}</p></div>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div><p className="text-[10px] font-bold uppercase text-w-faint">Forma de pagamento</p><p className="mt-1 text-sm font-semibold text-w-text">{selectedDetailItem.payment_method || '-'}</p></div>
+              </div>
+              <div className="mt-4">
+                <FormTextarea label="Observações financeiras" value={detailNotes} onChange={(event) => setDetailNotes(event.target.value)} />
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
+              <h3 className="text-sm font-bold text-w-text">Pagamentos</h3>
+              {selectedDetailInstallments.length > 0 ? (
+                <div className="mt-3 grid gap-2">
+                  {selectedDetailInstallments.map((installment) => (
+                    <div key={installment.id} className="grid gap-2 rounded-xl bg-w-surface p-3 sm:grid-cols-[80px_1fr_1fr_1fr] sm:items-center">
+                      <p className="text-sm font-bold text-w-text">#{installment.number}</p>
+                      <div><p className="text-[10px] font-bold uppercase text-w-faint">Vencimento</p><p className="text-sm font-semibold">{formatDate(installment.due_date)}</p></div>
+                      <div><p className="text-[10px] font-bold uppercase text-w-faint">Valor</p><p className="text-sm font-semibold">{formatMoney(Number(installment.amount ?? 0))}</p></div>
+                      <span className={installment.status === 'pago' ? 'badge-green' : 'badge-gold'}>{installment.status}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : Number(selectedDetailItem.paid_value ?? 0) > 0 ? (
+                <div className="mt-3 grid gap-2 rounded-xl bg-w-surface p-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-center">
+                  <div><p className="text-[10px] font-bold uppercase text-w-faint">Data</p><p className="text-sm font-semibold">{formatDate(selectedDetailItem.payment_date)}</p></div>
+                  <div><p className="text-[10px] font-bold uppercase text-w-faint">Valor</p><p className="text-sm font-semibold text-[#16A34A]">{formatMoney(selectedDetailItem.paid_value)}</p></div>
+                  <div><p className="text-[10px] font-bold uppercase text-w-faint">Forma</p><p className="text-sm font-semibold">{selectedDetailItem.payment_method || '-'}</p></div>
+                  {selectedDetailItem.receipt_url && <a className="btn-secondary px-3" href={selectedDetailItem.receipt_url} target="_blank" rel="noreferrer"><FileText size={15} /></a>}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-xl bg-w-surface p-3 text-sm font-semibold text-w-muted">Nenhum pagamento registrado.</p>
+              )}
+            </section>
+
+            <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
+              <h3 className="text-sm font-bold text-w-text">Anexos</h3>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-dashed border-w-border-md p-3">
+                  <p className="text-sm font-bold">Comprovante</p>
+                  {selectedDetailItem.receipt_url && <a className="mt-2 inline-flex text-sm font-semibold text-w-rose hover:underline" href={selectedDetailItem.receipt_url} target="_blank" rel="noreferrer">Ver comprovante</a>}
+                  <div className="mt-3">
+                    <FileUpload folder="comprovantes" label={selectedDetailItem.receipt_url ? 'Substituir comprovante' : 'Anexar comprovante'} onUploaded={(url) => items.update(selectedDetailItem.id, { receipt_url: url } as Partial<BudgetItem>)} />
+                  </div>
+                </div>
+                <div className="rounded-xl border border-dashed border-w-border-md p-3">
+                  <p className="text-sm font-bold">Contrato</p>
+                  {selectedDetailVendor?.contract_url ? (
+                    <a className="mt-2 inline-flex text-sm font-semibold text-w-rose hover:underline" href={selectedDetailVendor.contract_url} target="_blank" rel="noreferrer">Abrir contrato</a>
+                  ) : (
+                    <p className="mt-2 text-sm font-semibold text-w-muted">Nenhum contrato vinculado.</p>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              {selectedDetailVendor && <button type="button" className="btn-secondary" onClick={() => { setDetailItem(null); navigate('/fornecedores'); }}>Abrir fornecedor</button>}
+              <button type="button" className="btn-secondary" onClick={() => items.update(selectedDetailItem.id, { notes: detailNotes || null } as Partial<BudgetItem>)}>Salvar observações</button>
+              {!selectedDetailItem.vendor_id && <button type="button" className="btn-secondary" onClick={() => { start(selectedDetailItem); setDetailItem(null); }}>Editar item</button>}
+              {!selectedDetailItem.vendor_id && <button type="button" className="btn-secondary text-[#DC2626]" onClick={() => { setDeleting(selectedDetailItem); setDetailItem(null); }}>Excluir gasto</button>}
+              <button type="button" className="btn-primary" onClick={() => startPayment(selectedDetailItem)}>
+                <DollarSign size={15} /> Registrar pagamento
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <Modal open={open} title={editing ? 'Editar gasto' : 'Novo gasto'} onClose={() => setOpen(false)}>
         <form className="-m-5 flex max-h-[calc(92vh-80px)] flex-col" onSubmit={submit}>
@@ -485,11 +688,36 @@ export default function Budget() {
       <Modal open={Boolean(paying)} title="Registrar pagamento" onClose={() => setPaying(null)}>
         {paying && (
           <form className="space-y-4" onSubmit={submitPayment}>
+            {(() => {
+              const itemInstallments = installmentsByBudgetItemId.get(paying.id) ?? [];
+              const pendingInstallments = itemInstallments.filter((installment) => installment.status !== 'pago');
+              const selectedInstallment = itemInstallments.find((installment) => installment.id === selectedInstallmentId);
+              return (
+                <>
             <div className="glass rounded-3xl p-4">
               <p className="text-sm text-w-muted">{paying.name}</p>
-              <p className="mt-2 text-2xl font-bold">{formatMoney(getPendingValue(paying.contracted_value, paying.paid_value))}</p>
-              <p className="text-xs font-semibold text-w-muted">pendente</p>
+              <p className="mt-2 text-2xl font-bold">{formatMoney(selectedInstallment ? Number(selectedInstallment.amount ?? 0) : getPendingValue(paying.contracted_value, paying.paid_value))}</p>
+              <p className="text-xs font-semibold text-w-muted">{selectedInstallment ? `parcela ${selectedInstallment.number} vence em ${formatDate(selectedInstallment.due_date)}` : 'pendente'}</p>
             </div>
+            {itemInstallments.length > 0 && (
+              <FormSelect
+                label="Parcela"
+                value={selectedInstallmentId}
+                onChange={(event) => {
+                  const next = itemInstallments.find((installment) => installment.id === event.target.value);
+                  setSelectedInstallmentId(event.target.value);
+                  setPaymentForm({
+                    ...paymentForm,
+                    amount: next ? Number(next.amount ?? 0) : 0,
+                    payment_method: next?.payment_method ?? paymentForm.payment_method
+                  });
+                }}
+                options={pendingInstallments.map((installment) => ({
+                  label: `#${installment.number} - ${formatMoney(Number(installment.amount ?? 0))} - ${formatDate(installment.due_date)}`,
+                  value: installment.id
+                }))}
+              />
+            )}
             <CurrencyInput label="Valor do pagamento" value={paymentForm.amount} onValueChange={(value) => setPaymentForm({ ...paymentForm, amount: value })} />
             <FormInput label="Data" type="date" value={paymentForm.payment_date} onChange={(event) => setPaymentForm({ ...paymentForm, payment_date: event.target.value })} />
             <FormInput label="Forma de pagamento" value={paymentForm.payment_method} onChange={(event) => setPaymentForm({ ...paymentForm, payment_method: event.target.value })} />
@@ -497,8 +725,11 @@ export default function Budget() {
             <FormTextarea label="Observação" value={paymentForm.notes} onChange={(event) => setPaymentForm({ ...paymentForm, notes: event.target.value })} />
             <div className="flex justify-end gap-2">
               <button type="button" className="btn-secondary" onClick={() => setPaying(null)}>Cancelar</button>
-              <button className="btn-primary" disabled={paymentForm.amount <= 0}>Salvar pagamento</button>
+              <button className="btn-primary" disabled={paymentForm.amount <= 0 || (itemInstallments.length > 0 && !selectedInstallmentId)}>Salvar pagamento</button>
             </div>
+                </>
+              );
+            })()}
           </form>
         )}
       </Modal>
@@ -506,10 +737,15 @@ export default function Budget() {
       <ConfirmDialog
         open={Boolean(deleting)}
         title="Excluir gasto"
-        message={`Tem certeza que deseja excluir ${deleting?.name ?? 'este gasto'}?`}
+        message="Tem certeza que deseja excluir este gasto avulso? Essa ação não poderá ser desfeita."
         onCancel={() => setDeleting(null)}
         onConfirm={async () => {
           if (!deleting) return;
+          if (deleting.vendor_id) {
+            setMessage('Este item foi gerado por um fornecedor. Exclua ou edite o fornecedor na aba Fornecedores.');
+            setDeleting(null);
+            return;
+          }
           await items.remove(deleting.id);
           setDeleting(null);
         }}

@@ -4,13 +4,15 @@ import {
   ChevronDown,
   FileText,
   Handshake,
+  LayoutGrid,
   Link as LinkIcon,
+  List,
   Mail,
   MessageCircle,
+  MoreVertical,
   Paperclip,
   Plus,
   Search,
-  Trash2,
   Upload,
   X
 } from 'lucide-react';
@@ -24,7 +26,8 @@ import FormTextarea from '../components/FormTextarea';
 import Modal from '../components/Modal';
 import ResponsiveFilters from '../components/ResponsiveFilters';
 import { useWeddingTable } from '../hooks/useWeddingTable';
-import { BudgetCategory, BudgetItem, FileRecord, Vendor } from '../types';
+import { supabase } from '../lib/supabase';
+import { BudgetCategory, BudgetItem, FileRecord, PaymentInstallment, Vendor } from '../types';
 import { vendorCategories } from '../utils/constants';
 import { getPaymentStatus, getPendingValue, isContractedVendor, normalizeVendorStatus, toPrimaryCategory } from '../utils/finance';
 import { formatDate, formatMoney } from '../utils/format';
@@ -32,11 +35,9 @@ import { syncVendorBudgetItem } from '../utils/vendorBudgetSync';
 import { buildWhatsAppChatLink } from '../utils/whatsappService';
 
 const statusColumns = [
-  { key: 'pesquisando', label: 'Pesquisando', dot: 'bg-[#EAB308]', tint: 'bg-[#FEFCE8]', ring: 'border-[#FDE68A]' },
-  { key: 'orçamento recebido', label: 'Orçamentos', dot: 'bg-[#F97316]', tint: 'bg-[#FFF7ED]', ring: 'border-[#FED7AA]' },
-  { key: 'em negociação', label: 'Negociação', dot: 'bg-[#2563EB]', tint: 'bg-[#EFF6FF]', ring: 'border-[#BFDBFE]' },
-  { key: 'contratado', label: 'Contratados', dot: 'bg-[#16A34A]', tint: 'bg-[#F0FDF4]', ring: 'border-[#BBF7D0]' },
-  { key: 'cancelado', label: 'Cancelados', dot: 'bg-[#27272A]', tint: 'bg-[#F4F4F5]', ring: 'border-[#D4D4D8]' }
+  { key: 'pesquisando', label: 'Pesquisando', color: '#F59E0B' },
+  { key: 'contratado', label: 'Contratados', color: '#22C55E' },
+  { key: 'cancelado', label: 'Cancelado', color: '#6B7280' }
 ];
 
 const blankVendor = {
@@ -55,15 +56,34 @@ const blankVendor = {
   notes: ''
 };
 
-const blankInstallment = {
-  label: 'Entrada',
-  amount: 0,
-  due_date: new Date().toISOString().slice(0, 10)
-};
+const financeOptions = [
+  { label: 'Todos', value: '' },
+  { label: 'Em aberto', value: 'pending' },
+  { label: 'Pago', value: 'paid' },
+  { label: 'Vencido', value: 'overdue' },
+  { label: 'No orçamento', value: 'budget' }
+];
 
 type VendorForm = typeof blankVendor;
-type InstallmentForm = typeof blankInstallment;
 type DocumentKind = 'Contrato PDF' | 'Comprovante' | 'Orçamento' | 'Foto';
+type PaymentMode = 'cash' | 'installments';
+type InstallmentDraft = { number: number; amount: number; due_date: string };
+
+const blankPaymentPlan = {
+  mode: 'cash' as PaymentMode,
+  due_date: '',
+  installments_count: 2,
+  first_due_date: '',
+  interval: 'monthly',
+  payment_method: '',
+  notes: ''
+};
+
+function normalizeVendorWorkflowStatus(status?: string | null) {
+  const normalized = normalizeVendorStatus(status);
+  if (normalized === 'contratado' || normalized === 'cancelado') return normalized;
+  return 'pesquisando';
+}
 
 function moneyCompact(value: number) {
   return value >= 1000 ? `R$ ${Math.round(value / 1000).toLocaleString('pt-BR')}k` : formatMoney(value);
@@ -137,26 +157,29 @@ function VendorCard({
 }) {
   const pending = getPendingValue(vendor.contracted_value, vendor.paid_value);
   const nextDue = budgetItem?.due_date ?? vendor.due_date;
-  const hasInstallments = Boolean(budgetItem && budgetItem.name !== vendor.name);
+  const status = paymentBadge(vendor);
+  const statusTone = status === 'pago' ? 'badge-green' : status === 'Vencido' ? 'badge-red' : 'badge-gold';
 
   return (
     <article
       draggable
       onDragStart={onDragStart}
       onClick={onOpen}
-      className="group cursor-pointer rounded-2xl border border-[#ECE7E1] bg-white p-4 shadow-[0_14px_36px_rgba(24,24,27,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_50px_rgba(24,24,27,0.10)]"
+      className="group cursor-pointer rounded-2xl border border-[#E5E7EB] bg-white p-3.5 shadow-soft transition duration-200 hover:-translate-y-[3px] hover:border-[rgba(225,29,72,0.25)] hover:shadow-[0_18px_40px_rgba(15,23,42,0.10)] active:scale-[0.99]"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-base font-semibold text-w-text">{vendor.name}</h3>
           <p className="mt-1 text-xs font-medium text-w-muted">{toPrimaryCategory(vendor.category)}</p>
         </div>
-        <span className="rounded-full bg-w-surface px-2.5 py-1 text-[11px] font-bold capitalize text-w-muted">{vendor.status}</span>
+        <button type="button" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-w-muted transition hover:bg-w-surface hover:text-w-text" aria-label="Ações">
+          <MoreVertical size={16} />
+        </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
+      <div className="mt-3 grid grid-cols-3 gap-2">
         <div>
-          <p className="text-[10px] font-bold uppercase text-w-faint">Valor</p>
+          <p className="text-[10px] font-bold uppercase text-w-faint">Contratado</p>
           <p className="mt-1 text-sm font-semibold">{moneyCompact(vendor.contracted_value)}</p>
         </div>
         <div>
@@ -169,14 +192,16 @@ function VendorCard({
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl bg-[#FAFAFA] p-3">
-        <p className="text-[10px] font-bold uppercase text-w-faint">Próximo vencimento</p>
-        <p className="mt-1 text-sm font-semibold text-w-text">{formatDate(nextDue ?? null)}</p>
+      <div className="mt-3 grid grid-cols-[1fr_auto] items-center gap-3 rounded-xl bg-[#FAFAFA] p-2.5">
+        <div>
+          <p className="text-[10px] font-bold uppercase text-w-faint">Próximo vencimento</p>
+          <p className="mt-1 text-sm font-semibold text-w-text">{formatDate(nextDue ?? null)}</p>
+        </div>
+        <span className={statusTone}>{status}</span>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
         {vendor.contract_url && <span className="badge-muted">Contrato</span>}
-        {hasInstallments && <span className="badge-gold">Parcelado</span>}
         {budgetItem && <span className="badge-green">No orçamento</span>}
       </div>
     </article>
@@ -185,20 +210,14 @@ function VendorCard({
 
 function Timeline({ vendor, budgetItems }: { vendor: Vendor; budgetItems: BudgetItem[] }) {
   const hasBudget = budgetItems.length > 0;
-  const normalizedStatus = normalizeVendorStatus(vendor.status);
+  const normalizedStatus = normalizeVendorWorkflowStatus(vendor.status);
   const hasQuote = normalizedStatus !== 'pesquisando';
-  const meetingDone = ['em negociacao', 'contratado'].includes(normalizedStatus);
   const hasContract = normalizedStatus === 'contratado';
-  const nextPayment = budgetItems
-    .filter((item) => getPendingValue(item.contracted_value, item.paid_value) > 0 && item.due_date)
-    .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)))[0];
 
   const steps = [
     { label: 'Primeiro contato', done: true },
-    { label: 'Orçamento recebido', done: hasQuote },
-    { label: 'Reunião realizada', done: meetingDone },
-    { label: 'Contratação', done: hasContract || hasBudget },
-    { label: nextPayment ? `Próxima parcela: ${formatDate(nextPayment.due_date)}` : 'Próxima parcela', done: false }
+    { label: 'Orçamento recebido', done: hasQuote || hasBudget },
+    { label: 'Contratação', done: hasContract || hasBudget }
   ];
 
   return (
@@ -221,16 +240,24 @@ function Timeline({ vendor, budgetItems }: { vendor: Vendor; budgetItems: Budget
 export default function Vendors() {
   const vendors = useWeddingTable<Vendor>('vendors', 'name');
   const budgetItems = useWeddingTable<BudgetItem>('budget_items', 'due_date');
+  const installmentsTable = useWeddingTable<PaymentInstallment>('payment_installments', 'due_date');
   const customCategories = useWeddingTable<BudgetCategory>('budget_categories', 'sort_order');
   const files = useWeddingTable<FileRecord>('files', 'created_at');
   const [form, setForm] = useState<VendorForm>(blankVendor);
-  const [installments, setInstallments] = useState<InstallmentForm[]>([{ ...blankInstallment }]);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Vendor | null>(null);
   const [deleting, setDeleting] = useState<Vendor | null>(null);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [financeFilter, setFinanceFilter] = useState('');
+  const [view, setView] = useState<'kanban' | 'list'>('kanban');
+  const [dragOverStatus, setDragOverStatus] = useState('');
   const [message, setMessage] = useState('');
+  const [paymentVendor, setPaymentVendor] = useState<Vendor | null>(null);
+  const [paymentPlan, setPaymentPlan] = useState(blankPaymentPlan);
+  const [installmentDrafts, setInstallmentDrafts] = useState<InstallmentDraft[]>([]);
+  const [paymentError, setPaymentError] = useState('');
   const syncInFlight = useRef(new Set<string>());
 
   const categoryOptions = useMemo(() => {
@@ -249,30 +276,73 @@ export default function Vendors() {
 
   const rows = useMemo(
     () =>
-      vendors.rows.filter(
-        (vendor) =>
+      vendors.rows.filter((vendor) => {
+        const pending = getPendingValue(vendor.contracted_value, vendor.paid_value);
+        const hasBudget = Boolean(budgetByVendor.get(vendor.id)?.length);
+        const overdue = Boolean(vendor.due_date && pending > 0 && new Date(`${vendor.due_date}T23:59:59`) < new Date());
+        const financeMatch =
+          !financeFilter ||
+          (financeFilter === 'pending' && pending > 0) ||
+          (financeFilter === 'paid' && pending <= 0 && Number(vendor.contracted_value ?? 0) > 0) ||
+          (financeFilter === 'overdue' && overdue) ||
+          (financeFilter === 'budget' && hasBudget);
+
+        return (
           `${vendor.name} ${vendor.phone ?? ''} ${vendor.category}`.toLowerCase().includes(search.toLowerCase()) &&
-          (!category || toPrimaryCategory(vendor.category) === category)
-      ),
-    [category, search, vendors.rows]
+          (!category || toPrimaryCategory(vendor.category) === category) &&
+          (!statusFilter || normalizeVendorWorkflowStatus(vendor.status) === normalizeVendorWorkflowStatus(statusFilter)) &&
+          financeMatch
+        );
+      }),
+    [budgetByVendor, category, financeFilter, search, statusFilter, vendors.rows]
   );
 
-  const activeFilterCount = [search.trim(), category].filter(Boolean).length;
+  const activeFilterCount = [search.trim(), category, statusFilter, financeFilter].filter(Boolean).length;
 
   function existingBudgetItemsFor(vendorId: string) {
     return budgetByVendor.get(vendorId) ?? [];
   }
 
-  async function syncContractedVendor(vendor: Vendor, debug = false) {
-    if (!isContractedVendor(vendor)) return;
-    if (syncInFlight.current.has(vendor.id)) return;
+  async function syncContractedVendor(vendor: Vendor, debug = false, forceCreate = false) {
+    if (!isContractedVendor(vendor)) return null;
+    if (syncInFlight.current.has(vendor.id)) return null;
 
     syncInFlight.current.add(vendor.id);
     try {
-      await syncVendorBudgetItem(vendor, existingBudgetItemsFor(vendor.id), budgetItems, { debug });
+      return await syncVendorBudgetItem(vendor, existingBudgetItemsFor(vendor.id), budgetItems, { debug, forceCreate });
     } finally {
       syncInFlight.current.delete(vendor.id);
     }
+  }
+
+  function addInterval(date: string, index: number, interval: string) {
+    const next = new Date(`${date}T12:00:00`);
+    if (interval === 'weekly') next.setDate(next.getDate() + index * 7);
+    else if (interval === 'biweekly') next.setDate(next.getDate() + index * 15);
+    else if (interval === 'custom') next.setDate(next.getDate() + index * 30);
+    else next.setMonth(next.getMonth() + index);
+    return next.toISOString().slice(0, 10);
+  }
+
+  function buildInstallments(value: number, count: number, firstDate: string, interval: string) {
+    const safeCount = Math.max(2, count);
+    const cents = Math.round(Number(value ?? 0) * 100);
+    const base = Math.floor(cents / safeCount);
+    const remainder = cents - base * safeCount;
+    return Array.from({ length: safeCount }, (_, index) => ({
+      number: index + 1,
+      amount: (base + (index === 0 ? remainder : 0)) / 100,
+      due_date: firstDate ? addInterval(firstDate, index, interval) : ''
+    }));
+  }
+
+  function openPaymentModal(vendor: Vendor) {
+    const total = Number(vendor.contracted_value ?? 0);
+    const today = new Date().toISOString().slice(0, 10);
+    setPaymentVendor(vendor);
+    setPaymentPlan({ ...blankPaymentPlan, due_date: vendor.due_date ?? today, first_due_date: vendor.due_date ?? today });
+    setInstallmentDrafts(buildInstallments(total, 2, vendor.due_date ?? today, 'monthly'));
+    setPaymentError('');
   }
 
   useEffect(() => {
@@ -285,11 +355,10 @@ export default function Vendors() {
     vendors.rows.filter(isContractedVendor).forEach((vendor) => {
       syncContractedVendor(vendor, true).catch((error) => console.log('[vendor-budget-sync] erro do Supabase', error));
     });
-  }, [vendors.rows, budgetItems.rows]);
+  }, [vendors.rows]);
 
   function start(row?: Vendor) {
     setEditing(row ?? null);
-    setInstallments([{ ...blankInstallment, amount: Number(row?.contracted_value ?? 0) }]);
     setForm(
       row
         ? {
@@ -303,7 +372,7 @@ export default function Vendors() {
             contracted_value: row.contracted_value,
             paid_value: row.paid_value,
             due_date: row.due_date ?? '',
-            status: row.status,
+            status: normalizeVendorWorkflowStatus(row.status),
             contract_url: row.contract_url ?? '',
             notes: row.notes ?? ''
           }
@@ -322,32 +391,129 @@ export default function Vendors() {
     const payload = {
       ...form,
       category: toPrimaryCategory(form.category),
-      status: normalizeVendorStatus(form.status),
+      status: normalizeVendorWorkflowStatus(form.status),
       due_date: form.due_date || null,
       contract_url: form.contract_url || null
     };
+    if (normalizeVendorWorkflowStatus(payload.status) === 'contratado' && (!editing || !isContractedVendor(editing))) {
+      openPaymentModal({
+        ...(editing ?? {}),
+        ...payload,
+        id: editing?.id ?? '',
+        wedding_id: editing?.wedding_id ?? '',
+        paid_value: Number(form.paid_value ?? 0)
+      } as Vendor);
+      return;
+    }
+
     const saved = editing ? await vendors.update(editing.id, payload as Partial<Vendor>) : await vendors.create(payload as Partial<Vendor>);
     await syncContractedVendor(saved, true);
     setOpen(false);
   }
 
-  async function changeStatus(vendor: Vendor, status: string) {
-    const saved = await vendors.update(vendor.id, { status: normalizeVendorStatus(status) } as Partial<Vendor>);
-    await syncContractedVendor(saved, true);
+  async function changeStatus(vendor: Vendor, status: string, forceBudgetCreate = false) {
+    if (normalizeVendorWorkflowStatus(status) === 'contratado' && !isContractedVendor(vendor)) {
+      openPaymentModal(vendor);
+      return;
+    }
+
+    const saved = await vendors.update(vendor.id, { status: normalizeVendorWorkflowStatus(status) } as Partial<Vendor>);
+    await syncContractedVendor(saved, true, forceBudgetCreate);
   }
 
   async function confirmHiring(vendor: Vendor) {
-    const saved = await vendors.update(vendor.id, {
-      ...form,
+    openPaymentModal({ ...vendor, ...form, category: toPrimaryCategory(form.category), due_date: form.due_date || null } as Vendor);
+  }
+
+  async function confirmPaymentPlan() {
+    if (!paymentVendor) return;
+
+    const total = Number(paymentVendor.contracted_value ?? 0);
+    if (total <= 0) {
+      setPaymentError('Informe um valor contratado maior que zero.');
+      return;
+    }
+
+    const drafts = paymentPlan.mode === 'cash'
+      ? [{ number: 1, amount: total, due_date: paymentPlan.due_date }]
+      : installmentDrafts;
+
+    if (paymentPlan.mode === 'cash' && !paymentPlan.due_date) {
+      setPaymentError('Informe a data limite de pagamento.');
+      return;
+    }
+
+    if (paymentPlan.mode === 'installments') {
+      if (Number(paymentPlan.installments_count) <= 1) {
+        setPaymentError('A quantidade de parcelas deve ser maior que 1.');
+        return;
+      }
+      if (drafts.some((item) => Number(item.amount) <= 0 || !item.due_date)) {
+        setPaymentError('Todas as parcelas precisam ter valor e vencimento.');
+        return;
+      }
+      const totalDraft = drafts.reduce((sum, item) => sum + Number(item.amount ?? 0), 0);
+      if (Math.round(totalDraft * 100) !== Math.round(total * 100)) {
+        setPaymentError('A soma das parcelas deve ser igual ao valor contratado.');
+        return;
+      }
+    }
+
+    setPaymentError('');
+    const firstDueDate = drafts[0]?.due_date || paymentVendor.due_date || null;
+    const vendorPayload = {
+      name: paymentVendor.name,
+      category: toPrimaryCategory(paymentVendor.category),
+      contact_name: paymentVendor.contact_name ?? null,
+      phone: paymentVendor.phone ?? null,
+      email: paymentVendor.email ?? null,
+      instagram: paymentVendor.instagram ?? null,
+      site: paymentVendor.site ?? null,
+      contracted_value: total,
+      paid_value: Number(paymentVendor.paid_value ?? 0),
       status: 'contratado',
-      category: toPrimaryCategory(form.category),
-      due_date: form.due_date || null
-    } as Partial<Vendor>);
+      due_date: firstDueDate,
+      contract_url: paymentVendor.contract_url ?? null,
+      notes: paymentVendor.notes ?? null
+    } as Partial<Vendor>;
 
-    await syncContractedVendor(saved, true);
+    const savedVendor = paymentVendor.id
+      ? await vendors.update(paymentVendor.id, vendorPayload)
+      : await vendors.create(vendorPayload);
+    const savedBudgetItem = await syncContractedVendor(savedVendor, true, true);
 
-    setMessage(`${vendor.name} contratado. Financeiro, gráficos, vencimentos e agenda foram sincronizados.`);
+    if (!savedBudgetItem) {
+      setPaymentError('Não foi possível criar o item financeiro.');
+      return;
+    }
+
+    await budgetItems.update(savedBudgetItem.id, {
+      due_date: firstDueDate,
+      payment_method: paymentPlan.payment_method || null,
+      notes: [savedBudgetItem.notes, paymentPlan.notes].filter(Boolean).join('\n') || null
+    } as Partial<BudgetItem>);
+
+    await supabase.from('payment_installments').delete().eq('wedding_id', savedVendor.wedding_id).eq('vendor_id', savedVendor.id);
+
+    for (const draft of drafts) {
+      await installmentsTable.create({
+        vendor_id: savedVendor.id,
+        budget_item_id: savedBudgetItem.id,
+        number: draft.number,
+        amount: Number(draft.amount),
+        due_date: draft.due_date,
+        paid_amount: 0,
+        paid_at: null,
+        payment_method: paymentPlan.payment_method || null,
+        receipt_url: null,
+        status: 'pendente',
+        notes: paymentPlan.notes || null
+      } as Partial<PaymentInstallment>);
+    }
+
+    setPaymentVendor(null);
     setOpen(false);
+    setMessage(`${savedVendor.name} contratado. Financeiro e vencimentos foram sincronizados.`);
   }
 
   async function addFile(vendor: Vendor, url: string, kind: DocumentKind) {
@@ -364,82 +530,198 @@ export default function Vendors() {
 
   const selectedBudgetItems = editing ? budgetByVendor.get(editing.id) ?? [] : [];
   const selectedFiles = editing ? files.rows.filter((file) => file.vendor_id === editing.id) : [];
+  const statusOptions = [{ label: 'Todos', value: '' }, ...statusColumns.map((item) => ({ label: item.label, value: item.key }))];
+  const clearFilters = () => {
+    setSearch('');
+    setCategory('');
+    setStatusFilter('');
+    setFinanceFilter('');
+  };
+  const filterFields = (
+    <>
+      <label className="block">
+        <span className="label">Buscar fornecedor</span>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-w-faint" size={18} />
+          <input className="input pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nome, telefone, categoria..." />
+        </div>
+      </label>
+      <FormSelect label="Categoria" value={category} onChange={(event) => setCategory(event.target.value)} options={[{ label: 'Todas', value: '' }, ...categoryOptions.map((item) => ({ label: item, value: item }))]} />
+      <FormSelect label="Status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} options={statusOptions} />
+      <FormSelect label="Financeiro" value={financeFilter} onChange={(event) => setFinanceFilter(event.target.value)} options={financeOptions} />
+    </>
+  );
 
   return (
-    <div className="space-y-5 text-w-text">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="space-y-4 text-w-text">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-w-faint">CRM de contratação</p>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-w-faint">CRM de Contratação</p>
           <h1 className="page-title mt-1">Fornecedores</h1>
-          <p className="mt-1 text-sm text-w-muted">Pesquise, negocie, contrate e gere financeiro sem cadastro duplicado.</p>
+          <p className="mt-1 text-sm text-w-muted">Pesquise, compare, negocie e acompanhe contratos do casamento.</p>
         </div>
-        <button className="btn-primary" onClick={() => start()}>
-          <Plus size={16} /> Fornecedor
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <div className="inline-flex rounded-xl border border-[#E5E7EB] bg-white p-1 shadow-soft">
+            <button type="button" className={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition ${view === 'kanban' ? 'bg-w-text text-white' : 'text-w-muted hover:bg-w-surface hover:text-w-text'}`} onClick={() => setView('kanban')}>
+              <LayoutGrid size={15} /> Kanban
+            </button>
+            <button type="button" className={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition ${view === 'list' ? 'bg-w-text text-white' : 'text-w-muted hover:bg-w-surface hover:text-w-text'}`} onClick={() => setView('list')}>
+              <List size={15} /> Lista
+            </button>
+          </div>
+          <button className="btn-primary" onClick={() => start()}>
+            <Plus size={16} /> Fornecedor
+          </button>
+        </div>
       </div>
 
       {message && <div className="rounded-2xl border border-[#BBF7D0] bg-[#F0FDF4] p-3 text-sm font-medium text-[#15803D]">{message}</div>}
 
-      <ResponsiveFilters activeFiltersCount={activeFilterCount} onClearFilters={() => { setSearch(''); setCategory(''); }} clearLabel="Limpar" gridClassName="lg:grid-cols-[1.4fr_1fr_auto]">
-        <label className="block">
-          <span className="label">Busca global</span>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-w-faint" size={18} />
-            <input className="input pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Fotógrafo, buffet, contrato, parcela..." />
-          </div>
-        </label>
-        <FormSelect label="Categoria" value={category} onChange={(event) => setCategory(event.target.value)} options={[{ label: 'Todas', value: '' }, ...categoryOptions.map((item) => ({ label: item, value: item }))]} />
-      </ResponsiveFilters>
-
-      <section className="grid auto-cols-[minmax(280px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-2 xl:grid-flow-row xl:grid-cols-5 xl:overflow-visible">
-        {statusColumns.map((column) => {
-          const columnRows = rows.filter((vendor) => normalizeVendorStatus(vendor.status) === normalizeVendorStatus(column.key));
-          return (
-            <div
-              key={column.key}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                const id = event.dataTransfer.getData('vendor-id');
-                const vendor = vendors.rows.find((item) => item.id === id);
-                if (vendor) changeStatus(vendor, column.key);
-              }}
-              className={`min-h-[420px] rounded-3xl border ${column.ring} ${column.tint} p-3`}
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className={`h-2.5 w-2.5 rounded-full ${column.dot}`} />
-                  <h2 className="text-sm font-bold">{column.label}</h2>
-                </div>
-                <span className="rounded-full bg-white/80 px-2 py-0.5 text-xs font-bold text-w-muted">{columnRows.length}</span>
-              </div>
-              <div className="space-y-3">
-                {columnRows.map((vendor) => {
-                  const nextItem = (budgetByVendor.get(vendor.id) ?? []).sort((a, b) => String(a.due_date ?? '9999-12-31').localeCompare(String(b.due_date ?? '9999-12-31')))[0];
-                  return (
-                    <VendorCard
-                      key={vendor.id}
-                      vendor={vendor}
-                      budgetItem={nextItem}
-                      onOpen={() => start(vendor)}
-                      onDragStart={(event) => event.dataTransfer.setData('vendor-id', vendor.id)}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
+      <section className="hidden rounded-2xl border border-[#E5E7EB] bg-white p-3 shadow-soft lg:grid lg:grid-cols-[1.4fr_1fr_1fr_1fr_auto] lg:items-end lg:gap-3">
+        {filterFields}
+        <button type="button" className="btn-secondary h-12" onClick={clearFilters}>Limpar</button>
       </section>
+
+      <div className="lg:hidden">
+        <ResponsiveFilters activeFiltersCount={activeFilterCount} onClearFilters={clearFilters} clearLabel="Limpar" gridClassName="grid-cols-1">
+          {filterFields}
+        </ResponsiveFilters>
+      </div>
+
+      {!vendors.rows.length ? (
+        <section className="rounded-3xl border border-dashed border-[#E5E7EB] bg-white p-8 text-center shadow-soft">
+          <Handshake className="mx-auto text-w-faint" />
+          <h2 className="mt-3 text-lg font-bold">Nenhum fornecedor cadastrado</h2>
+          <p className="mx-auto mt-1 max-w-xl text-sm text-w-muted">Comece adicionando fornecedores para comparar orçamentos, negociar e gerar o financeiro automaticamente.</p>
+          <button className="btn-primary mt-4" onClick={() => start()}><Plus size={16} /> Adicionar fornecedor</button>
+        </section>
+      ) : view === 'kanban' ? (
+        <section className="grid auto-cols-[minmax(300px,86vw)] grid-flow-col gap-3 overflow-x-auto pb-2 xl:grid-flow-row xl:grid-cols-3 xl:overflow-visible">
+          {statusColumns.map((column) => {
+            const columnRows = rows.filter((vendor) => normalizeVendorWorkflowStatus(vendor.status) === normalizeVendorWorkflowStatus(column.key));
+            const total = columnRows.reduce((sum, vendor) => sum + Number(vendor.contracted_value ?? 0), 0);
+            const isDragTarget = dragOverStatus === column.key;
+
+            return (
+              <div
+                key={column.key}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setDragOverStatus(column.key);
+                }}
+                onDragLeave={() => setDragOverStatus('')}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setDragOverStatus('');
+                  const id = event.dataTransfer.getData('vendor-id');
+                  const vendor = vendors.rows.find((item) => item.id === id);
+                  if (!vendor) return;
+                  const forceBudgetCreate = normalizeVendorWorkflowStatus(column.key) === 'contratado';
+                  changeStatus(vendor, column.key, forceBudgetCreate);
+                }}
+                className={`card-hover-soft rounded-3xl border border-[#E5E7EB] bg-white p-3 shadow-soft ${isDragTarget ? 'bg-[#FFF1F5] ring-2 ring-[rgba(225,29,72,0.18)]' : ''}`}
+                style={{ borderTop: `4px solid ${column.color}` }}
+              >
+                <div className="mb-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: column.color }} />
+                      <h2 className="truncate text-sm font-bold">{column.label}</h2>
+                    </div>
+                    <span className="rounded-full bg-w-surface px-2 py-0.5 text-xs font-bold text-w-muted">{columnRows.length}</span>
+                  </div>
+                  <p className="mt-1 text-xs font-semibold text-w-muted">{columnRows.length} fornecedores</p>
+                  <p className="mt-1 text-sm font-bold text-w-text">{formatMoney(total)}</p>
+                </div>
+
+                <div className="space-y-3">
+                  {columnRows.length ? columnRows.map((vendor) => {
+                    const nextItem = (budgetByVendor.get(vendor.id) ?? []).sort((a, b) => String(a.due_date ?? '9999-12-31').localeCompare(String(b.due_date ?? '9999-12-31')))[0];
+                    return (
+                      <VendorCard
+                        key={vendor.id}
+                        vendor={vendor}
+                        budgetItem={nextItem}
+                        onOpen={() => start(vendor)}
+                        onDragStart={(event) => {
+                          event.dataTransfer.setData('vendor-id', vendor.id);
+                        }}
+                      />
+                    );
+                  }) : (
+                    <div className="rounded-2xl border border-dashed border-[#E5E7EB] bg-[#FAFAFA] p-4 text-center">
+                      <p className="text-sm font-semibold text-w-muted">Nenhum fornecedor</p>
+                      <button type="button" className="mt-2 text-sm font-bold text-w-rose hover:underline" onClick={() => start()}>
+                        + Adicionar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      ) : (
+        <section className="overflow-hidden rounded-3xl border border-[#E5E7EB] bg-white shadow-soft">
+          <div className="hidden grid-cols-[1.5fr_1fr_1fr_0.9fr_0.9fr_0.9fr_1fr_48px] gap-3 border-b border-[#E5E7EB] bg-[#FAFAFA] px-4 py-3 text-xs font-bold uppercase text-w-faint lg:grid">
+            <span>Fornecedor</span>
+            <span>Categoria</span>
+            <span>Status</span>
+            <span>Valor</span>
+            <span>Pago</span>
+            <span>Em aberto</span>
+            <span>Vencimento</span>
+            <span />
+          </div>
+          <div className="divide-y divide-[#E5E7EB]">
+            {rows.map((vendor) => {
+              const pending = getPendingValue(vendor.contracted_value, vendor.paid_value);
+              const statusMeta = statusColumns.find((item) => normalizeVendorWorkflowStatus(item.key) === normalizeVendorWorkflowStatus(vendor.status));
+              return (
+                <button key={vendor.id} type="button" className="grid w-full gap-2 px-4 py-3 text-left transition hover:bg-[#FAFAFA] lg:grid-cols-[1.5fr_1fr_1fr_0.9fr_0.9fr_0.9fr_1fr_48px] lg:items-center lg:gap-3" onClick={() => start(vendor)}>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-w-text">{vendor.name}</p>
+                    <p className="text-xs text-w-muted">{vendor.contact_name || vendor.phone || '-'}</p>
+                  </div>
+                  <p className="text-sm font-semibold text-w-muted">{toPrimaryCategory(vendor.category)}</p>
+                  <span className="inline-flex w-fit items-center gap-2 rounded-full bg-w-surface px-2.5 py-1 text-xs font-bold text-w-muted">
+                    <span className="h-2 w-2 rounded-full" style={{ background: statusMeta?.color ?? '#6B7280' }} />
+                    {statusMeta?.label ?? vendor.status}
+                  </span>
+                  <p className="text-sm font-semibold">{formatMoney(vendor.contracted_value)}</p>
+                  <p className="text-sm font-semibold text-[#22C55E]">{formatMoney(vendor.paid_value)}</p>
+                  <p className="text-sm font-semibold text-[#F59E0B]">{formatMoney(pending)}</p>
+                  <p className="text-sm font-semibold text-w-muted">{formatDate(vendor.due_date)}</p>
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl text-w-muted"><MoreVertical size={16} /></span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <Modal open={open} title={editing ? editing.name : 'Novo fornecedor'} onClose={() => setOpen(false)}>
         <form className="-m-5 flex max-h-[calc(100dvh-80px)] flex-col overflow-hidden rounded-t-3xl bg-white sm:max-h-[calc(92vh-80px)] sm:rounded-2xl" onSubmit={submit}>
-          <div className="flex-1 space-y-4 overflow-y-auto p-5">
-            <section className="glass rounded-3xl p-4">
+          <div className="flex-1 space-y-4 overflow-y-auto bg-w-surface/40 p-5">
+            <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
+              <div className="mb-4">
+                <h3 className="text-sm font-bold text-w-text">Dados do fornecedor</h3>
+                <p className="mt-0.5 text-xs font-medium text-w-muted">Identificação, categoria e contato principal.</p>
+              </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <FormInput label="Nome do fornecedor" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
                 <CategorySelect value={form.category} options={categoryOptions} onChange={(value) => setForm({ ...form, category: value })} onCreate={createCategory} />
                 <FormInput label="Contato" value={form.contact_name} onChange={(event) => setForm({ ...form, contact_name: event.target.value })} />
                 <FormInput label="Telefone" value={form.phone} onChange={(event) => setForm({ ...form, phone: maskPhone(event.target.value) })} />
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
+              <div className="mb-4">
+                <h3 className="text-sm font-bold text-w-text">Contrato</h3>
+                <p className="mt-0.5 text-xs font-medium text-w-muted">Valor total e status do fornecedor.</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
                 <CurrencyInput label="Valor total" value={form.contracted_value} onValueChange={(value) => setForm({ ...form, contracted_value: value })} />
                 <FormSelect label="Status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })} options={statusColumns.map((item) => ({ label: item.label, value: item.key }))} />
               </div>
@@ -447,27 +729,7 @@ export default function Vendors() {
 
             {editing && <Timeline vendor={{ ...editing, ...form } as Vendor} budgetItems={selectedBudgetItems} />}
 
-            <details className="rounded-2xl border border-w-border bg-white p-4" open>
-              <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold">
-                Parcelas
-                <ChevronDown size={16} />
-              </summary>
-              <div className="mt-4 space-y-3">
-                {installments.map((item, index) => (
-                  <div key={index} className="grid gap-3 rounded-2xl bg-w-surface p-3 md:grid-cols-[1fr_1fr_160px_auto]">
-                    <FormInput label="Nome" value={item.label} onChange={(event) => setInstallments((current) => current.map((row, i) => i === index ? { ...row, label: event.target.value } : row))} />
-                    <CurrencyInput label="Valor" value={item.amount} onValueChange={(value) => setInstallments((current) => current.map((row, i) => i === index ? { ...row, amount: value } : row))} />
-                    <FormInput label="Vencimento" type="date" value={item.due_date} onChange={(event) => setInstallments((current) => current.map((row, i) => i === index ? { ...row, due_date: event.target.value } : row))} />
-                    <button type="button" className="btn-secondary self-end px-3" onClick={() => setInstallments((current) => current.filter((_, i) => i !== index))}><Trash2 size={15} /></button>
-                  </div>
-                ))}
-                <button type="button" className="btn-secondary" onClick={() => setInstallments((current) => [...current, { label: `Parcela ${current.length + 1}`, amount: 0, due_date: '' }])}>
-                  <Plus size={15} /> Adicionar parcela
-                </button>
-              </div>
-            </details>
-
-            <details className="rounded-2xl border border-w-border bg-white p-4" open={Boolean(editing)}>
+            <details className="rounded-2xl border border-w-border bg-white p-4 shadow-soft" open={Boolean(editing)}>
               <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold">
                 Documentos
                 <ChevronDown size={16} />
@@ -497,7 +759,7 @@ export default function Vendors() {
               )}
             </details>
 
-            <details className="rounded-2xl border border-w-border bg-white p-4">
+            <details className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
               <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold">
                 Mais detalhes
                 <ChevronDown size={16} />
@@ -523,10 +785,138 @@ export default function Vendors() {
           <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-w-border bg-white p-4 sm:flex sm:justify-end">
             {editing && <button type="button" className="btn-secondary text-[#DC2626]" onClick={() => setDeleting(editing)}>Excluir</button>}
             <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Cancelar</button>
-            {editing && normalizeVendorStatus(form.status) !== 'contratado' && <button type="button" className="btn-secondary border-[#BBF7D0] bg-[#F0FDF4] text-[#15803D]" onClick={() => confirmHiring(editing)}><CheckCircle2 size={16} /> Contratar</button>}
+            {editing && normalizeVendorWorkflowStatus(form.status) !== 'contratado' && <button type="button" className="btn-secondary border-[#BBF7D0] bg-[#F0FDF4] text-[#15803D]" onClick={() => confirmHiring(editing)}><CheckCircle2 size={16} /> Contratar</button>}
             <button className="btn-primary">Salvar</button>
           </div>
         </form>
+      </Modal>
+
+      <Modal open={Boolean(paymentVendor)} title="Definir pagamento do fornecedor" onClose={() => setPaymentVendor(null)}>
+        {paymentVendor && (
+          <form className="-m-5 flex max-h-[calc(100dvh-80px)] flex-col overflow-hidden rounded-t-3xl bg-white sm:max-h-[calc(92vh-80px)] sm:rounded-2xl" onSubmit={(event) => { event.preventDefault(); confirmPaymentPlan(); }}>
+            <div className="flex-1 space-y-4 overflow-y-auto bg-w-surface/40 p-5">
+              <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
+                <p className="text-sm font-semibold text-w-muted">Antes de concluir, defina como este fornecedor será pago.</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+                  <div className="min-w-0">
+                    <p className="truncate text-lg font-bold text-w-text">{paymentVendor.name}</p>
+                    <p className="text-sm font-semibold text-w-muted">{toPrimaryCategory(paymentVendor.category)}</p>
+                  </div>
+                  <div className="rounded-2xl bg-w-surface px-4 py-3">
+                    <p className="text-[10px] font-bold uppercase text-w-faint">Valor contratado</p>
+                    <p className="text-xl font-bold text-w-text">{formatMoney(Number(paymentVendor.contracted_value ?? 0))}</p>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
+                <p className="mb-3 text-sm font-bold text-w-text">Condição de pagamento</p>
+                <div className="grid grid-cols-2 gap-2 rounded-2xl bg-w-surface p-1">
+                  {[
+                    { key: 'cash' as PaymentMode, label: 'À vista' },
+                    { key: 'installments' as PaymentMode, label: 'Parcelado' }
+                  ].map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      className={`min-h-10 rounded-xl text-sm font-bold transition ${paymentPlan.mode === option.key ? 'bg-white text-w-rose shadow-soft' : 'text-w-muted hover:text-w-text'}`}
+                      onClick={() => {
+                        setPaymentPlan({ ...paymentPlan, mode: option.key });
+                        if (option.key === 'installments') {
+                          setInstallmentDrafts(buildInstallments(Number(paymentVendor.contracted_value ?? 0), Number(paymentPlan.installments_count), paymentPlan.first_due_date || paymentPlan.due_date, paymentPlan.interval));
+                        }
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+
+                {paymentPlan.mode === 'cash' ? (
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <FormInput label="Data limite" type="date" value={paymentPlan.due_date} onChange={(event) => setPaymentPlan({ ...paymentPlan, due_date: event.target.value })} required />
+                    <CurrencyInput label="Valor total" value={Number(paymentVendor.contracted_value ?? 0)} onValueChange={() => undefined} />
+                  </div>
+                ) : (
+                  <div className="mt-4 space-y-4">
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <FormInput
+                        label="Quantidade"
+                        type="number"
+                        min={2}
+                        value={paymentPlan.installments_count}
+                        onChange={(event) => {
+                          const count = Math.max(2, Number(event.target.value || 2));
+                          setPaymentPlan({ ...paymentPlan, installments_count: count });
+                          setInstallmentDrafts(buildInstallments(Number(paymentVendor.contracted_value ?? 0), count, paymentPlan.first_due_date, paymentPlan.interval));
+                        }}
+                      />
+                      <FormInput
+                        label="Primeiro vencimento"
+                        type="date"
+                        value={paymentPlan.first_due_date}
+                        onChange={(event) => {
+                          setPaymentPlan({ ...paymentPlan, first_due_date: event.target.value });
+                          setInstallmentDrafts(buildInstallments(Number(paymentVendor.contracted_value ?? 0), Number(paymentPlan.installments_count), event.target.value, paymentPlan.interval));
+                        }}
+                      />
+                      <FormSelect
+                        label="Intervalo"
+                        value={paymentPlan.interval}
+                        onChange={(event) => {
+                          setPaymentPlan({ ...paymentPlan, interval: event.target.value });
+                          setInstallmentDrafts(buildInstallments(Number(paymentVendor.contracted_value ?? 0), Number(paymentPlan.installments_count), paymentPlan.first_due_date, event.target.value));
+                        }}
+                        options={[
+                          { label: 'Mensal', value: 'monthly' },
+                          { label: 'Quinzenal', value: 'biweekly' },
+                          { label: 'Semanal', value: 'weekly' },
+                          { label: 'Personalizado', value: 'custom' }
+                        ]}
+                      />
+                    </div>
+
+                    <div className="space-y-2 rounded-2xl bg-w-surface p-3">
+                      {installmentDrafts.map((draft, index) => (
+                        <div key={draft.number} className="grid gap-2 rounded-xl bg-white p-3 shadow-soft sm:grid-cols-[80px_1fr_1fr] sm:items-end">
+                          <p className="text-sm font-bold text-w-muted">#{draft.number}</p>
+                          <CurrencyInput
+                            label="Valor"
+                            value={draft.amount}
+                            onValueChange={(value) => setInstallmentDrafts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, amount: value } : item))}
+                          />
+                          <FormInput
+                            label="Vencimento"
+                            type="date"
+                            value={draft.due_date}
+                            onChange={(event) => setInstallmentDrafts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, due_date: event.target.value } : item))}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid gap-2 text-sm font-semibold text-w-muted sm:grid-cols-2">
+                      <p>Total das parcelas: {formatMoney(installmentDrafts.reduce((sum, item) => sum + Number(item.amount ?? 0), 0))}</p>
+                      <p className="sm:text-right">Contrato: {formatMoney(Number(paymentVendor.contracted_value ?? 0))}</p>
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <FormInput label="Forma de pagamento" value={paymentPlan.payment_method} onChange={(event) => setPaymentPlan({ ...paymentPlan, payment_method: event.target.value })} />
+                  <FormTextarea label="Observações" value={paymentPlan.notes} onChange={(event) => setPaymentPlan({ ...paymentPlan, notes: event.target.value })} />
+                </div>
+              </section>
+
+              {paymentError && <div className="rounded-2xl border border-[#FECACA] bg-[#FEF2F2] p-3 text-sm font-semibold text-[#B91C1C]">{paymentError}</div>}
+            </div>
+            <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-w-border bg-white p-4">
+              <button type="button" className="btn-secondary" onClick={() => setPaymentVendor(null)}>Cancelar</button>
+              <button className="btn-primary">Concluir contratação</button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       <ConfirmDialog
@@ -536,6 +926,7 @@ export default function Vendors() {
         onCancel={() => setDeleting(null)}
         onConfirm={async () => {
           if (!deleting) return;
+          await supabase.from('budget_items').delete().eq('wedding_id', deleting.wedding_id).eq('vendor_id', deleting.id);
           await vendors.remove(deleting.id);
           setDeleting(null);
           setOpen(false);
@@ -544,3 +935,4 @@ export default function Vendors() {
     </div>
   );
 }
+

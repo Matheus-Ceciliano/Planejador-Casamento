@@ -19,15 +19,17 @@ const roleLabels: Record<string, string> = {
   bride: 'Noiva',
   groom: 'Noivo',
   planner: 'Cerimonialista',
+  viewer: 'Visualizador',
   noiva: 'Noiva',
   noivo: 'Noivo',
   cerimonialista: 'Cerimonialista',
 };
 
 const inviteRoleOptions = [
-  { label: 'Noivo', value: 'groom' },
   { label: 'Noiva', value: 'bride' },
+  { label: 'Noivo', value: 'groom' },
   { label: 'Cerimonialista', value: 'planner' },
+  { label: 'Visualizador', value: 'viewer' },
 ];
 
 function formatDate(value: string | null | undefined) {

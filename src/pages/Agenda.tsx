@@ -25,7 +25,7 @@ import FormTextarea from '../components/FormTextarea';
 import Modal from '../components/Modal';
 import { useWedding } from '../hooks/useWedding';
 import { useWeddingTable } from '../hooks/useWeddingTable';
-import { BudgetCategory, BudgetItem, Task, Vendor } from '../types';
+import { BudgetCategory, BudgetItem, PaymentInstallment, Task, Vendor } from '../types';
 import { budgetCategories } from '../utils/constants';
 import { formatMoney } from '../utils/format';
 
@@ -42,7 +42,7 @@ type TimelineItem = {
 type AgendaType = 'task' | 'event' | 'payment' | 'reminder';
 type ViewMode = 'list' | 'calendar';
 type TypeFilter = 'all' | 'event' | 'task' | 'payment';
-type AgendaSource = 'task' | 'budget' | 'timeline' | 'wedding';
+type AgendaSource = 'task' | 'budget' | 'installment' | 'timeline' | 'wedding';
 
 type AgendaItem = {
   id: string;
@@ -219,6 +219,7 @@ export default function Agenda() {
   const { wedding } = useWedding();
   const tasks = useWeddingTable<Task>('tasks', 'due_date');
   const budgetItems = useWeddingTable<BudgetItem>('budget_items', 'due_date');
+  const paymentInstallments = useWeddingTable<PaymentInstallment>('payment_installments', 'due_date');
   const budgetCategoryRows = useWeddingTable<BudgetCategory>('budget_categories', 'sort_order');
   const vendors = useWeddingTable<Vendor>('vendors', 'name');
   const timeline = useWeddingTable<TimelineItem>('timeline_items', 'time');
@@ -245,6 +246,8 @@ export default function Agenda() {
   }, [budgetCategoryRows.rows]);
 
   const vendorById = useMemo(() => new Map(vendors.rows.map((vendor) => [vendor.id, vendor])), [vendors.rows]);
+  const budgetById = useMemo(() => new Map(budgetItems.rows.map((item) => [item.id, item])), [budgetItems.rows]);
+  const installmentBudgetIds = useMemo(() => new Set(paymentInstallments.rows.map((item) => item.budget_item_id).filter(Boolean) as string[]), [paymentInstallments.rows]);
 
   const agendaItems = useMemo<AgendaItem[]>(() => {
     const items: AgendaItem[] = [];
@@ -271,8 +274,30 @@ export default function Agenda() {
         });
       });
 
+    paymentInstallments.rows
+      .filter((installment) => installment.due_date)
+      .forEach((installment) => {
+        const budgetItem = installment.budget_item_id ? budgetById.get(installment.budget_item_id) : null;
+        const linkedVendor = installment.vendor_id ? vendorById.get(installment.vendor_id) : null;
+        const pending = Math.max(0, Number(installment.amount ?? 0) - Number(installment.paid_amount ?? 0));
+        items.push({
+          id: `installment-${installment.id}`,
+          sourceId: installment.id,
+          source: 'installment',
+          date: installment.due_date as string,
+          type: 'payment',
+          title: `Parcela ${installment.number} - ${budgetItem?.name ?? linkedVendor?.name ?? 'Fornecedor'}`,
+          description: `${budgetItem?.category ?? 'Financeiro'} · ${formatMoney(pending)} pendente`,
+          category: budgetItem?.category ?? 'Financeiro',
+          status: installment.status,
+          amount: Number(installment.amount ?? 0),
+          location: linkedVendor?.name ?? null,
+          href: '/orcamento'
+        });
+      });
+
     budgetItems.rows
-      .filter((item) => item.due_date)
+      .filter((item) => item.due_date && !installmentBudgetIds.has(item.id))
       .forEach((item) => {
         const pending = Number(item.contracted_value ?? 0) - Number(item.paid_value ?? 0);
         const linkedVendor = item.vendor_id ? vendorById.get(item.vendor_id) : null;
@@ -326,7 +351,7 @@ export default function Agenda() {
     }
 
     return items.sort((a, b) => `${a.date} ${a.time ?? ''}`.localeCompare(`${b.date} ${b.time ?? ''}`, 'pt-BR', { numeric: true }));
-  }, [budgetItems.rows, tasks.rows, timeline.rows, vendorById, wedding]);
+  }, [budgetById, budgetItems.rows, installmentBudgetIds, paymentInstallments.rows, tasks.rows, timeline.rows, vendorById, wedding]);
 
   const visibleItems = useMemo(() => {
     return agendaItems.filter((item) => {
@@ -459,6 +484,38 @@ export default function Agenda() {
     const status = nextStatus(item.type, item.status);
     if (item.source === 'task') await tasks.update(item.sourceId, { status });
     if (item.source === 'budget') await budgetItems.update(item.sourceId, { payment_status: status, payment_date: status === 'pago' ? today : null });
+    if (item.source === 'installment') {
+      const installment = paymentInstallments.rows.find((row) => row.id === item.sourceId);
+      if (!installment) return;
+      await paymentInstallments.update(item.sourceId, {
+        status,
+        paid_amount: status === 'pago' ? Number(installment.amount ?? 0) : 0,
+        paid_at: status === 'pago' ? today : null
+      } as Partial<PaymentInstallment>);
+
+      if (installment.budget_item_id) {
+        const related = paymentInstallments.rows.map((row) =>
+          row.id === installment.id
+            ? { ...row, status, paid_amount: status === 'pago' ? Number(row.amount ?? 0) : 0 }
+            : row
+        ).filter((row) => row.budget_item_id === installment.budget_item_id);
+        const paidValue = related.reduce((sum, row) => sum + (row.status === 'pago' ? Number(row.paid_amount || row.amount || 0) : 0), 0);
+        const budgetItem = budgetById.get(installment.budget_item_id);
+        if (budgetItem) {
+          await budgetItems.update(budgetItem.id, {
+            paid_value: paidValue,
+            payment_status: paidValue >= Number(budgetItem.contracted_value ?? 0) ? 'pago' : paidValue > 0 ? 'pago parcialmente' : 'pendente',
+            payment_date: status === 'pago' ? today : null
+          } as Partial<BudgetItem>);
+          if (budgetItem.vendor_id) {
+            const nextDue = related
+              .filter((row) => row.status !== 'pago' && row.due_date)
+              .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)))[0]?.due_date ?? budgetItem.due_date;
+            await vendors.update(budgetItem.vendor_id, { paid_value: paidValue, due_date: nextDue } as Partial<Vendor>);
+          }
+        }
+      }
+    }
   }
 
   function moveMonth(offset: number) {
@@ -951,4 +1008,3 @@ function EmptyAgenda({ onCreate }: { onCreate: () => void }) {
     </div>
   );
 }
-

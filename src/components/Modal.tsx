@@ -1,5 +1,7 @@
 import { X } from 'lucide-react';
 import { ReactNode, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { retainModalLayer } from '../utils/modalLayer';
 
 type Props = {
   open: boolean;
@@ -9,18 +11,16 @@ type Props = {
 };
 
 export default function Modal({ open, title, children, onClose }: Props) {
-  // Lock scroll on open
   useEffect(() => {
-    if (open) document.body.style.overflow = 'hidden';
-    else document.body.style.overflow = '';
-    return () => { document.body.style.overflow = ''; };
+    if (!open) return;
+    return retainModalLayer();
   }, [open]);
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/30 p-0 backdrop-blur-sm sm:items-center sm:p-4 animate-fade-in">
-      <div className="flex h-[100dvh] w-full flex-col overflow-hidden rounded-none bg-w-card shadow-float sm:h-auto sm:max-h-[92vh] sm:max-w-3xl sm:rounded-3xl animate-slide-up">
+  return createPortal(
+    <div className="fixed inset-0 z-[9998] flex items-stretch justify-center bg-slate-950/45 p-0 backdrop-blur-[8px] sm:items-center sm:p-4 animate-fade-in">
+      <div className="relative z-[9999] flex h-[100dvh] w-full flex-col overflow-hidden rounded-none bg-w-card shadow-float sm:h-auto sm:max-h-[92vh] sm:max-w-3xl sm:rounded-3xl animate-slide-up">
 
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-w-border bg-w-card px-5 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] sm:px-6 sm:py-5">
@@ -41,6 +41,7 @@ export default function Modal({ open, title, children, onClose }: Props) {
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

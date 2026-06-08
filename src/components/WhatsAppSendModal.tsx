@@ -8,8 +8,10 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useWedding } from '../hooks/useWedding';
 import { Guest, GuestGroup } from '../types';
+import { retainModalLayer } from '../utils/modalLayer';
 import {
   DEFAULT_MESSAGE_TEMPLATE,
   buildRsvpLink,
@@ -165,6 +167,11 @@ export default function WhatsAppSendModal({
   const [recipients, setRecipients] = useState<WhatsAppRecipient[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  useEffect(() => {
+    if (!open) return;
+    return retainModalLayer();
+  }, [open]);
+
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
@@ -268,9 +275,9 @@ export default function WhatsAppSendModal({
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-stone-950/40 p-0 sm:items-center sm:p-4">
-      <div className="flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-xl sm:h-auto sm:max-h-[92vh] sm:max-w-2xl sm:rounded-xl">
+  return createPortal(
+    <div className="fixed inset-0 z-[9998] flex items-stretch justify-center bg-slate-950/45 p-0 backdrop-blur-[8px] sm:items-center sm:p-4">
+      <div className="relative z-[9999] flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-xl sm:h-auto sm:max-h-[92vh] sm:max-w-2xl sm:rounded-xl">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 border-b border-[#E7E0D8] bg-[#FAF8F5] px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:px-5 sm:py-4">
           <div className="flex items-center gap-2.5">
@@ -546,6 +553,7 @@ export default function WhatsAppSendModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -11,7 +11,9 @@ import BudgetDueDates from './pages/BudgetDueDates';
 import Dashboard from './pages/Dashboard';
 import Files from './pages/Files';
 import Guests from './pages/Guests';
+import InviteAccept from './pages/InviteAccept';
 import Login from './pages/Login';
+import Members from './pages/Members';
 import Register from './pages/Register';
 import Settings from './pages/Settings';
 import Timeline from './pages/Timeline';
@@ -44,6 +46,7 @@ function RoutesContent() {
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/agenda" element={<Agenda />} />
       <Route path="/convidados" element={<Guests />} />
+      <Route path="/membros" element={<Members />} />
       <Route path="/orcamento" element={<Budget />} />
       <Route path="/orcamento/analise" element={<BudgetAnalysis />} />
       <Route path="/orcamento/vencimentos" element={<BudgetDueDates />} />
@@ -67,6 +70,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/convite/:token" element={<InviteAccept />} />
         <Route path="/*" element={<Protected />} />
       </Routes>
       <OfflineNotice />

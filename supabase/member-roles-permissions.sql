@@ -1,18 +1,11 @@
 create schema if not exists extensions;
 create extension if not exists "pgcrypto" with schema extensions;
 
-alter table public.wedding_members
-  drop constraint if exists wedding_members_role_check;
-
-alter table public.wedding_members
-  add constraint wedding_members_role_check
-  check (role in ('owner','bride','groom','planner','noivo','noiva','cerimonialista'));
-
 create table if not exists public.wedding_invites (
   id uuid primary key default extensions.gen_random_uuid(),
   wedding_id uuid not null references public.weddings(id) on delete cascade,
   token text unique not null,
-  role text not null check (role in ('bride','groom','planner')),
+  role text not null,
   created_by uuid references auth.users(id) on delete set null,
   used_by uuid references auth.users(id) on delete set null,
   used_at timestamptz,
@@ -24,20 +17,36 @@ create table if not exists public.wedding_invites (
 create index if not exists wedding_invites_wedding_id_idx
   on public.wedding_invites (wedding_id);
 
+alter table public.wedding_members
+  drop constraint if exists wedding_members_role_check;
+
+alter table public.wedding_members
+  add constraint wedding_members_role_check
+  check (role in ('owner','bride','groom','planner','viewer','noivo','noiva','cerimonialista'));
+
+alter table public.wedding_members
+  add column if not exists permissions jsonb not null default '{}'::jsonb;
+
+alter table public.wedding_invites
+  drop constraint if exists wedding_invites_role_check;
+
+alter table public.wedding_invites
+  add constraint wedding_invites_role_check
+  check (role in ('bride','groom','planner','viewer','noivo','noiva','cerimonialista'));
+
 alter table public.wedding_invites enable row level security;
 
-create or replace function public.is_wedding_member(target_wedding_id uuid)
-returns boolean
+create or replace function public.normalize_member_role(member_role text)
+returns text
 language sql
-security definer
-set search_path = public
+immutable
 as $$
-  select exists (
-    select 1 from public.wedding_members
-    where wedding_id = target_wedding_id
-      and user_id = auth.uid()
-      and role in ('owner','bride','groom','planner','noivo','noiva','cerimonialista')
-  );
+  select case member_role
+    when 'noivo' then 'groom'
+    when 'noiva' then 'bride'
+    when 'cerimonialista' then 'planner'
+    else member_role
+  end;
 $$;
 
 create or replace function public.can_manage_wedding_members(target_wedding_id uuid)
@@ -50,7 +59,7 @@ as $$
     select 1 from public.wedding_members
     where wedding_id = target_wedding_id
       and user_id = auth.uid()
-      and role in ('owner','bride','groom','noivo','noiva')
+      and public.normalize_member_role(role) in ('owner','bride','groom')
   );
 $$;
 
@@ -76,19 +85,6 @@ create policy "wedding invites managers delete"
 on public.wedding_invites for delete
 using (public.can_manage_wedding_members(wedding_id));
 
-create or replace function public.normalize_member_role(member_role text)
-returns text
-language sql
-immutable
-as $$
-  select case member_role
-    when 'noivo' then 'groom'
-    when 'noiva' then 'bride'
-    when 'cerimonialista' then 'planner'
-    else member_role
-  end;
-$$;
-
 create or replace function public.create_wedding_invite(
   target_wedding_id uuid,
   invite_role text,
@@ -105,7 +101,7 @@ declare
 begin
   normalized_role := public.normalize_member_role(invite_role);
 
-  if normalized_role not in ('bride','groom','planner') then
+  if normalized_role not in ('bride','groom','planner','viewer') then
     raise exception 'Papel invalido.';
   end if;
 
@@ -186,7 +182,6 @@ begin
     i.used_at,
     i.is_revoked,
     case
-      when i.id is null then 'not_found'
       when i.is_revoked then 'revoked'
       when i.used_at is not null then 'used'
       when i.expires_at is not null and i.expires_at < now() then 'expired'
@@ -255,7 +250,8 @@ begin
     name,
     email,
     role,
-    can_edit
+    can_edit,
+    permissions
   )
   values (
     invite_record.wedding_id,
@@ -263,7 +259,12 @@ begin
     coalesce(nullif(profile_record.full_name, ''), profile_record.email, auth.email()),
     coalesce(profile_record.email, auth.email()),
     normalized_role,
-    true
+    normalized_role <> 'viewer',
+    case
+      when normalized_role in ('bride', 'groom') then '{"guests":true,"agenda":true,"vendors":true,"budget":true,"files":true,"timeline":true,"settings":true}'::jsonb
+      when normalized_role = 'planner' then '{"guests":true,"agenda":true,"vendors":true,"budget":false,"files":true,"timeline":true,"settings":false}'::jsonb
+      else '{"guests":false,"agenda":false,"vendors":false,"budget":false,"files":false,"timeline":false,"settings":false}'::jsonb
+    end
   );
 
   update public.wedding_invites
