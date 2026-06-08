@@ -1,6 +1,5 @@
 import {
   AlertTriangle,
-  ArrowRight,
   CalendarClock,
   CalendarDays,
   CheckCircle2,
@@ -388,10 +387,6 @@ export default function Agenda() {
   }, {}), [calendarItems]);
   const selectedItems = selectedDay ? (itemsByDate[selectedDay] ?? []) : [];
 
-  const nextAction = useMemo(
-    () => agendaItems.find((item) => item.date >= today && !['concluída', 'cancelado', 'realizado', 'pago'].includes(statusForItem(item, today))),
-    [agendaItems, today]
-  );
 
   const weddingDaysLeft = wedding?.wedding_date ? daysBetween(today, wedding.wedding_date) : null;
   const weddingCountdown = wedding?.wedding_date
@@ -543,41 +538,36 @@ export default function Agenda() {
   ];
 
   return (
-    <div className="space-y-5 text-[#1F2937]">
+    <div className="space-y-4 text-[#1F2937]">
       {/* Header */}
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="page-title text-[#1F2937]">Central de Planejamento</h1>
           {weddingCountdown && (
-            <p className="mt-1 text-sm font-semibold text-[#E11D48]">{weddingCountdown}</p>
+            <p className="mt-1 inline-flex rounded-full border border-[#FCE4EA] bg-[#FFF1F5] px-2.5 py-1 text-xs font-bold text-[#E11D48]">{weddingCountdown}</p>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex shrink-0 rounded-xl border border-[#F0EBE6] bg-white p-1 shadow-soft">
-            <button type="button" onClick={() => setView('list')} className={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold ${view === 'list' ? 'bg-[#E11D48] text-white' : 'text-[#71717A]'}`}>
+        <div className="flex items-center">
+          <div className="grid grid-cols-2 rounded-2xl border border-[#F0EBE6] bg-white p-1 shadow-soft">
+            <button type="button" onClick={() => setView('list')} className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-xl px-3 text-sm font-bold transition ${view === 'list' ? 'bg-[#E11D48] text-white shadow-rose' : 'text-[#71717A] hover:bg-[#FAFAFA] hover:text-[#1F2937]'}`}>
               <List size={16} /> Lista
             </button>
-            <button type="button" onClick={() => setView('calendar')} className={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold ${view === 'calendar' ? 'bg-[#E11D48] text-white' : 'text-[#71717A]'}`}>
+            <button type="button" onClick={() => setView('calendar')} className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-xl px-3 text-sm font-bold transition ${view === 'calendar' ? 'bg-[#E11D48] text-white shadow-rose' : 'text-[#71717A] hover:bg-[#FAFAFA] hover:text-[#1F2937]'}`}>
               <CalendarDays size={16} /> Calendário
             </button>
           </div>
-          <button type="button" className="btn-secondary shrink-0" onClick={goToToday}>
-            <CalendarDays size={17} /> Hoje
-          </button>
         </div>
       </div>
 
       {/* Next Action Card */}
-      <NextActionCard item={nextAction} today={today} onOpen={openEdit} />
-
       {/* Filter Tabs — single row */}
-      <div className="flex gap-1.5 overflow-x-auto rounded-xl border border-[#F0EBE6] bg-white p-1.5 shadow-soft">
+      <div className="flex gap-1.5 overflow-x-auto rounded-2xl border border-[#F0EBE6] bg-white/80 p-1.5 shadow-soft">
         {filterTabs.map((tab) => (
           <button
             key={tab.key}
             type="button"
             onClick={() => setTypeFilter(tab.key)}
-            className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+            className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-bold transition sm:text-sm ${
               typeFilter === tab.key
                 ? 'bg-[#E11D48] text-white shadow-sm'
                 : 'text-[#71717A] hover:bg-[#F9F5F3] hover:text-[#1F2937]'
@@ -601,8 +591,8 @@ export default function Agenda() {
           selectedItems={selectedItems}
           weddingDate={wedding?.wedding_date ?? null}
           weddingCountdown={weddingCountdown}
-          nextAction={nextAction}
           onMoveMonth={moveMonth}
+          onToday={goToToday}
           onSelectDay={selectDay}
           onCreate={openCreate}
           onEdit={openEdit}
@@ -695,49 +685,6 @@ export default function Agenda() {
   );
 }
 
-/* ─── Next Action Card ─── */
-function NextActionCard({ item, today, onOpen }: { item?: AgendaItem; today: string; onOpen: (item: AgendaItem) => void }) {
-  if (!item) {
-    return (
-      <div className="flex items-center gap-3 rounded-xl border border-[#F0EBE6] bg-white px-4 py-3.5 shadow-soft">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F9F5F3] text-xl">🎉</span>
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wide text-[#71717A]">Próxima ação</p>
-          <p className="mt-0.5 text-sm font-semibold text-[#1F2937]">Nenhuma atividade próxima</p>
-        </div>
-      </div>
-    );
-  }
-
-  const currentStatus = statusForItem(item, today);
-  const isOverdue = ['atrasada', 'vencido'].includes(currentStatus);
-
-  return (
-    <div className={`flex items-center gap-3 rounded-xl border px-4 py-3.5 shadow-soft transition ${isOverdue ? 'border-red-200 bg-red-50/60' : 'border-[#F0EBE6] bg-white'}`}>
-      <span className="text-2xl">{typeEmoji[item.type]}</span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-[#71717A]">Próxima ação</p>
-        <p className="mt-0.5 truncate text-sm font-bold text-[#1F2937]">{item.title}</p>
-        <p className="mt-0.5 text-xs text-[#71717A]">
-          {shortDateLabel(item.date)}{item.time ? ` · ${item.time}` : ''}{item.location ? ` · ${item.location}` : ''}
-        </p>
-      </div>
-      {(item.source === 'task' || item.source === 'budget') && (
-        <button
-          type="button"
-          onClick={() => onOpen(item)}
-          className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-[#F0EBE6] bg-white px-3 py-2 text-xs font-bold text-[#1F2937] shadow-sm transition hover:border-[#E11D48] hover:text-[#E11D48]"
-        >
-          Abrir <ArrowRight size={13} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-/* ─── Filter not needed anymore ─── */
-
-/* ─── Agenda List ─── */
 function AgendaList({
   groups,
   items,
@@ -756,13 +703,13 @@ function AgendaList({
   if (!items.length) return <EmptyAgenda onCreate={onCreate} />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {groups.map((group) => (
         <section key={group.label}>
-          <div className="mb-3 flex items-center gap-2">
-            <h2 className={`text-xs font-bold uppercase tracking-widest ${group.accent}`}>{group.label}</h2>
-            <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-[#71717A] ring-1 ring-[#F0EBE6]">{group.items.length}</span>
-            <div className="h-px flex-1 bg-[#F0EBE6]" />
+          <div className="mb-2.5 flex items-center gap-2">
+            <h2 className={`text-[11px] font-extrabold uppercase tracking-widest ${group.accent}`}>{group.label}</h2>
+            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-extrabold text-[#71717A] ring-1 ring-[#F0EBE6]">{group.items.length}</span>
+            <div className="h-px flex-1 bg-[#F0EBE6]/80" />
           </div>
           <div className="space-y-2">
             {group.items.map((item) => <AgendaCard key={item.id} item={item} today={today} onEdit={onEdit} onToggle={onToggle} />)}
@@ -777,35 +724,41 @@ function AgendaList({
 function AgendaCard({ item, today, onEdit, onToggle }: { item: AgendaItem; today: string; onEdit: (item: AgendaItem) => void; onToggle: (item: AgendaItem) => void }) {
   const currentStatus = statusForItem(item, today);
   const actionable = item.source === 'task' || item.source === 'budget';
-  const isDone = ['concluída', 'pago', 'realizado'].includes(currentStatus);
+  const isDone = ['concluida', 'concluída', 'pago', 'realizado'].includes(currentStatus);
   const isOverdue = ['atrasada', 'vencido'].includes(currentStatus);
+  const Icon = typeIcon(item.type);
 
   return (
-    <article className={`group flex items-center gap-3 rounded-xl border px-4 py-3.5 transition ${isOverdue ? 'border-red-200 bg-red-50/40' : isDone ? 'border-[#F0EBE6] bg-[#FAFAFA] opacity-70' : 'border-[#F0EBE6] bg-white hover:border-[#E11D48]/30 hover:shadow-[0_4px_16px_rgba(225,29,72,0.06)]'}`}>
-      {/* Emoji icon */}
-      <span className="shrink-0 text-xl leading-none">{typeEmoji[item.type]}</span>
+    <article
+      className={`group flex cursor-pointer items-center gap-3 rounded-2xl border px-3.5 py-3 shadow-soft transition ${isOverdue ? 'border-red-200 bg-red-50/40' : isDone ? 'border-[#F0EBE6] bg-[#FAFAFA] opacity-80' : 'border-[#F0EBE6] bg-white hover:-translate-y-0.5 hover:border-[#E11D48]/25 hover:shadow-card'}`}
+      onClick={() => (actionable ? onEdit(item) : undefined)}
+    >
+      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${typeTone(item.type)}`}>
+        <Icon size={16} />
+      </span>
 
-      {/* Main content */}
       <div className="min-w-0 flex-1">
-        <p className={`text-sm font-bold leading-snug ${isDone ? 'text-[#A1A1AA] line-through' : 'text-[#1F2937]'}`}>{item.title}</p>
-        <p className="mt-0.5 text-xs text-[#71717A]">
-          {shortDateLabel(item.date)}
-          {item.time ? ` · ${item.time}` : ''}
-          {item.location ? ` · ${item.location}` : ''}
-          {item.amount !== undefined ? ` · ${formatMoney(item.amount)}` : ''}
-        </p>
-        {isOverdue && (
-          <span className="mt-1 inline-block rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-700">Atrasado</span>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <p className={`truncate text-sm font-extrabold leading-snug ${isDone ? 'text-[#A1A1AA] line-through' : 'text-[#1F2937]'}`}>{item.title}</p>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-[#FAFAFA] text-[#71717A]'}`}>{isOverdue ? 'Atrasado' : typeLabels[item.type]}</span>
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-[#71717A]">
+          <span>{shortDateLabel(item.date)}</span>
+          {item.time && <span>{item.time}</span>}
+          {item.location && <span className="inline-flex items-center gap-1"><MapPin size={12} /> {item.location}</span>}
+          {item.amount !== undefined && <span>{formatMoney(item.amount)}</span>}
+        </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition group-hover:opacity-100">
+      <div className="flex shrink-0 items-center gap-1.5 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100">
         {actionable && (
           <button
             type="button"
-            title={item.type === 'payment' ? 'Marcar como pago' : 'Marcar como concluído'}
-            onClick={() => onToggle(item)}
+            title={item.type === 'payment' ? 'Marcar como pago' : 'Marcar como concluido'}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggle(item);
+            }}
             className={`flex h-8 w-8 items-center justify-center rounded-lg border transition ${isDone ? 'border-green-200 bg-green-50 text-green-600' : 'border-[#F0EBE6] bg-white text-[#71717A] hover:border-green-300 hover:bg-green-50 hover:text-green-600'}`}
           >
             <CheckCircle2 size={16} />
@@ -815,7 +768,10 @@ function AgendaCard({ item, today, onEdit, onToggle }: { item: AgendaItem; today
           <button
             type="button"
             title="Editar"
-            onClick={() => onEdit(item)}
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit(item);
+            }}
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#F0EBE6] bg-white text-[#71717A] transition hover:border-[#E11D48]/40 hover:text-[#E11D48]"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -824,6 +780,7 @@ function AgendaCard({ item, today, onEdit, onToggle }: { item: AgendaItem; today
         <Link
           to={item.href}
           title="Abrir"
+          onClick={(event) => event.stopPropagation()}
           className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#F0EBE6] bg-white text-[#71717A] transition hover:border-[#E11D48]/40 hover:text-[#E11D48]"
         >
           <ExternalLink size={14} />
@@ -832,8 +789,6 @@ function AgendaCard({ item, today, onEdit, onToggle }: { item: AgendaItem; today
     </article>
   );
 }
-
-/* ─── Calendar Panel ─── */
 function CalendarPanel({
   month,
   monthDays,
@@ -843,8 +798,8 @@ function CalendarPanel({
   selectedItems,
   weddingDate,
   weddingCountdown,
-  nextAction,
   onMoveMonth,
+  onToday,
   onSelectDay,
   onCreate,
   onEdit,
@@ -858,8 +813,8 @@ function CalendarPanel({
   selectedItems: AgendaItem[];
   weddingDate: string | null;
   weddingCountdown: string | null;
-  nextAction?: AgendaItem;
   onMoveMonth: (offset: number) => void;
+  onToday: () => void;
   onSelectDay: (key: string) => void;
   onCreate: (date: string, type?: AgendaType) => void;
   onEdit: (item: AgendaItem) => void;
@@ -868,9 +823,12 @@ function CalendarPanel({
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
       <section className="overflow-hidden rounded-xl border border-[#F0EBE6] bg-white shadow-[0_16px_36px_rgba(31,41,55,0.06)]">
-        <div className="flex items-center justify-between gap-2 border-b border-[#F0EBE6] px-3 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F0EBE6] px-3 py-3">
           <button type="button" className="btn-secondary min-h-9 px-3" onClick={() => onMoveMonth(-1)} aria-label="Mês anterior"><ChevronLeft size={16} /></button>
-          <h2 className="min-w-0 truncate text-center text-sm font-bold capitalize text-[#1F2937]">{monthLabel(month)}</h2>
+          <div className="flex min-w-0 items-center justify-center gap-2">
+            <h2 className="min-w-0 truncate text-center text-sm font-bold capitalize text-[#1F2937]">{monthLabel(month)}</h2>
+            <button type="button" className="btn-secondary min-h-8 px-2.5 text-xs" onClick={onToday}>Hoje</button>
+          </div>
           <button type="button" className="btn-secondary min-h-9 px-3" onClick={() => onMoveMonth(1)} aria-label="Próximo mês"><ChevronRight size={16} /></button>
         </div>
         <div className="grid grid-cols-7 border-b border-[#F0EBE6] bg-[#FAFAFA] text-center text-[10px] font-bold uppercase tracking-wide text-[#71717A]">
@@ -909,7 +867,7 @@ function CalendarPanel({
         {selectedDay ? (
           <DayItemsPanel selectedDay={selectedDay} items={selectedItems} today={today} onCreate={onCreate} onEdit={onEdit} onToggle={onToggle} />
         ) : (
-          <CalendarSidePanel weddingDate={weddingDate} weddingCountdown={weddingCountdown} nextAction={nextAction} />
+          <CalendarSidePanel weddingDate={weddingDate} weddingCountdown={weddingCountdown} />
         )}
       </aside>
 
@@ -917,7 +875,7 @@ function CalendarPanel({
         {selectedDay ? (
           <DayItemsPanel selectedDay={selectedDay} items={selectedItems} today={today} onCreate={onCreate} onEdit={onEdit} onToggle={onToggle} />
         ) : (
-          <CalendarSidePanel weddingDate={weddingDate} weddingCountdown={weddingCountdown} nextAction={nextAction} />
+          <CalendarSidePanel weddingDate={weddingDate} weddingCountdown={weddingCountdown} />
         )}
       </section>
     </div>
@@ -953,12 +911,10 @@ function DayItemsPanel({ selectedDay, items, today, onCreate, onEdit, onToggle }
 /* ─── Calendar Side Panel ─── */
 function CalendarSidePanel({
   weddingDate,
-  weddingCountdown,
-  nextAction
+  weddingCountdown
 }: {
   weddingDate: string | null;
   weddingCountdown: string | null;
-  nextAction?: AgendaItem;
 }) {
   return (
     <div className="space-y-4">
@@ -977,22 +933,7 @@ function CalendarSidePanel({
         </div>
       )}
 
-      <div>
-        <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-[#71717A]">Próxima ação</p>
-        {nextAction ? (
-          <div className="rounded-xl border border-[#F0EBE6] bg-[#FAFAFA] p-3">
-            <p className="text-xl">{typeEmoji[nextAction.type]}</p>
-            <p className="mt-1.5 text-sm font-bold text-[#1F2937]">{nextAction.title}</p>
-            <p className="mt-0.5 text-xs text-[#71717A]">{shortDateLabel(nextAction.date)}{nextAction.time ? ` · ${nextAction.time}` : ''}</p>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-[#F0EBE6] bg-[#FAFAFA] p-3 text-center">
-            <p className="text-xs text-[#71717A]">Nenhuma atividade próxima</p>
-          </div>
-        )}
-      </div>
-
-      <p className="text-center text-xs text-[#A1A1AA]">Clique em um dia para ver ou criar itens</p>
+      <p className="rounded-xl border border-dashed border-[#F0EBE6] bg-[#FAFAFA] p-3 text-center text-xs text-[#A1A1AA]">Clique em um dia para ver ou criar itens</p>
     </div>
   );
 }

@@ -1,4 +1,20 @@
-﻿import { Copy, Heart, Link2, Mail, Plus, Trash2, UserCog, Users } from 'lucide-react';
+import {
+  CalendarClock,
+  CheckCircle2,
+  Copy,
+  Heart,
+  Link2,
+  Mail,
+  MoreHorizontal,
+  Plus,
+  RotateCcw,
+  Send,
+  ShieldCheck,
+  Trash2,
+  UserCog,
+  Users,
+  XCircle
+} from 'lucide-react';
 import { FormEvent, useMemo, useState } from 'react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import FormSelect from '../components/FormSelect';
@@ -10,7 +26,7 @@ import { supabase } from '../lib/supabase';
 import { MemberRole, WeddingInvite, WeddingMember } from '../types';
 
 const roleLabels: Record<string, string> = {
-  owner: 'Proprietário',
+  owner: 'Proprietario',
   bride: 'Noiva',
   groom: 'Noivo',
   planner: 'Cerimonialista',
@@ -28,34 +44,34 @@ const roleOptions = [
 ];
 
 const permissionItems = [
-  { key: 'guests', label: 'Convidados' },
-  { key: 'agenda', label: 'Agenda' },
-  { key: 'vendors', label: 'Fornecedores' },
-  { key: 'budget', label: 'Orçamento' },
-  { key: 'files', label: 'Arquivos' },
-  { key: 'timeline', label: 'Cronograma' },
-  { key: 'settings', label: 'Configurações' }
+  { key: 'budget_view', label: 'Pode visualizar orcamento' },
+  { key: 'budget', label: 'Pode editar orcamento' },
+  { key: 'guests', label: 'Pode gerenciar convidados' },
+  { key: 'vendors', label: 'Pode gerenciar fornecedores' },
+  { key: 'timeline', label: 'Pode gerenciar tarefas' },
+  { key: 'settings', label: 'Pode convidar outros membros' }
 ];
 
 const fullPermissions = Object.fromEntries(permissionItems.map((item) => [item.key, true]));
-const readOnlyPermissions = Object.fromEntries(permissionItems.map((item) => [item.key, false]));
+const readOnlyPermissions = { budget_view: true, budget: false, guests: false, vendors: false, timeline: false, settings: false };
 
 const defaultPermissions: Record<string, Record<string, boolean>> = {
   owner: fullPermissions,
   bride: fullPermissions,
   groom: fullPermissions,
-  planner: { guests: true, agenda: true, vendors: true, budget: false, files: true, timeline: true, settings: false },
+  planner: { budget_view: true, budget: false, guests: true, vendors: true, timeline: true, settings: false },
   viewer: readOnlyPermissions,
   noiva: fullPermissions,
   noivo: fullPermissions,
-  cerimonialista: { guests: true, agenda: true, vendors: true, budget: false, files: true, timeline: true, settings: false }
+  cerimonialista: { budget_view: true, budget: false, guests: true, vendors: true, timeline: true, settings: false }
 };
 
-function roleBadgeClass(role: string) {
-  const normalized = role === 'groom' || role === 'bride' || role === 'owner' ? 'owner' : role;
-  if (normalized === 'owner') return 'bg-w-rose-lt text-w-rose';
-  if (normalized === 'planner' || normalized === 'cerimonialista') return 'bg-[#F0FDF4] text-[#16A34A]';
-  return 'bg-w-surface text-w-muted';
+function roleTheme(role: string) {
+  const normalized = role === 'noiva' ? 'bride' : role === 'noivo' ? 'groom' : role === 'cerimonialista' ? 'planner' : role;
+  if (normalized === 'owner' || normalized === 'bride') return 'bg-w-rose-lt text-w-rose ring-w-rose-md';
+  if (normalized === 'groom') return 'bg-[#EFF6FF] text-[#2563EB] ring-[#DBEAFE]';
+  if (normalized === 'planner') return 'bg-w-green-lt text-[#16A34A] ring-[#DCFCE7]';
+  return 'bg-w-surface text-w-muted ring-w-border';
 }
 
 function initials(name: string) {
@@ -67,11 +83,157 @@ function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(new Date(value));
 }
 
+function formatActivityTime(value?: string | null) {
+  if (!value) return 'Hoje';
+  return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+}
+
 function inviteStatus(invite: WeddingInvite) {
-  if (invite.is_revoked) return 'Revogado';
+  if (invite.is_revoked) return 'Cancelado';
   if (invite.used_at) return 'Aceito';
   if (invite.expires_at && new Date(invite.expires_at) < new Date()) return 'Expirado';
   return 'Pendente';
+}
+
+type SummaryCardProps = {
+  label: string;
+  value: number;
+  icon: typeof Heart;
+  tone: string;
+  helper: string;
+};
+
+function SummaryCard({ label, value, icon: Icon, tone, helper }: SummaryCardProps) {
+  return (
+    <article className="rounded-2xl border border-w-border bg-white p-3 shadow-soft transition hover:-translate-y-0.5 hover:border-w-border-md hover:shadow-card">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-w-faint">{label}</p>
+          <p className="mt-1 text-2xl font-extrabold tracking-tight text-w-text">{value}</p>
+        </div>
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${tone}`}>
+          <Icon size={15} />
+        </span>
+      </div>
+      <p className="mt-1.5 text-xs font-semibold text-w-muted">{helper}</p>
+    </article>
+  );
+}
+
+type MemberCardProps = {
+  member: WeddingMember;
+  canManage: boolean;
+  isCurrentUser: boolean;
+  actionOpen: string;
+  onToggleActions: (id: string) => void;
+  onEdit: (member: WeddingMember) => void;
+  onRemove: (member: WeddingMember) => void;
+};
+
+function MemberCard({ member, canManage, isCurrentUser, actionOpen, onToggleActions, onEdit, onRemove }: MemberCardProps) {
+  const removable = canManage && member.role !== 'owner' && !isCurrentUser;
+
+  return (
+    <article className="relative rounded-3xl border border-w-border bg-white p-3.5 shadow-soft transition hover:border-w-border-md hover:shadow-card sm:p-4">
+      <div className="flex items-center gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-w-rose-lt to-white text-sm font-extrabold text-w-rose ring-1 ring-w-rose-md">
+          {initials(member.name)}
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="truncate text-sm font-extrabold text-w-text sm:text-base">{member.name}</h3>
+            {isCurrentUser && <span className="rounded-full bg-w-surface px-2 py-0.5 text-[10px] font-bold uppercase text-w-faint">Voce</span>}
+          </div>
+          <p className="truncate text-xs font-medium text-w-muted">{member.email}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-w-faint">
+            <span className="inline-flex items-center gap-1">
+              <CalendarClock size={12} /> Ultimo acesso: Hoje
+            </span>
+            <span className="inline-flex items-center gap-1 text-w-green">
+              <CheckCircle2 size={12} /> Ativo
+            </span>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <span className={`hidden rounded-full px-2.5 py-1 text-xs font-bold ring-1 sm:inline-flex ${roleTheme(member.role)}`}>
+            {roleLabels[member.role] ?? member.role}
+          </span>
+          <button
+            type="button"
+            className="rounded-2xl p-2 text-w-muted transition hover:bg-w-surface hover:text-w-text"
+            onClick={() => onToggleActions(actionOpen === member.id ? '' : member.id)}
+            aria-label="Acoes do membro"
+          >
+            <MoreHorizontal size={18} />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between sm:hidden">
+        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${roleTheme(member.role)}`}>
+          {roleLabels[member.role] ?? member.role}
+        </span>
+      </div>
+
+      {actionOpen === member.id && (
+        <div className="absolute right-3 top-14 z-20 w-56 overflow-hidden rounded-2xl border border-w-border bg-white shadow-float animate-scale-in">
+          <button type="button" className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-w-text hover:bg-w-surface" onClick={() => onEdit(member)}>
+            <ShieldCheck size={15} /> Editar permissoes
+          </button>
+          <button type="button" className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-w-text hover:bg-w-surface" onClick={() => onEdit(member)}>
+            <UserCog size={15} /> Alterar funcao
+          </button>
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-w-red hover:bg-w-red-lt disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!removable}
+            onClick={() => removable && onRemove(member)}
+          >
+            <Trash2 size={15} /> Remover membro
+          </button>
+        </div>
+      )}
+    </article>
+  );
+}
+
+type InviteCardProps = {
+  invite: WeddingInvite;
+  copiedId: string;
+  onCopy: (invite: WeddingInvite) => void;
+  onResend: (invite: WeddingInvite) => void;
+  onCancel: (invite: WeddingInvite) => void;
+};
+
+function InviteCard({ invite, copiedId, onCopy, onResend, onCancel }: InviteCardProps) {
+  const status = inviteStatus(invite);
+  return (
+    <article className="rounded-2xl border border-w-border bg-white p-3 shadow-soft">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-extrabold text-w-text">Convite para {roleLabels[invite.role] ?? invite.role}</p>
+          <p className="mt-1 truncate text-xs font-medium text-w-muted">{invite.created_by ? 'Link de acesso gerado' : 'Convite pendente'}</p>
+        </div>
+        <span className="rounded-full bg-w-gold-lt px-2 py-1 text-[10px] font-extrabold uppercase text-w-gold">{status}</span>
+      </div>
+      <p className="mt-2 text-xs font-semibold text-w-faint">Validade: {formatDate(invite.expires_at)}</p>
+      <div className="mt-3 grid gap-2">
+        <button type="button" className="btn-primary w-full py-2 text-xs" onClick={() => onCopy(invite)}>
+          <Copy size={14} /> {copiedId === invite.id ? 'Link copiado' : 'Copiar link'}
+        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" className="btn-secondary px-2 py-2 text-xs" onClick={() => onResend(invite)}>
+            <Send size={13} /> Reenviar
+          </button>
+          <button type="button" className="btn-secondary px-2 py-2 text-xs text-w-red" onClick={() => onCancel(invite)}>
+            <XCircle size={13} /> Cancelar
+          </button>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 export default function Members() {
@@ -86,7 +248,14 @@ export default function Members() {
   const [message, setMessage] = useState('');
   const [inviteError, setInviteError] = useState('');
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
-  const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'bride' });
+  const [actionOpen, setActionOpen] = useState('');
+  const [inviteForm, setInviteForm] = useState({
+    name: '',
+    email: '',
+    role: 'bride',
+    ttlDays: 7
+  });
+  const [invitePermissions, setInvitePermissions] = useState<Record<string, boolean>>(defaultPermissions.bride);
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
 
   const currentMember = members.rows.find((member) => member.user_id === user?.id);
@@ -98,9 +267,17 @@ export default function Members() {
   const viewers = members.rows.filter((member) => member.role === 'viewer').length;
 
   const activities = useMemo(() => {
-    const recentMembers = members.rows.slice(0, 2).map((member) => `${member.name} entrou no planejamento`);
-    const recentInvites = pendingInvites.slice(0, 2).map((invite) => `Convite pendente para ${roleLabels[invite.role] ?? invite.role}`);
-    return [...recentMembers, ...recentInvites, 'Histórico de alterações será registrado conforme a auditoria evoluir.'].slice(0, 4);
+    const recentMembers = members.rows.slice(0, 3).map((member) => ({
+      id: `member-${member.id}`,
+      text: `${member.name} entrou no planejamento`,
+      time: formatActivityTime(member.created_at)
+    }));
+    const recentInvites = pendingInvites.slice(0, 2).map((invite) => ({
+      id: `invite-${invite.id}`,
+      text: `Convite pendente para ${roleLabels[invite.role] ?? invite.role}`,
+      time: `Expira em ${formatDate(invite.expires_at)}`
+    }));
+    return [...recentMembers, ...recentInvites].slice(0, 5);
   }, [members.rows, pendingInvites]);
 
   function inviteLink(token: string) {
@@ -130,17 +307,18 @@ export default function Members() {
       const { error } = await supabase.rpc('create_wedding_invite', {
         target_wedding_id: wedding.id,
         invite_role: inviteForm.role,
-        ttl_days: 7
+        ttl_days: inviteForm.ttlDays
       });
 
       if (error) {
         const needsMigration = ['PGRST202', 'PGRST205'].includes(error.code ?? '') || error.message.includes('schema cache');
-        setInviteError(needsMigration ? 'A estrutura de convites ainda não foi aplicada no Supabase. Execute supabase/member-roles-permissions.sql e recarregue o schema cache.' : error.message);
+        setInviteError(needsMigration ? 'A estrutura de convites ainda nao foi aplicada no Supabase. Execute supabase/member-roles-permissions.sql e recarregue o schema cache.' : error.message);
         return;
       }
 
       setInviteOpen(false);
-      setInviteForm({ name: '', email: '', role: 'bride' });
+      setInviteForm({ name: '', email: '', role: 'bride', ttlDays: 7 });
+      setInvitePermissions(defaultPermissions.bride);
       setMessage('Convite gerado. Copie o link em Convites pendentes.');
       await invites.refresh();
     } catch (error) {
@@ -151,6 +329,7 @@ export default function Members() {
   }
 
   function openPermissions(member: WeddingMember) {
+    setActionOpen('');
     setPermissionOpen(member);
     setPermissions({ ...(defaultPermissions[member.role] ?? defaultPermissions.viewer), ...(member.permissions ?? {}) });
   }
@@ -167,7 +346,7 @@ export default function Members() {
       return;
     }
     setPermissionOpen(null);
-    setMessage('Permissões atualizadas.');
+    setMessage('Permissoes atualizadas.');
     await members.refresh();
   }
 
@@ -184,86 +363,114 @@ export default function Members() {
     setTimeout(() => setCopiedId(''), 1600);
   }
 
+  async function resendInvite(invite: WeddingInvite) {
+    await copyInvite(invite);
+    setMessage('Link copiado para reenviar o convite.');
+  }
+
+  async function cancelInvite(invite: WeddingInvite) {
+    const { error } = await supabase.rpc('revoke_wedding_invite', { invite_id: invite.id });
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    setMessage('Convite cancelado.');
+    await invites.refresh();
+  }
+
   return (
-    <div className="space-y-4 text-w-text">
+    <div className="space-y-4 text-w-text sm:space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="page-title">Membros</h1>
           <p className="mt-1 text-sm text-w-muted">Gerencie quem pode acessar e colaborar no planejamento do casamento.</p>
         </div>
-        <button className="btn-primary" onClick={openInviteModal} disabled={!canManage}>
-          <Plus size={16} /> Convidar membro
+        <button className="btn-primary w-full justify-center rounded-2xl px-5 py-3 shadow-rose sm:w-auto" onClick={openInviteModal} disabled={!canManage}>
+          <Plus size={17} /> Convidar membro
         </button>
       </div>
 
-      {message && <div className="rounded-2xl border border-[#E5E7EB] bg-white p-3 text-sm font-semibold text-w-muted">{message}</div>}
+      {message && <div className="rounded-2xl border border-w-border bg-white px-4 py-3 text-sm font-semibold text-w-muted shadow-soft">{message}</div>}
 
-      <section className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-        {[
-          { label: 'Noivas', value: brides, icon: Heart, tone: 'text-w-rose' },
-          { label: 'Noivos', value: grooms, icon: Users, tone: 'text-[#2563EB]' },
-          { label: 'Cerimonialistas', value: planners, icon: UserCog, tone: 'text-[#16A34A]' },
-          { label: 'Visualizadores', value: viewers, icon: Mail, tone: 'text-[#6B7280]' }
-        ].map(({ label, value, icon: Icon, tone }) => (
-          <div key={label} className="card-metric p-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-w-faint">{label}</p>
-              <Icon size={15} className={tone} />
-            </div>
-            <p className="mt-2 text-2xl font-bold">{value}</p>
-          </div>
-        ))}
+      <section className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+        <SummaryCard label="Noivas" value={brides} icon={Heart} tone="bg-w-rose-lt text-w-rose" helper={`${brides} ${brides === 1 ? 'membro ativo' : 'membros ativos'}`} />
+        <SummaryCard label="Noivos" value={grooms} icon={Users} tone="bg-[#EFF6FF] text-[#2563EB]" helper={`${grooms} ${grooms === 1 ? 'membro ativo' : 'membros ativos'}`} />
+        <SummaryCard label="Cerimonialistas" value={planners} icon={UserCog} tone="bg-w-green-lt text-[#16A34A]" helper={`${planners} ${planners === 1 ? 'membro ativo' : 'membros ativos'}`} />
+        <SummaryCard label="Visualizadores" value={viewers} icon={Mail} tone="bg-w-surface text-w-muted" helper={`${viewers} ${viewers === 1 ? 'acesso limitado' : 'acessos limitados'}`} />
       </section>
 
-      <section className="grid gap-3 lg:grid-cols-[1fr_360px]">
-        <div className="grid gap-3">
-          {members.rows.map((member) => (
-            <article key={member.id} className="card-hover-soft rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-soft">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => openPermissions(member)}>
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-w-rose-lt text-sm font-bold text-w-rose">{initials(member.name)}</span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-bold">{member.name}</span>
-                    <span className="block truncate text-xs text-w-muted">{member.email}</span>
-                    <span className="mt-2 block text-xs font-semibold text-w-muted">Último acesso: Hoje</span>
-                  </span>
-                </button>
-                <div className="flex items-center justify-between gap-2 sm:justify-end">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${roleBadgeClass(member.role)}`}>{roleLabels[member.role] ?? member.role}</span>
-                  {canManage && member.role !== 'owner' && member.user_id !== user?.id && (
-                    <button type="button" className="rounded-xl p-2 text-w-muted transition hover:bg-w-red-lt hover:text-[#EF4444]" onClick={() => setRemoving(member)} aria-label="Remover membro">
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </article>
-          ))}
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_390px]">
+        <div className="rounded-3xl border border-w-border bg-white/70 p-3 shadow-soft sm:p-4">
+          <div className="mb-3 flex items-center justify-between gap-3 px-1">
+            <div>
+              <h2 className="text-sm font-extrabold text-w-text">Equipe do planejamento</h2>
+              <p className="mt-0.5 text-xs font-medium text-w-muted">{members.rows.length} pessoas com acesso</p>
+            </div>
+            <span className="rounded-full bg-w-rose-lt px-3 py-1 text-xs font-bold text-w-rose">Acesso colaborativo</span>
+          </div>
+
+          <div className="grid gap-2.5">
+            {members.rows.map((member) => (
+              <MemberCard
+                key={member.id}
+                member={member}
+                canManage={canManage}
+                isCurrentUser={member.user_id === user?.id}
+                actionOpen={actionOpen}
+                onToggleActions={setActionOpen}
+                onEdit={openPermissions}
+                onRemove={(next) => {
+                  setActionOpen('');
+                  setRemoving(next);
+                }}
+              />
+            ))}
+          </div>
         </div>
 
-        <aside className="space-y-3">
-          <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-soft">
-            <h2 className="text-sm font-bold">Convites pendentes</h2>
-            <div className="mt-3 grid gap-2">
+        <aside className="space-y-4">
+          <section className="rounded-3xl border border-w-border bg-white p-4 shadow-soft">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-extrabold text-w-text">Convites pendentes</h2>
+                <p className="mt-0.5 text-xs font-medium text-w-muted">{pendingInvites.length} aguardando aceite</p>
+              </div>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-w-rose-lt text-w-rose">
+                <Link2 size={17} />
+              </span>
+            </div>
+            <div className="mt-3 grid gap-2.5">
               {pendingInvites.map((invite) => (
-                <div key={invite.id} className="rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] p-3">
-                  <p className="text-sm font-bold">{roleLabels[invite.role] ?? invite.role}</p>
-                  <p className="mt-1 text-xs text-w-muted">Validade: {formatDate(invite.expires_at)}</p>
-                  <button className="btn-secondary mt-3 w-full" onClick={() => copyInvite(invite)}>
-                    <Copy size={15} /> {copiedId === invite.id ? 'Copiado' : 'Copiar link'}
-                  </button>
-                </div>
+                <InviteCard key={invite.id} invite={invite} copiedId={copiedId} onCopy={copyInvite} onResend={resendInvite} onCancel={cancelInvite} />
               ))}
               {!pendingInvites.length && <p className="rounded-2xl bg-w-surface p-4 text-sm font-semibold text-w-muted">Nenhum convite pendente.</p>}
             </div>
           </section>
 
-          <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-soft">
-            <h2 className="text-sm font-bold">Atividades recentes</h2>
-            <div className="mt-3 grid gap-2">
-              {activities.map((activity) => (
-                <p key={activity} className="rounded-2xl bg-w-surface p-3 text-sm font-semibold text-w-muted">{activity}</p>
+          <section className="rounded-3xl border border-w-border bg-white p-4 shadow-soft">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-extrabold text-w-text">Atividades recentes</h2>
+                <p className="mt-0.5 text-xs font-medium text-w-muted">Historico do acesso</p>
+              </div>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-w-surface text-w-muted">
+                <CalendarClock size={17} />
+              </span>
+            </div>
+            <div className="mt-4 space-y-3">
+              {activities.map((activity, index) => (
+                <div key={activity.id} className="relative flex gap-3 rounded-2xl bg-w-surface p-3">
+                  <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-w-rose ring-1 ring-w-border">
+                    <span className="h-2 w-2 rounded-full bg-w-rose" />
+                  </span>
+                  {index < activities.length - 1 && <span className="absolute left-6 top-10 h-6 w-px bg-w-border" />}
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-w-text">{activity.text}</p>
+                    <p className="mt-0.5 text-xs font-semibold text-w-faint">{activity.time}</p>
+                  </div>
+                </div>
               ))}
+              {!activities.length && <p className="rounded-2xl bg-w-surface p-4 text-sm font-semibold text-w-muted">Nenhuma atividade recente.</p>}
             </div>
           </section>
         </aside>
@@ -274,51 +481,100 @@ export default function Members() {
       </button>
 
       <Modal open={inviteOpen} title="Convidar membro" onClose={closeInviteModal}>
-        <form className="space-y-4" onSubmit={submitInvite}>
+        <form className="space-y-5" onSubmit={submitInvite}>
           {inviteError && (
             <div className="rounded-2xl border border-w-red/20 bg-w-red-lt p-3 text-sm font-semibold text-w-red">
               {inviteError}
             </div>
           )}
-          <label className="block">
-            <span className="label">Nome</span>
-            <input className="input" value={inviteForm.name} onChange={(event) => setInviteForm({ ...inviteForm, name: event.target.value })} placeholder="Nome do membro" />
-          </label>
-          <label className="block">
-            <span className="label">Email</span>
-            <input className="input" type="email" value={inviteForm.email} onChange={(event) => setInviteForm({ ...inviteForm, email: event.target.value })} placeholder="email@exemplo.com" />
-          </label>
-          <FormSelect label="Função" value={inviteForm.role} onChange={(event) => setInviteForm({ ...inviteForm, role: event.target.value })} options={roleOptions} />
-          <div className="rounded-2xl bg-w-surface p-3 text-sm text-w-muted">
-            O link único expira em 7 dias e poderá ser compartilhado com a pessoa convidada.
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className="label">Nome do membro</span>
+              <input className="input rounded-2xl" value={inviteForm.name} onChange={(event) => setInviteForm({ ...inviteForm, name: event.target.value })} placeholder="Nome do membro" />
+            </label>
+            <label className="block">
+              <span className="label">E-mail</span>
+              <input className="input rounded-2xl" type="email" value={inviteForm.email} onChange={(event) => setInviteForm({ ...inviteForm, email: event.target.value })} placeholder="email@exemplo.com" />
+            </label>
           </div>
-          <div className="flex justify-end gap-2">
-            <button type="button" className="btn-secondary" onClick={closeInviteModal} disabled={inviteSubmitting}>Cancelar</button>
-            <button className="btn-primary" disabled={inviteSubmitting}>
-              <Link2 size={16} /> {inviteSubmitting ? 'Gerando...' : 'Enviar convite'}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <FormSelect
+              label="Tipo de acesso"
+              value={inviteForm.role}
+              onChange={(event) => {
+                const nextRole = event.target.value;
+                setInviteForm({ ...inviteForm, role: nextRole });
+                setInvitePermissions(defaultPermissions[nextRole] ?? defaultPermissions.viewer);
+              }}
+              options={roleOptions}
+            />
+            <label className="block">
+              <span className="label">Validade do convite</span>
+              <select
+                className="input rounded-2xl"
+                value={inviteForm.ttlDays}
+                onChange={(event) => setInviteForm({ ...inviteForm, ttlDays: Number(event.target.value) })}
+              >
+                <option value={3}>3 dias</option>
+                <option value={7}>7 dias</option>
+                <option value={15}>15 dias</option>
+                <option value={30}>30 dias</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="rounded-3xl border border-w-border bg-w-surface p-3">
+            <p className="px-1 text-xs font-extrabold uppercase tracking-[0.14em] text-w-faint">Permissoes</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {permissionItems.map((item) => (
+                <label key={item.key} className="flex items-center justify-between gap-3 rounded-2xl border border-w-border bg-white p-3 text-sm font-semibold text-w-text">
+                  <span>{item.label}</span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(invitePermissions[item.key])}
+                    onChange={(event) => setInvitePermissions((current) => ({ ...current, [item.key]: event.target.checked }))}
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-w-rose-lt p-3 text-sm font-semibold text-w-rose">
+            O app gera um link unico para compartilhar com a pessoa convidada.
+          </div>
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" className="btn-secondary justify-center" onClick={closeInviteModal} disabled={inviteSubmitting}>Cancelar</button>
+            <button className="btn-primary justify-center" disabled={inviteSubmitting}>
+              <Send size={16} /> {inviteSubmitting ? 'Enviando...' : 'Enviar convite'}
             </button>
           </div>
         </form>
       </Modal>
 
-      <Modal open={Boolean(permissionOpen)} title="Permissões do membro" onClose={() => setPermissionOpen(null)}>
+      <Modal open={Boolean(permissionOpen)} title="Permissoes do membro" onClose={() => setPermissionOpen(null)}>
         {permissionOpen && (
           <form className="space-y-4" onSubmit={savePermissions}>
-            <div className="rounded-2xl bg-w-surface p-4">
-              <p className="font-bold">{permissionOpen.name}</p>
-              <p className="text-sm text-w-muted">{permissionOpen.email}</p>
+            <div className="flex items-center gap-3 rounded-3xl bg-w-surface p-4">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-w-rose-lt text-sm font-extrabold text-w-rose">{initials(permissionOpen.name)}</span>
+              <div className="min-w-0">
+                <p className="truncate font-extrabold text-w-text">{permissionOpen.name}</p>
+                <p className="truncate text-sm text-w-muted">{permissionOpen.email}</p>
+              </div>
             </div>
             <FormSelect
-              label="Função"
+              label="Funcao"
               value={permissionOpen.role}
               onChange={(event) => setPermissionOpen({ ...permissionOpen, role: event.target.value as MemberRole })}
-              options={[{ label: 'Proprietário', value: 'owner' }, ...roleOptions]}
+              options={[{ label: 'Proprietario', value: 'owner' }, ...roleOptions]}
               disabled={permissionOpen.role === 'owner'}
             />
-            <div className="grid gap-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               {permissionItems.map((item) => (
-                <label key={item.key} className="flex items-center justify-between rounded-2xl border border-[#E5E7EB] bg-white p-3 text-sm font-semibold">
-                  {item.label}
+                <label key={item.key} className="flex items-center justify-between gap-3 rounded-2xl border border-w-border bg-white p-3 text-sm font-semibold">
+                  <span>{item.label}</span>
                   <input
                     type="checkbox"
                     checked={Boolean(permissions[item.key])}
@@ -328,9 +584,9 @@ export default function Members() {
                 </label>
               ))}
             </div>
-            <div className="flex justify-end gap-2">
-              <button type="button" className="btn-secondary" onClick={() => setPermissionOpen(null)}>Cancelar</button>
-              <button className="btn-primary">Salvar permissões</button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button type="button" className="btn-secondary justify-center" onClick={() => setPermissionOpen(null)}>Cancelar</button>
+              <button className="btn-primary justify-center">Salvar permissoes</button>
             </div>
           </form>
         )}

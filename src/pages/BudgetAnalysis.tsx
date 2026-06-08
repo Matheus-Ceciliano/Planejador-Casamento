@@ -3,11 +3,18 @@ import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, Res
 import { useNavigate } from 'react-router-dom';
 import { useWedding } from '../hooks/useWedding';
 import { useWeddingTable } from '../hooks/useWeddingTable';
-import { BudgetItem } from '../types';
-import { getPendingValue, toPrimaryCategory } from '../utils/finance';
+import { BudgetItem, PaymentInstallment } from '../types';
+import { calculateFinancialHealth, getPendingValue, toPrimaryCategory } from '../utils/finance';
 import { formatDate, formatMoney } from '../utils/format';
 
 const chartColors = ['#E11D48', '#2563EB', '#22C55E', '#F59E0B', '#7C3AED', '#0F766E', '#EF4444', '#52525B'];
+const healthToneClasses = {
+  saudavel: 'text-[#22C55E]',
+  atencao: 'text-[#F59E0B]',
+  preocupante: 'text-[#F97316]',
+  critica: 'text-[#EF4444]',
+  sem_dados: 'text-w-muted'
+};
 
 function percent(value: number, total: number) {
   if (!total) return 0;
@@ -27,6 +34,7 @@ export default function BudgetAnalysis() {
   const navigate = useNavigate();
   const { wedding } = useWedding();
   const items = useWeddingTable<BudgetItem>('budget_items', 'due_date');
+  const installments = useWeddingTable<PaymentInstallment>('payment_installments', 'due_date');
 
   const planned = Number(wedding?.planned_budget ?? 0);
   const committed = items.rows.reduce((sum, item) => sum + Number(item.contracted_value ?? 0), 0);
@@ -57,8 +65,14 @@ export default function BudgetAnalysis() {
     .filter((item) => item.due_date && getPendingValue(item.contracted_value, item.paid_value) > 0)
     .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)))[0];
   const expensiveCategory = categoryData[0];
-  const health = committedPct > 95 || pending > paid * 2 ? 'Critico' : committedPct > 75 ? 'Atencao' : 'Saudavel';
-  const healthTone = health === 'Critico' ? 'text-[#EF4444]' : health === 'Atencao' ? 'text-[#F59E0B]' : 'text-[#22C55E]';
+  const health = calculateFinancialHealth({
+    totalContratado: committed,
+    totalPago: paid,
+    itensFinanceiros: items.rows,
+    pagamentos: installments.rows,
+    dataCasamento: wedding?.wedding_date
+  });
+  const healthTone = healthToneClasses[health.status];
 
   return (
     <div className="space-y-5 text-w-text">
@@ -89,8 +103,9 @@ export default function BudgetAnalysis() {
             <HeartPulse size={17} className={healthTone} />
             <h2 className="text-sm font-bold">Saude financeira</h2>
           </div>
-          <p className={`mt-4 text-3xl font-bold ${healthTone}`}>{health}</p>
-          <p className="mt-2 text-sm text-w-muted">{formatMoney(pending)} em aberto.</p>
+          <p className={`mt-4 text-3xl font-bold ${healthTone}`}>{health.label}</p>
+          <p className="mt-1 text-sm font-semibold text-w-text">Risco {health.score}%</p>
+          <p className="mt-2 text-sm text-w-muted">{health.motivo}</p>
         </div>
       </section>
 

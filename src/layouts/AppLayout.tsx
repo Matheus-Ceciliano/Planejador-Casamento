@@ -1,10 +1,11 @@
 import {
   CalendarDays, ChevronDown, Clock3, Files, Handshake,
-  Heart, Home, LogOut, Menu, MoreHorizontal,
+  Heart, Home, LogOut, Menu,
   Send, Settings, Users, WalletCards, X,
 } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { AnimatedPage } from '../components/Animated';
 import InstallPWAButton from '../components/InstallPWAButton';
 import { useAuth } from '../hooks/useAuth';
 import { useWedding } from '../hooks/useWedding';
@@ -14,11 +15,11 @@ const nav = [
   { to: '/dashboard',    label: 'Início',         icon: Home },
   { to: '/agenda',       label: 'Agenda',          icon: CalendarDays },
   { to: '/convidados',   label: 'Convidados',      icon: Users },
-  { to: '/membros',      label: 'Membros',         icon: Users },
   { to: '/orcamento',    label: 'Orçamento',       icon: WalletCards },
   { to: '/fornecedores', label: 'Fornecedores',    icon: Handshake },
   { to: '/cronograma',   label: 'Cronograma',      icon: Clock3 },
   { to: '/arquivos',     label: 'Arquivos',        icon: Files },
+  { to: '/membros',      label: 'Membros',         icon: Users },
   { to: '/configuracoes',label: 'Configurações',   icon: Settings },
 ];
 
@@ -40,7 +41,7 @@ function LogoMark() {
 }
 
 /* ── Sidebar ──────────────────────────────────────────────────────── */
-function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+function Sidebar({ onNavigate, onSignOut }: { onNavigate?: () => void; onSignOut?: () => void }) {
   return (
     <aside className="flex h-full flex-col bg-white">
       {/* Brand */}
@@ -81,6 +82,21 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </NavLink>
         ))}
       </nav>
+
+      {onSignOut && (
+        <div className="border-t border-w-border p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-w-muted transition hover:bg-w-surface hover:text-w-text"
+            onClick={onSignOut}
+          >
+            <span className="rounded-lg p-1">
+              <LogOut size={16} />
+            </span>
+            Sair da conta
+          </button>
+        </div>
+      )}
     </aside>
   );
 }
@@ -91,6 +107,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
   const [modalOpen, setModalOpen] = useState(false);
   const { signOut, user } = useAuth();
   const { wedding, weddings, selectWedding } = useWedding();
+  const location = useLocation();
 
   useEffect(() => {
     const syncModalState = (event?: Event) => {
@@ -127,7 +144,13 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
             >
               <X size={18} />
             </button>
-            <Sidebar onNavigate={() => setOpen(false)} />
+            <Sidebar
+              onNavigate={() => setOpen(false)}
+              onSignOut={() => {
+                setOpen(false);
+                signOut();
+              }}
+            />
           </div>
         </div>
       )}
@@ -188,7 +211,9 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
 
         {/* ── Page content ── */}
         <main className="pwa-main-safe mx-auto max-w-7xl animate-fade-in px-3 pt-5 sm:px-6 sm:pt-6 lg:pb-8">
-          {children ?? <Outlet />}
+          <AnimatedPage key={location.pathname}>
+            {children ?? <Outlet />}
+          </AnimatedPage>
         </main>
       </div>
 

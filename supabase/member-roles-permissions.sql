@@ -49,6 +49,20 @@ as $$
   end;
 $$;
 
+create or replace function public.is_wedding_member(target_wedding_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.wedding_members
+    where wedding_id = target_wedding_id
+      and user_id = auth.uid()
+      and public.normalize_member_role(role) in ('owner','bride','groom','planner','viewer')
+  );
+$$;
+
 create or replace function public.can_manage_wedding_members(target_wedding_id uuid)
 returns boolean
 language sql
@@ -235,7 +249,12 @@ begin
     where wedding_id = invite_record.wedding_id
       and user_id = auth.uid()
   ) then
-    raise exception 'Voce ja faz parte deste planejamento.';
+    update public.wedding_invites
+    set used_by = coalesce(used_by, auth.uid()),
+        used_at = coalesce(used_at, now())
+    where id = invite_record.id;
+
+    return invite_record.wedding_id;
   end if;
 
   select * into profile_record

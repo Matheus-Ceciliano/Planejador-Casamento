@@ -110,6 +110,40 @@ textarea {
   }
 }
 
+@keyframes cardRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out both;
 }
@@ -124,6 +158,20 @@ textarea {
 
 .animate-slide-right {
   animation: slideInRight 0.2s ease-out both;
+}
+
+.animate-card-rise {
+  animation: cardRise 0.52s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-page-enter {
+  animation: pageEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #F6F1ED 0%, #FFFFFF 45%, #F6F1ED 90%);
+  background-size: 220% 100%;
+  animation: shimmer 1.3s ease-in-out infinite;
 }
 
 /* ── Component Layer ────────────────────────────────────────────── */
@@ -142,28 +190,49 @@ textarea {
   /* ── Panel / Card ── */
   .panel {
     @apply rounded-2xl border border-w-border bg-w-card shadow-card;
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    animation: cardRise 0.52s cubic-bezier(0.16, 1, 0.3, 1) both;
+    transition: border-color 0.26s ease, box-shadow 0.26s ease, transform 0.26s ease;
   }
 
   .panel-hover:hover {
     @apply shadow-float -translate-y-0.5;
   }
 
+  .panel:hover {
+    @apply border-w-border-md shadow-float;
+    transform: translateY(-2px);
+  }
+
   /* ── Premium card (glass version) ── */
   .card-glass {
     @apply rounded-2xl border border-white/60 bg-white/80 shadow-glass backdrop-blur-xl;
+    animation: cardRise 0.52s cubic-bezier(0.16, 1, 0.3, 1) both;
+    transition: border-color 0.26s ease, box-shadow 0.26s ease, transform 0.26s ease;
+  }
+
+  .card-glass:hover {
+    @apply shadow-float;
+    transform: translateY(-2px);
   }
 
   .card-metric {
     @apply rounded-3xl border border-[#E5E7EB] bg-white shadow-soft transition-all duration-150 ease-out;
+    animation: cardRise 0.52s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .card-metric:hover {
+    @apply border-w-border-md shadow-card;
+    transform: translateY(-2px);
   }
 
   .card-hover-soft {
     @apply bg-white transition-all duration-150 ease-out;
+    animation: cardRise 0.52s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   .card-hover-soft:hover {
     @apply border-w-border-md shadow-card;
+    transform: translateY(-2px);
   }
 
   .chip-category {
@@ -172,7 +241,7 @@ textarea {
 
   /* ── Primary button ── */
   .btn-primary {
-    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-w-rose px-4 py-2 text-sm font-semibold text-white shadow-rose transition-all duration-150 ease-out hover:bg-[#BE123C] hover:-translate-y-0.5 active:translate-y-0 active:shadow-rose disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-w-rose px-4 py-2 text-sm font-semibold text-white shadow-rose transition-all duration-150 ease-out hover:bg-[#BE123C] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] active:shadow-rose disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none;
   }
 
   .btn-primary:hover:not(:disabled) {
@@ -181,12 +250,12 @@ textarea {
 
   /* ── Secondary button ── */
   .btn-secondary {
-    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-w-border bg-w-card px-4 py-2 text-sm font-semibold text-w-text shadow-soft transition-all duration-150 ease-out hover:border-w-border-md hover:bg-w-surface hover:shadow-card disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-w-border bg-w-card px-4 py-2 text-sm font-semibold text-w-text shadow-soft transition-all duration-150 ease-out hover:border-w-border-md hover:bg-w-surface hover:shadow-card active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   /* ── Ghost button ── */
   .btn-ghost {
-    @apply inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-w-muted transition-all duration-150 ease-out hover:bg-w-border hover:text-w-text disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-w-muted transition-all duration-150 ease-out hover:bg-w-border hover:text-w-text active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   /* ── Input ── */
@@ -278,6 +347,54 @@ textarea {
 
   .badge-muted {
     @apply badge bg-w-border text-w-muted;
+  }
+}
+
+/* ── Card motion across app pages ───────────────────────────── */
+.pwa-main-safe :where(article, section, div)[class*="shadow-soft"],
+.pwa-main-safe :where(article, section, div)[class*="shadow-card"],
+.pwa-main-safe :where(article, section, div)[class*="shadow-float"] {
+  animation: cardRise 0.52s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: center top;
+  transition-property: border-color, box-shadow, transform, background-color, opacity;
+  transition-duration: 260ms;
+  transition-timing-function: ease-out;
+}
+
+.pwa-main-safe :where(article, section, div)[class*="shadow-soft"]:hover,
+.pwa-main-safe :where(article, section, div)[class*="shadow-card"]:hover {
+  transform: translateY(-2px);
+  border-color: rgba(225, 29, 72, 0.22);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+}
+
+.pwa-main-safe > *:nth-child(1) { animation-delay: 0ms; }
+.pwa-main-safe > *:nth-child(2) { animation-delay: 35ms; }
+.pwa-main-safe > *:nth-child(3) { animation-delay: 70ms; }
+.pwa-main-safe > *:nth-child(4) { animation-delay: 105ms; }
+
+.pwa-main-safe :where(article, section, div)[class*="shadow-soft"]:nth-child(1),
+.pwa-main-safe :where(article, section, div)[class*="shadow-card"]:nth-child(1) { animation-delay: 0ms; }
+.pwa-main-safe :where(article, section, div)[class*="shadow-soft"]:nth-child(2),
+.pwa-main-safe :where(article, section, div)[class*="shadow-card"]:nth-child(2) { animation-delay: 45ms; }
+.pwa-main-safe :where(article, section, div)[class*="shadow-soft"]:nth-child(3),
+.pwa-main-safe :where(article, section, div)[class*="shadow-card"]:nth-child(3) { animation-delay: 90ms; }
+.pwa-main-safe :where(article, section, div)[class*="shadow-soft"]:nth-child(4),
+.pwa-main-safe :where(article, section, div)[class*="shadow-card"]:nth-child(4) { animation-delay: 135ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .pwa-main-safe :where(article, section, div)[class*="shadow-soft"]:hover,
+  .pwa-main-safe :where(article, section, div)[class*="shadow-card"]:hover {
+    transform: none;
   }
 }
 

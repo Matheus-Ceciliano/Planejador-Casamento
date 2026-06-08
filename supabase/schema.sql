@@ -64,9 +64,9 @@ create table if not exists public.wedding_members (
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
   email text not null,
-  role text not null check (role in ('noivo','noiva','cerimonialista')),
+  role text not null check (role in ('owner','bride','groom','planner','viewer','noivo','noiva','cerimonialista')),
   can_edit boolean not null default true,
-  permissions jsonb not null default '{"all": true}'::jsonb,
+  permissions jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (wedding_id, user_id)
@@ -82,7 +82,7 @@ as $$
     select 1 from public.wedding_members
     where wedding_id = target_wedding_id
       and user_id = auth.uid()
-      and role in ('noivo','noiva','cerimonialista')
+      and role in ('owner','bride','groom','planner','viewer','noivo','noiva','cerimonialista')
   );
 $$;
 
