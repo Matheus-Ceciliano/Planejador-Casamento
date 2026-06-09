@@ -20,9 +20,9 @@ import {
 import { AnimatedNumber, AnimatedProgressBar, SkeletonCard, SkeletonChart, SkeletonList } from '../components/Animated';
 import { useWedding } from '../hooks/useWedding';
 import { useWeddingTable } from '../hooks/useWeddingTable';
-import { BudgetItem, Guest, PaymentInstallment, Task, Vendor } from '../types';
+import { BudgetItem, Guest, Task, Vendor } from '../types';
 import { daysUntil, formatDate, formatMoney } from '../utils/format';
-import { calculateFinancialHealth, getPendingValue, isBudgetOverdue, isPaymentInstallmentOverdue } from '../utils/finance';
+import { calculateFinancialHealth, getPendingValue, isBudgetOverdue } from '../utils/finance';
 
 /* â”€â”€ Chart palette aligned with new design system â”€â”€ */
 const semanticColors = {
@@ -248,7 +248,6 @@ export default function Dashboard() {
   const { wedding } = useWedding();
   const guests  = useWeddingTable<Guest>('guests');
   const budget  = useWeddingTable<BudgetItem>('budget_items');
-  const installments = useWeddingTable<PaymentInstallment>('payment_installments', 'due_date');
   const vendors = useWeddingTable<Vendor>('vendors');
   const tasks   = useWeddingTable<Task>('tasks');
 
@@ -271,11 +270,9 @@ export default function Dashboard() {
   const available       = planned - contracted;
   const budgetPct       = planned ? Math.round((contracted / planned) * 100) : 0;
   const overdueItems    = budget.rows.filter(isBudgetOverdue);
-  const overdueInstallments = installments.rows.filter(isPaymentInstallmentOverdue);
-  const overduePaymentsCount = overdueItems.length + overdueInstallments.length;
+  const overduePaymentsCount = overdueItems.length;
   const overduePaymentsValue =
-    overdueItems.reduce((sum, item) => sum + getPendingValue(item.contracted_value, item.paid_value), 0) +
-    overdueInstallments.reduce((sum, item) => sum + Math.max(0, Number(item.amount ?? 0) - Number(item.paid_amount ?? 0)), 0);
+    overdueItems.reduce((sum, item) => sum + getPendingValue(item.contracted_value, item.paid_value), 0);
   const lateTasks       = tasks.rows.filter(isLateTask);
   const contractedVendors = vendors.rows.filter((v) => v.status === 'contratado').length;
   const budgetTone = planned > 0 ? (contracted > planned ? 'red' : 'green') : contracted > 0 ? 'red' : 'default';
@@ -344,7 +341,7 @@ export default function Dashboard() {
     totalContratado: contracted,
     totalPago: paid,
     itensFinanceiros: budget.rows,
-    pagamentos: installments.rows,
+    pagamentos: [],
     fornecedores: vendors.rows,
     dataCasamento: wedding?.wedding_date
   });
@@ -376,7 +373,7 @@ export default function Dashboard() {
       .slice(0, 5);
   }, [budget.rows, tasks.rows]);
 
-  const loading = guests.loading || budget.loading || installments.loading || vendors.loading || tasks.loading;
+  const loading = guests.loading || budget.loading || vendors.loading || tasks.loading;
 
   if (loading) {
     return (

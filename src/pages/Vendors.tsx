@@ -27,7 +27,7 @@ import Modal from '../components/Modal';
 import ResponsiveFilters from '../components/ResponsiveFilters';
 import { useWeddingTable } from '../hooks/useWeddingTable';
 import { supabase } from '../lib/supabase';
-import { BudgetCategory, BudgetItem, FileRecord, PaymentInstallment, Vendor } from '../types';
+import { BudgetCategory, BudgetItem, FileRecord, Vendor } from '../types';
 import { vendorCategories } from '../utils/constants';
 import { getPaymentStatus, getPendingValue, isContractedVendor, normalizeVendorStatus, toPrimaryCategory } from '../utils/finance';
 import { formatDate, formatMoney } from '../utils/format';
@@ -66,18 +66,12 @@ const financeOptions = [
 
 type VendorForm = typeof blankVendor;
 type DocumentKind = 'Contrato PDF' | 'Comprovante' | 'Orçamento' | 'Foto';
-type PaymentMode = 'cash' | 'installments';
-type InstallmentDraft = { number: number; amount: number; due_date: string };
-
 const blankPaymentPlan = {
-  mode: 'cash' as PaymentMode,
   due_date: '',
-  installments_count: 2,
-  first_due_date: '',
-  interval: 'monthly',
   payment_method: '',
   notes: ''
 };
+const paymentHistoryPrefix = '[PAGAMENTO] ';
 
 function normalizeVendorWorkflowStatus(status?: string | null) {
   const normalized = normalizeVendorStatus(status);
@@ -101,6 +95,14 @@ function paymentBadge(vendor: Vendor) {
   const pending = getPendingValue(vendor.contracted_value, vendor.paid_value);
   if (vendor.due_date && pending > 0 && new Date(`${vendor.due_date}T23:59:59`) < new Date()) return 'Vencido';
   return getPaymentStatus(vendor.contracted_value, vendor.paid_value);
+}
+
+function paymentHistory(notes?: string | null) {
+  return String(notes ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith(paymentHistoryPrefix))
+    .map((line) => line.slice(paymentHistoryPrefix.length));
 }
 
 function CategorySelect({
@@ -219,6 +221,7 @@ function Timeline({ vendor, budgetItems }: { vendor: Vendor; budgetItems: Budget
     { label: 'Orçamento recebido', done: hasQuote || hasBudget },
     { label: 'Contratação', done: hasContract || hasBudget }
   ];
+  const payments = budgetItems.flatMap((item) => paymentHistory(item.notes));
 
   return (
     <div className="space-y-3">
@@ -233,6 +236,18 @@ function Timeline({ vendor, budgetItems }: { vendor: Vendor; budgetItems: Budget
           </div>
         ))}
       </div>
+      {payments.length > 0 && (
+        <div className="rounded-2xl border border-w-border bg-white p-3">
+          <p className="text-xs font-bold uppercase tracking-wide text-w-faint">Histórico de pagamentos</p>
+          <div className="mt-2 space-y-2">
+            {payments.map((payment, index) => (
+              <div key={`${payment}-${index}`} className="rounded-xl bg-w-surface p-2.5 text-xs font-semibold text-w-text">
+                {payment}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -240,7 +255,6 @@ function Timeline({ vendor, budgetItems }: { vendor: Vendor; budgetItems: Budget
 export default function Vendors() {
   const vendors = useWeddingTable<Vendor>('vendors', 'name');
   const budgetItems = useWeddingTable<BudgetItem>('budget_items', 'due_date');
-  const installmentsTable = useWeddingTable<PaymentInstallment>('payment_installments', 'due_date');
   const customCategories = useWeddingTable<BudgetCategory>('budget_categories', 'sort_order');
   const files = useWeddingTable<FileRecord>('files', 'created_at');
   const [form, setForm] = useState<VendorForm>(blankVendor);
@@ -256,7 +270,6 @@ export default function Vendors() {
   const [message, setMessage] = useState('');
   const [paymentVendor, setPaymentVendor] = useState<Vendor | null>(null);
   const [paymentPlan, setPaymentPlan] = useState(blankPaymentPlan);
-  const [installmentDrafts, setInstallmentDrafts] = useState<InstallmentDraft[]>([]);
   const [paymentError, setPaymentError] = useState('');
   const syncInFlight = useRef(new Set<string>());
 
@@ -315,33 +328,10 @@ export default function Vendors() {
     }
   }
 
-  function addInterval(date: string, index: number, interval: string) {
-    const next = new Date(`${date}T12:00:00`);
-    if (interval === 'weekly') next.setDate(next.getDate() + index * 7);
-    else if (interval === 'biweekly') next.setDate(next.getDate() + index * 15);
-    else if (interval === 'custom') next.setDate(next.getDate() + index * 30);
-    else next.setMonth(next.getMonth() + index);
-    return next.toISOString().slice(0, 10);
-  }
-
-  function buildInstallments(value: number, count: number, firstDate: string, interval: string) {
-    const safeCount = Math.max(2, count);
-    const cents = Math.round(Number(value ?? 0) * 100);
-    const base = Math.floor(cents / safeCount);
-    const remainder = cents - base * safeCount;
-    return Array.from({ length: safeCount }, (_, index) => ({
-      number: index + 1,
-      amount: (base + (index === 0 ? remainder : 0)) / 100,
-      due_date: firstDate ? addInterval(firstDate, index, interval) : ''
-    }));
-  }
-
   function openPaymentModal(vendor: Vendor) {
-    const total = Number(vendor.contracted_value ?? 0);
     const today = new Date().toISOString().slice(0, 10);
     setPaymentVendor(vendor);
-    setPaymentPlan({ ...blankPaymentPlan, due_date: vendor.due_date ?? today, first_due_date: vendor.due_date ?? today });
-    setInstallmentDrafts(buildInstallments(total, 2, vendor.due_date ?? today, 'monthly'));
+    setPaymentPlan({ ...blankPaymentPlan, due_date: vendor.due_date ?? today });
     setPaymentError('');
   }
 
@@ -434,33 +424,13 @@ export default function Vendors() {
       return;
     }
 
-    const drafts = paymentPlan.mode === 'cash'
-      ? [{ number: 1, amount: total, due_date: paymentPlan.due_date }]
-      : installmentDrafts;
-
-    if (paymentPlan.mode === 'cash' && !paymentPlan.due_date) {
+    if (!paymentPlan.due_date) {
       setPaymentError('Informe a data limite de pagamento.');
       return;
     }
 
-    if (paymentPlan.mode === 'installments') {
-      if (Number(paymentPlan.installments_count) <= 1) {
-        setPaymentError('A quantidade de parcelas deve ser maior que 1.');
-        return;
-      }
-      if (drafts.some((item) => Number(item.amount) <= 0 || !item.due_date)) {
-        setPaymentError('Todas as parcelas precisam ter valor e vencimento.');
-        return;
-      }
-      const totalDraft = drafts.reduce((sum, item) => sum + Number(item.amount ?? 0), 0);
-      if (Math.round(totalDraft * 100) !== Math.round(total * 100)) {
-        setPaymentError('A soma das parcelas deve ser igual ao valor contratado.');
-        return;
-      }
-    }
-
     setPaymentError('');
-    const firstDueDate = drafts[0]?.due_date || paymentVendor.due_date || null;
+    const firstDueDate = paymentPlan.due_date || paymentVendor.due_date || null;
     const vendorPayload = {
       name: paymentVendor.name,
       category: toPrimaryCategory(paymentVendor.category),
@@ -492,24 +462,6 @@ export default function Vendors() {
       payment_method: paymentPlan.payment_method || null,
       notes: [savedBudgetItem.notes, paymentPlan.notes].filter(Boolean).join('\n') || null
     } as Partial<BudgetItem>);
-
-    await supabase.from('payment_installments').delete().eq('wedding_id', savedVendor.wedding_id).eq('vendor_id', savedVendor.id);
-
-    for (const draft of drafts) {
-      await installmentsTable.create({
-        vendor_id: savedVendor.id,
-        budget_item_id: savedBudgetItem.id,
-        number: draft.number,
-        amount: Number(draft.amount),
-        due_date: draft.due_date,
-        paid_amount: 0,
-        paid_at: null,
-        payment_method: paymentPlan.payment_method || null,
-        receipt_url: null,
-        status: 'pendente',
-        notes: paymentPlan.notes || null
-      } as Partial<PaymentInstallment>);
-    }
 
     setPaymentVendor(null);
     setOpen(false);
@@ -810,101 +762,12 @@ export default function Vendors() {
               </section>
 
               <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
-                <p className="mb-3 text-sm font-bold text-w-text">Condição de pagamento</p>
-                <div className="grid grid-cols-2 gap-2 rounded-2xl bg-w-surface p-1">
-                  {[
-                    { key: 'cash' as PaymentMode, label: 'À vista' },
-                    { key: 'installments' as PaymentMode, label: 'Parcelado' }
-                  ].map((option) => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      className={`min-h-10 rounded-xl text-sm font-bold transition ${paymentPlan.mode === option.key ? 'bg-white text-w-rose shadow-soft' : 'text-w-muted hover:text-w-text'}`}
-                      onClick={() => {
-                        setPaymentPlan({ ...paymentPlan, mode: option.key });
-                        if (option.key === 'installments') {
-                          setInstallmentDrafts(buildInstallments(Number(paymentVendor.contracted_value ?? 0), Number(paymentPlan.installments_count), paymentPlan.first_due_date || paymentPlan.due_date, paymentPlan.interval));
-                        }
-                      }}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-
-                {paymentPlan.mode === 'cash' ? (
-                  <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <FormInput label="Data limite" type="date" value={paymentPlan.due_date} onChange={(event) => setPaymentPlan({ ...paymentPlan, due_date: event.target.value })} required />
-                    <CurrencyInput label="Valor total" value={Number(paymentVendor.contracted_value ?? 0)} onValueChange={() => undefined} />
-                  </div>
-                ) : (
-                  <div className="mt-4 space-y-4">
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <FormInput
-                        label="Quantidade"
-                        type="number"
-                        min={2}
-                        value={paymentPlan.installments_count}
-                        onChange={(event) => {
-                          const count = Math.max(2, Number(event.target.value || 2));
-                          setPaymentPlan({ ...paymentPlan, installments_count: count });
-                          setInstallmentDrafts(buildInstallments(Number(paymentVendor.contracted_value ?? 0), count, paymentPlan.first_due_date, paymentPlan.interval));
-                        }}
-                      />
-                      <FormInput
-                        label="Primeiro vencimento"
-                        type="date"
-                        value={paymentPlan.first_due_date}
-                        onChange={(event) => {
-                          setPaymentPlan({ ...paymentPlan, first_due_date: event.target.value });
-                          setInstallmentDrafts(buildInstallments(Number(paymentVendor.contracted_value ?? 0), Number(paymentPlan.installments_count), event.target.value, paymentPlan.interval));
-                        }}
-                      />
-                      <FormSelect
-                        label="Intervalo"
-                        value={paymentPlan.interval}
-                        onChange={(event) => {
-                          setPaymentPlan({ ...paymentPlan, interval: event.target.value });
-                          setInstallmentDrafts(buildInstallments(Number(paymentVendor.contracted_value ?? 0), Number(paymentPlan.installments_count), paymentPlan.first_due_date, event.target.value));
-                        }}
-                        options={[
-                          { label: 'Mensal', value: 'monthly' },
-                          { label: 'Quinzenal', value: 'biweekly' },
-                          { label: 'Semanal', value: 'weekly' },
-                          { label: 'Personalizado', value: 'custom' }
-                        ]}
-                      />
-                    </div>
-
-                    <div className="space-y-2 rounded-2xl bg-w-surface p-3">
-                      {installmentDrafts.map((draft, index) => (
-                        <div key={draft.number} className="grid gap-2 rounded-xl bg-white p-3 shadow-soft sm:grid-cols-[80px_1fr_1fr] sm:items-end">
-                          <p className="text-sm font-bold text-w-muted">#{draft.number}</p>
-                          <CurrencyInput
-                            label="Valor"
-                            value={draft.amount}
-                            onValueChange={(value) => setInstallmentDrafts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, amount: value } : item))}
-                          />
-                          <FormInput
-                            label="Vencimento"
-                            type="date"
-                            value={draft.due_date}
-                            onChange={(event) => setInstallmentDrafts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, due_date: event.target.value } : item))}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                    <div className="grid gap-2 text-sm font-semibold text-w-muted sm:grid-cols-2">
-                      <p>Total das parcelas: {formatMoney(installmentDrafts.reduce((sum, item) => sum + Number(item.amount ?? 0), 0))}</p>
-                      <p className="sm:text-right">Contrato: {formatMoney(Number(paymentVendor.contracted_value ?? 0))}</p>
-                    </div>
-                  </div>
-                )}
-              </section>
-
-              <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
                 <div className="grid gap-4 md:grid-cols-2">
+                  <FormInput label="Vencimento" type="date" value={paymentPlan.due_date} onChange={(event) => setPaymentPlan({ ...paymentPlan, due_date: event.target.value })} required />
+                  <CurrencyInput label="Valor total" value={Number(paymentVendor.contracted_value ?? 0)} onValueChange={() => undefined} />
                   <FormInput label="Forma de pagamento" value={paymentPlan.payment_method} onChange={(event) => setPaymentPlan({ ...paymentPlan, payment_method: event.target.value })} />
+                </div>
+                <div className="mt-4">
                   <FormTextarea label="Observações" value={paymentPlan.notes} onChange={(event) => setPaymentPlan({ ...paymentPlan, notes: event.target.value })} />
                 </div>
               </section>

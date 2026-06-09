@@ -3,7 +3,7 @@ import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, Res
 import { useNavigate } from 'react-router-dom';
 import { useWedding } from '../hooks/useWedding';
 import { useWeddingTable } from '../hooks/useWeddingTable';
-import { BudgetItem, PaymentInstallment } from '../types';
+import { BudgetItem, Vendor } from '../types';
 import { calculateFinancialHealth, getPendingValue, toPrimaryCategory } from '../utils/finance';
 import { formatDate, formatMoney } from '../utils/format';
 
@@ -34,7 +34,7 @@ export default function BudgetAnalysis() {
   const navigate = useNavigate();
   const { wedding } = useWedding();
   const items = useWeddingTable<BudgetItem>('budget_items', 'due_date');
-  const installments = useWeddingTable<PaymentInstallment>('payment_installments', 'due_date');
+  const vendors = useWeddingTable<Vendor>('vendors', 'name');
 
   const planned = Number(wedding?.planned_budget ?? 0);
   const committed = items.rows.reduce((sum, item) => sum + Number(item.contracted_value ?? 0), 0);
@@ -69,7 +69,8 @@ export default function BudgetAnalysis() {
     totalContratado: committed,
     totalPago: paid,
     itensFinanceiros: items.rows,
-    pagamentos: installments.rows,
+    pagamentos: [],
+    fornecedores: vendors.rows,
     dataCasamento: wedding?.wedding_date
   });
   const healthTone = healthToneClasses[health.status];

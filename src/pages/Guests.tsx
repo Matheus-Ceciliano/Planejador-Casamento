@@ -1031,7 +1031,13 @@ export default function Guests() {
 
   async function handleConfirmDelete() {
     if (!deleting) return;
+    const groupId = deleting.group_id;
+    const isLastGroupMember = Boolean(
+      groupId && guests.rows.filter((guest) => guest.group_id === groupId && guest.id !== deleting.id).length === 0
+    );
+
     await guests.remove(deleting.id);
+    if (groupId && isLastGroupMember) await groups.remove(groupId);
     if (detailGuestId === deleting.id) setDetailGuestId(null);
     setDeleting(null);
   }

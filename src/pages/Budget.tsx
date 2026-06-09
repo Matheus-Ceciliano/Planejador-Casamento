@@ -25,7 +25,7 @@ import Modal from '../components/Modal';
 import ResponsiveFilters from '../components/ResponsiveFilters';
 import { useWedding } from '../hooks/useWedding';
 import { useWeddingTable } from '../hooks/useWeddingTable';
-import { BudgetCategory, BudgetItem, PaymentInstallment, Vendor } from '../types';
+import { BudgetCategory, BudgetItem, Vendor } from '../types';
 import { budgetCategories, categorySlugMap } from '../utils/constants';
 import { getPaymentStatus, getPendingValue, isBudgetOverdue, isContractedVendor, toPrimaryCategory } from '../utils/finance';
 import { formatDate, formatMoney } from '../utils/format';
@@ -57,9 +57,47 @@ const paymentBlank = {
   notes: ''
 };
 
+const paymentMethodOptions = ['Pix', 'Dinheiro', 'Cartão', 'Boleto', 'Transferência', 'Outro'];
+const paymentHistoryPrefix = '[PAGAMENTO] ';
+
 function percent(value: number, total: number) {
   if (!total) return 0;
   return Math.max(0, Math.min(100, Math.round((value / total) * 100)));
+}
+
+function paymentStatusLabel(contractedValue: number, paidValue: number) {
+  const pending = getPendingValue(contractedValue, paidValue);
+  if (pending <= 0 && Number(contractedValue ?? 0) > 0) return 'Pago';
+  if (Number(paidValue ?? 0) > 0) return 'Parcial';
+  return 'Pendente';
+}
+
+function receiptFileName(url: string) {
+  try {
+    const pathname = new URL(url).pathname;
+    return decodeURIComponent(pathname.split('/').pop() || 'Comprovante anexado');
+  } catch {
+    return decodeURIComponent(url.split('/').pop() || 'Comprovante anexado');
+  }
+}
+
+function buildPaymentHistoryEntry(amount: number, date: string, method: string, receiptUrl?: string, note?: string) {
+  const parts = [
+    formatMoney(amount),
+    date ? formatDate(date) : 'sem data',
+    method || 'sem forma',
+    receiptUrl ? `comprovante: ${receiptUrl}` : '',
+    note ? `obs: ${note}` : ''
+  ].filter(Boolean);
+  return `${paymentHistoryPrefix}${parts.join(' | ')}`;
+}
+
+function paymentHistory(notes?: string | null) {
+  return String(notes ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith(paymentHistoryPrefix))
+    .map((line) => line.slice(paymentHistoryPrefix.length));
 }
 
 function dueBucket(item: BudgetItem) {
@@ -153,7 +191,6 @@ export default function Budget() {
   const params = useParams();
   const { wedding } = useWedding();
   const items = useWeddingTable<BudgetItem>('budget_items', 'due_date');
-  const installments = useWeddingTable<PaymentInstallment>('payment_installments', 'due_date');
   const vendors = useWeddingTable<Vendor>('vendors', 'name');
   const categories = useWeddingTable<BudgetCategory>('budget_categories', 'sort_order');
   const initial = params.category ? categorySlugMap[params.category] ?? 'Outros' : 'Todos';
@@ -164,7 +201,6 @@ export default function Budget() {
   const [detailNotes, setDetailNotes] = useState('');
   const [deleting, setDeleting] = useState<BudgetItem | null>(null);
   const [paying, setPaying] = useState<BudgetItem | null>(null);
-  const [selectedInstallmentId, setSelectedInstallmentId] = useState('');
   const [form, setForm] = useState({ ...blank, category: initial === 'Todos' ? 'Buffet' : initial });
   const [paymentForm, setPaymentForm] = useState(paymentBlank);
   const [search, setSearch] = useState('');
@@ -174,17 +210,8 @@ export default function Budget() {
   const syncInFlight = useRef(new Set<string>());
 
   const vendorById = useMemo(() => new Map(vendors.rows.map((vendor) => [vendor.id, vendor])), [vendors.rows]);
-  const installmentsByBudgetItemId = useMemo(() => {
-    const map = new Map<string, PaymentInstallment[]>();
-    installments.rows.forEach((installment) => {
-      if (!installment.budget_item_id) return;
-      map.set(installment.budget_item_id, [...(map.get(installment.budget_item_id) ?? []), installment]);
-    });
-    return map;
-  }, [installments.rows]);
   const selectedDetailItem = detailItem ? items.rows.find((item) => item.id === detailItem.id) ?? detailItem : null;
   const selectedDetailVendor = selectedDetailItem?.vendor_id ? vendorById.get(selectedDetailItem.vendor_id) : undefined;
-  const selectedDetailInstallments = selectedDetailItem ? installmentsByBudgetItemId.get(selectedDetailItem.id) ?? [] : [];
 
   useEffect(() => {
     setDetailNotes(selectedDetailItem?.notes ?? '');
@@ -342,75 +369,41 @@ export default function Budget() {
     event.preventDefault();
     if (!paying) return;
 
-    const itemInstallments = installmentsByBudgetItemId.get(paying.id) ?? [];
-    const selectedInstallment = itemInstallments.find((installment) => installment.id === selectedInstallmentId);
-    if (selectedInstallment) {
-      const paidAmount = Number(paymentForm.amount || selectedInstallment.amount || 0);
-      await installments.update(selectedInstallment.id, {
-        paid_amount: paidAmount,
-        paid_at: paymentForm.payment_date,
-        payment_method: paymentForm.payment_method || selectedInstallment.payment_method,
-        receipt_url: paymentForm.receipt_url || selectedInstallment.receipt_url,
-        status: 'pago',
-        notes: [selectedInstallment.notes, paymentForm.notes].filter(Boolean).join('\n') || null
-      } as Partial<PaymentInstallment>);
+    const currentPaid = Number(paying.paid_value ?? 0);
+    const paymentAmount = Number(paymentForm.amount ?? 0);
+    const remaining = getPendingValue(paying.contracted_value, paying.paid_value);
 
-      const nextInstallments = itemInstallments.map((installment) =>
-        installment.id === selectedInstallment.id
-          ? { ...installment, paid_amount: paidAmount, status: 'pago', paid_at: paymentForm.payment_date }
-          : installment
-      );
-      const nextPaid = nextInstallments.reduce((sum, installment) => sum + (installment.status === 'pago' ? Number(installment.paid_amount || installment.amount || 0) : 0), 0);
-      const nextDue = nextInstallments
-        .filter((installment) => installment.status !== 'pago' && installment.due_date)
-        .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)))[0]?.due_date ?? paying.due_date;
+    if (paymentAmount <= 0 || paymentAmount > remaining || !paymentForm.payment_date || !paymentForm.payment_method) return;
 
-      await items.update(paying.id, {
-        paid_value: nextPaid,
-        payment_status: getPaymentStatus(paying.contracted_value, nextPaid),
-        payment_date: paymentForm.payment_date,
-        payment_method: paymentForm.payment_method || paying.payment_method,
-        receipt_url: paymentForm.receipt_url || paying.receipt_url,
-        due_date: nextDue,
-        notes: [paying.notes, paymentForm.notes].filter(Boolean).join('\n') || null
-      } as Partial<BudgetItem>);
-      if (paying.vendor_id) {
-        await vendors.update(paying.vendor_id, { paid_value: nextPaid, due_date: nextDue } as Partial<Vendor>);
-      }
-      setMessage(`Parcela registrada para ${paying.name}.`);
-      setPaying(null);
-      setSelectedInstallmentId('');
-      return;
-    }
-
-    const nextPaid = Number(paying.paid_value ?? 0) + Number(paymentForm.amount ?? 0);
+    const nextPaid = currentPaid + paymentAmount;
+    const historyEntry = buildPaymentHistoryEntry(
+      paymentAmount,
+      paymentForm.payment_date,
+      paymentForm.payment_method,
+      paymentForm.receipt_url,
+      paymentForm.notes
+    );
     await items.update(paying.id, {
       paid_value: nextPaid,
       payment_status: getPaymentStatus(paying.contracted_value, nextPaid),
       payment_date: paymentForm.payment_date,
       payment_method: paymentForm.payment_method || paying.payment_method,
       receipt_url: paymentForm.receipt_url || paying.receipt_url,
-      notes: [paying.notes, paymentForm.notes].filter(Boolean).join('\n')
+      notes: [paying.notes, historyEntry].filter(Boolean).join('\n')
     } as Partial<BudgetItem>);
     if (paying.vendor_id) {
       await vendors.update(paying.vendor_id, { paid_value: nextPaid, due_date: paying.due_date } as Partial<Vendor>);
     }
     setMessage(`Pagamento registrado para ${paying.name}.`);
     setPaying(null);
-    setSelectedInstallmentId('');
   }
 
   function startPayment(item: BudgetItem) {
-    const pendingInstallments = (installmentsByBudgetItemId.get(item.id) ?? [])
-      .filter((installment) => installment.status !== 'pago')
-      .sort((a, b) => String(a.due_date ?? '').localeCompare(String(b.due_date ?? ''), 'pt-BR', { numeric: true }));
-    const firstInstallment = pendingInstallments[0];
     setPaying(item);
-    setSelectedInstallmentId(firstInstallment?.id ?? '');
     setPaymentForm({
       ...paymentBlank,
-      amount: firstInstallment ? Number(firstInstallment.amount ?? 0) : 0,
-      payment_method: firstInstallment?.payment_method ?? ''
+      amount: getPendingValue(item.contracted_value, item.paid_value),
+      payment_method: item.payment_method ?? ''
     });
   }
 
@@ -420,7 +413,7 @@ export default function Budget() {
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-w-faint">Central financeira</p>
           <h1 className="page-title mt-1">Orçamento</h1>
-          <p className="mt-1 text-sm text-w-muted">Contratos, parcelas, comprovantes e vencimentos em uma única visão.</p>
+          <p className="mt-1 text-sm text-w-muted">Contratos, comprovantes e vencimentos em uma única visão.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button className="btn-secondary" onClick={() => navigate('/fornecedores')}><ExternalLink size={16} /> Fornecedores</button>
@@ -599,14 +592,11 @@ export default function Budget() {
 
             <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
               <h3 className="text-sm font-bold text-w-text">Pagamentos</h3>
-              {selectedDetailInstallments.length > 0 ? (
-                <div className="mt-3 grid gap-2">
-                  {selectedDetailInstallments.map((installment) => (
-                    <div key={installment.id} className="grid gap-2 rounded-xl bg-w-surface p-3 sm:grid-cols-[80px_1fr_1fr_1fr] sm:items-center">
-                      <p className="text-sm font-bold text-w-text">#{installment.number}</p>
-                      <div><p className="text-[10px] font-bold uppercase text-w-faint">Vencimento</p><p className="text-sm font-semibold">{formatDate(installment.due_date)}</p></div>
-                      <div><p className="text-[10px] font-bold uppercase text-w-faint">Valor</p><p className="text-sm font-semibold">{formatMoney(Number(installment.amount ?? 0))}</p></div>
-                      <span className={installment.status === 'pago' ? 'badge-green' : 'badge-gold'}>{installment.status}</span>
+              {paymentHistory(selectedDetailItem.notes).length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {paymentHistory(selectedDetailItem.notes).map((entry, index) => (
+                    <div key={`${entry}-${index}`} className="rounded-xl bg-w-surface p-3 text-sm font-semibold text-w-text">
+                      {entry}
                     </div>
                   ))}
                 </div>
@@ -687,50 +677,154 @@ export default function Budget() {
 
       <Modal open={Boolean(paying)} title="Registrar pagamento" onClose={() => setPaying(null)}>
         {paying && (
-          <form className="space-y-4" onSubmit={submitPayment}>
-            {(() => {
-              const itemInstallments = installmentsByBudgetItemId.get(paying.id) ?? [];
-              const pendingInstallments = itemInstallments.filter((installment) => installment.status !== 'pago');
-              const selectedInstallment = itemInstallments.find((installment) => installment.id === selectedInstallmentId);
-              return (
-                <>
-            <div className="glass rounded-3xl p-4">
-              <p className="text-sm text-w-muted">{paying.name}</p>
-              <p className="mt-2 text-2xl font-bold">{formatMoney(selectedInstallment ? Number(selectedInstallment.amount ?? 0) : getPendingValue(paying.contracted_value, paying.paid_value))}</p>
-              <p className="text-xs font-semibold text-w-muted">{selectedInstallment ? `parcela ${selectedInstallment.number} vence em ${formatDate(selectedInstallment.due_date)}` : 'pendente'}</p>
-            </div>
-            {itemInstallments.length > 0 && (
-              <FormSelect
-                label="Parcela"
-                value={selectedInstallmentId}
-                onChange={(event) => {
-                  const next = itemInstallments.find((installment) => installment.id === event.target.value);
-                  setSelectedInstallmentId(event.target.value);
-                  setPaymentForm({
-                    ...paymentForm,
-                    amount: next ? Number(next.amount ?? 0) : 0,
-                    payment_method: next?.payment_method ?? paymentForm.payment_method
-                  });
-                }}
-                options={pendingInstallments.map((installment) => ({
-                  label: `#${installment.number} - ${formatMoney(Number(installment.amount ?? 0))} - ${formatDate(installment.due_date)}`,
-                  value: installment.id
-                }))}
-              />
-            )}
-            <CurrencyInput label="Valor do pagamento" value={paymentForm.amount} onValueChange={(value) => setPaymentForm({ ...paymentForm, amount: value })} />
-            <FormInput label="Data" type="date" value={paymentForm.payment_date} onChange={(event) => setPaymentForm({ ...paymentForm, payment_date: event.target.value })} />
-            <FormInput label="Forma de pagamento" value={paymentForm.payment_method} onChange={(event) => setPaymentForm({ ...paymentForm, payment_method: event.target.value })} />
-            <FileUpload folder="comprovantes" onUploaded={(url) => setPaymentForm({ ...paymentForm, receipt_url: url })} />
-            <FormTextarea label="Observação" value={paymentForm.notes} onChange={(event) => setPaymentForm({ ...paymentForm, notes: event.target.value })} />
-            <div className="flex justify-end gap-2">
-              <button type="button" className="btn-secondary" onClick={() => setPaying(null)}>Cancelar</button>
-              <button className="btn-primary" disabled={paymentForm.amount <= 0 || (itemInstallments.length > 0 && !selectedInstallmentId)}>Salvar pagamento</button>
-            </div>
-                </>
-              );
-            })()}
-          </form>
+          (() => {
+            const vendorName = paying.vendor_id ? vendorById.get(paying.vendor_id)?.name ?? paying.name : paying.name;
+            const contracted = Number(paying.contracted_value ?? 0);
+            const alreadyPaid = Number(paying.paid_value ?? 0);
+            const remaining = getPendingValue(contracted, alreadyPaid);
+            const paymentAmount = Number(paymentForm.amount ?? 0);
+            const amountTooHigh = paymentAmount > remaining && paymentAmount > 0;
+            const amountValid = paymentAmount > 0 && paymentAmount <= remaining;
+            const formValid = amountValid && Boolean(paymentForm.payment_date) && Boolean(paymentForm.payment_method);
+            const nextPaid = alreadyPaid + (amountValid ? paymentAmount : 0);
+            const nextRemaining = Math.max(0, contracted - nextPaid);
+            const paidPct = percent(alreadyPaid, contracted);
+            const nextPct = percent(nextPaid, contracted);
+            const currentStatus = paymentStatusLabel(contracted, alreadyPaid);
+            const progressColor = amountTooHigh ? 'bg-[#EF4444]' : alreadyPaid > 0 && remaining > 0 ? 'bg-[#F59E0B]' : 'bg-[#22C55E]';
+
+            return (
+              <form className="-m-5 flex max-h-[calc(100dvh-80px)] flex-col overflow-hidden bg-white sm:-m-6 sm:max-h-[calc(92vh-80px)]" onSubmit={submitPayment}>
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-w-surface/40 p-5 sm:p-6">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-w-faint">Fornecedor</p>
+                    <p className="mt-1 truncate text-lg font-extrabold text-w-text">{vendorName}</p>
+                  </div>
+
+                  <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-w-faint">Valor contratado</p>
+                        <p className="mt-1 text-base font-extrabold text-w-text">{formatMoney(contracted)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-w-faint">Já pago</p>
+                        <p className="mt-1 text-base font-extrabold text-[#16A34A]">{formatMoney(alreadyPaid)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-w-faint">Saldo restante</p>
+                        <p className="mt-1 text-base font-extrabold text-w-text">{formatMoney(remaining)}</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                      <span className={`badge ${currentStatus === 'Pago' ? 'badge-green' : currentStatus === 'Parcial' ? 'badge-gold' : 'badge-muted'}`}>
+                        {currentStatus}
+                      </span>
+                      <span className="text-xs font-bold text-w-muted">{paidPct}% pago</span>
+                    </div>
+                    <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-w-border">
+                      <div className={`h-full rounded-full ${progressColor} transition-[width] duration-300`} style={{ width: `${paidPct}%` }} />
+                    </div>
+                  </section>
+
+                  <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <CurrencyInput
+                        label="Valor do pagamento"
+                        value={paymentForm.amount}
+                        onValueChange={(value) => setPaymentForm({ ...paymentForm, amount: value })}
+                        hint={`Saldo disponível para pagamento: ${formatMoney(remaining)}`}
+                        error={amountTooHigh ? 'O valor informado ultrapassa o saldo restante deste fornecedor.' : undefined}
+                      />
+
+                      <label className="block">
+                        <span className="field-label">Data</span>
+                        <div className="relative">
+                          <CalendarClock className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-w-faint" size={16} />
+                          <input
+                            className="field-base pl-10"
+                            type="date"
+                            value={paymentForm.payment_date}
+                            onChange={(event) => setPaymentForm({ ...paymentForm, payment_date: event.target.value })}
+                            required
+                          />
+                        </div>
+                      </label>
+                    </div>
+
+                    <div className="mt-4">
+                      <p className="field-label">Forma de pagamento</p>
+                      <div className="flex flex-wrap gap-2">
+                        {paymentMethodOptions.map((method) => (
+                          <button
+                            key={method}
+                            type="button"
+                            className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                              paymentForm.payment_method === method
+                                ? 'border-w-rose bg-w-rose text-white shadow-rose'
+                                : 'border-w-border bg-white text-w-muted hover:border-w-rose-md hover:bg-w-rose-lt hover:text-w-rose'
+                            }`}
+                            onClick={() => setPaymentForm({ ...paymentForm, payment_method: method })}
+                          >
+                            {method}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+
+                  <section className="rounded-2xl border border-dashed border-w-border-md bg-white p-4 shadow-soft">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-bold text-w-text">Comprovante</p>
+                        <p className="mt-1 text-sm text-w-muted">Anexe um comprovante, se houver</p>
+                        <p className="mt-0.5 text-xs font-semibold text-w-faint">PDF, PNG ou JPG</p>
+                      </div>
+                      <FileUpload folder="comprovantes" label="Anexar arquivo" onUploaded={(url) => setPaymentForm({ ...paymentForm, receipt_url: url })} />
+                    </div>
+                    {paymentForm.receipt_url && (
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-w-surface p-3 text-sm font-semibold text-w-text">
+                        <a className="inline-flex min-w-0 items-center gap-2 text-w-text hover:text-w-rose" href={paymentForm.receipt_url} target="_blank" rel="noreferrer">
+                          <FileText size={15} className="shrink-0" />
+                          <span className="truncate">{receiptFileName(paymentForm.receipt_url)}</span>
+                        </a>
+                        <button type="button" className="btn-ghost text-[#DC2626]" onClick={() => setPaymentForm({ ...paymentForm, receipt_url: '' })}>
+                          Remover
+                        </button>
+                      </div>
+                    )}
+                  </section>
+
+                  <FormTextarea
+                    label="Observação"
+                    value={paymentForm.notes}
+                    onChange={(event) => setPaymentForm({ ...paymentForm, notes: event.target.value })}
+                    placeholder="Ex: Entrada do espaço, pagamento parcial via Pix..."
+                    rows={3}
+                  />
+
+                  <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
+                    <p className="text-sm font-bold text-w-text">Você está registrando:</p>
+                    <div className="mt-3 grid gap-2 text-sm text-w-muted sm:grid-cols-2">
+                      <div className="flex justify-between gap-3"><span>Valor</span><strong className="text-w-text">{formatMoney(paymentAmount)}</strong></div>
+                      <div className="flex justify-between gap-3"><span>Data</span><strong className="text-w-text">{paymentForm.payment_date ? formatDate(paymentForm.payment_date) : '-'}</strong></div>
+                      <div className="flex justify-between gap-3"><span>Forma</span><strong className="text-w-text">{paymentForm.payment_method || '-'}</strong></div>
+                      <div className="flex justify-between gap-3"><span>Novo total pago</span><strong className="text-[#16A34A]">{formatMoney(nextPaid)}</strong></div>
+                      <div className="flex justify-between gap-3 sm:col-span-2"><span>Novo saldo restante</span><strong className={nextRemaining > 0 ? 'text-w-text' : 'text-[#16A34A]'}>{formatMoney(nextRemaining)}</strong></div>
+                    </div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-w-border">
+                      <div className={`h-full rounded-full ${amountTooHigh ? 'bg-[#EF4444]' : nextRemaining > 0 ? 'bg-[#F59E0B]' : 'bg-[#22C55E]'} transition-[width] duration-300`} style={{ width: `${nextPct}%` }} />
+                    </div>
+                  </section>
+                </div>
+
+                <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-w-border bg-white p-4">
+                  <button type="button" className="btn-secondary" onClick={() => setPaying(null)}>Cancelar</button>
+                  <button className="btn-primary" disabled={!formValid}>Confirmar pagamento</button>
+                </div>
+              </form>
+            );
+          })()
         )}
       </Modal>
 

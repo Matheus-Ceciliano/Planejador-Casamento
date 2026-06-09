@@ -4,10 +4,12 @@
  *   { label: string; value: number; onValueChange: (value: number) => void }
  */
 import { InputHTMLAttributes } from 'react';
-import AppCurrencyInput from './ui/AppCurrencyInput';
+import AppCurrencyInput, { AppCurrencyInputProps } from './ui/AppCurrencyInput';
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> & {
   label: string;
+  hint?: AppCurrencyInputProps['hint'];
+  error?: AppCurrencyInputProps['error'];
   value: number;
   onValueChange: (value: number) => void;
 };

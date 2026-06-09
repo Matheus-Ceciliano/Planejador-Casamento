@@ -60,6 +60,8 @@ export type FinancialHealthResult = {
     valorAtrasado: number;
     valorVencendoEm7Dias: number;
     valorVencendoEm30Dias: number;
+    valorSemDataLimite: number;
+    fornecedoresSemDataLimite: number;
     percentualPago: number;
     percentualPendente: number;
     percentualAtrasado: number;
@@ -97,11 +99,16 @@ function clampRisk(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function riskContribution(base: number, ratio: number, multiplier: number, cap: number) {
+  if (ratio <= 0) return 0;
+  return Math.min(cap, base + ratio * multiplier);
+}
+
 function labelForFinancialRisk(score: number) {
-  if (score <= 20) return { status: 'saudavel' as const, label: 'Saudável' };
-  if (score <= 45) return { status: 'atencao' as const, label: 'Atenção' };
+  if (score <= 20) return { status: 'saudavel' as const, label: 'Saudavel' };
+  if (score <= 45) return { status: 'atencao' as const, label: 'Atencao' };
   if (score <= 70) return { status: 'preocupante' as const, label: 'Preocupante' };
-  return { status: 'critica' as const, label: 'Crítica' };
+  return { status: 'critica' as const, label: 'Critico' };
 }
 
 function buildFinancialDueList(items: BudgetItem[], installments: PaymentInstallment[]) {
@@ -133,7 +140,7 @@ export function calculateFinancialHealth({
   totalPago,
   itensFinanceiros = [],
   pagamentos = [],
-  dataCasamento,
+  fornecedores = [],
   hoje = new Date()
 }: FinancialHealthInput): FinancialHealthResult {
   const totalContratadoReal = Math.max(
@@ -152,8 +159,8 @@ export function calculateFinancialHealth({
     return {
       status: 'sem_dados',
       score: 0,
-      label: 'Sem dados financeiros suficientes',
-      motivo: 'Cadastre valores contratados para calcular a saúde financeira.',
+      label: 'Sem dados',
+      motivo: 'Cadastre valores contratados para calcular a saude financeira.',
       detalhes: {
         totalContratado: 0,
         totalPago: 0,
@@ -161,6 +168,8 @@ export function calculateFinancialHealth({
         valorAtrasado: 0,
         valorVencendoEm7Dias: 0,
         valorVencendoEm30Dias: 0,
+        valorSemDataLimite: 0,
+        fornecedoresSemDataLimite: 0,
         percentualPago: 0,
         percentualPendente: 0,
         percentualAtrasado: 0,
@@ -180,11 +189,6 @@ export function calculateFinancialHealth({
     const days = daysBetween(hoje, dateAtNoon(due.dueDate));
     return days >= 0 && days <= 7;
   });
-  const upcoming30 = dues.filter((due) => {
-    if (!due.dueDate) return false;
-    const days = daysBetween(hoje, dateAtNoon(due.dueDate));
-    return days >= 0 && days <= 30;
-  });
   const upcoming8to30 = dues.filter((due) => {
     if (!due.dueDate) return false;
     const days = daysBetween(hoje, dateAtNoon(due.dueDate));
@@ -193,71 +197,50 @@ export function calculateFinancialHealth({
 
   const valorAtrasado = overdueDues.reduce((sum, due) => sum + due.amount, 0);
   const valorVencendoEm7Dias = upcoming7.reduce((sum, due) => sum + due.amount, 0);
-  const valorVencendoEm30Dias = upcoming30.reduce((sum, due) => sum + due.amount, 0);
+  const valorVencendo8a30 = upcoming8to30.reduce((sum, due) => sum + due.amount, 0);
+  const valorVencendoEm30Dias = valorVencendoEm7Dias + valorVencendo8a30;
+  const fornecedoresSemData = fornecedores.filter((vendor) => {
+    const pending = getPendingValue(vendor.contracted_value, vendor.paid_value);
+    return isContractedVendor(vendor) && pending > 0 && !vendor.due_date;
+  });
+  const valorSemDataLimite = fornecedoresSemData.reduce(
+    (sum, vendor) => sum + getPendingValue(vendor.contracted_value, vendor.paid_value),
+    0
+  );
+
   const percentualAtrasado = percentOf(valorAtrasado, totalContratadoReal);
+  const percentualVencendo7 = percentOf(valorVencendoEm7Dias, totalContratadoReal);
+  const percentualVencendo8a30 = percentOf(valorVencendo8a30, totalContratadoReal);
+  const percentualSemDataLimite = percentOf(valorSemDataLimite, totalContratadoReal);
   const proximoVencimento = datedDues
     .map((due) => daysBetween(hoje, dateAtNoon(due.dueDate as string)))
     .filter((days) => days >= 0)
     .sort((a, b) => a - b)[0] ?? null;
-  const diasAteCasamento = dataCasamento ? daysBetween(hoje, dateAtNoon(dataCasamento)) : null;
 
   let risk = 0;
 
-  if (valorAtrasado > 0) {
-    if (percentualAtrasado < 0.02) risk += 10;
-    else if (percentualAtrasado <= 0.10) risk += 25;
-    else risk += 40;
-  }
-
-  const pct7 = percentOf(valorVencendoEm7Dias, totalContratadoReal);
-  const valorVencendo8a30 = upcoming8to30.reduce((sum, due) => sum + due.amount, 0);
-  const pct8to30 = percentOf(valorVencendo8a30, totalContratadoReal);
-
-  if (valorVencendoEm7Dias > 0) risk += pct7 > 0.05 ? 20 : 8;
-  if (valorVencendo8a30 > 0) risk += pct8to30 > 0.10 ? 15 : 5;
-
-  if (diasAteCasamento !== null) {
-    if (diasAteCasamento < 30) {
-      if (percentualPago < 0.5) risk += 35;
-      else if (percentualPago < 0.7) risk += 22;
-      if (percentualPendente > 0.4) risk += 25;
-      else if (percentualPendente > 0.2) risk += 12;
-    } else if (diasAteCasamento < 90) {
-      if (percentualPago < 0.5) risk += 25;
-      else if (percentualPago < 0.7) risk += 15;
-      if (percentualPendente > 0.5) risk += 15;
-    } else if (diasAteCasamento <= 180) {
-      if (percentualPago < 0.5) risk += 10;
-      if (percentualPendente > 0.6) risk += 8;
-    }
-  }
-
-  if (diasAteCasamento !== null && diasAteCasamento > 180 && valorAtrasado === 0) {
-    risk = Math.min(risk, 35);
-  }
-
-  if (percentualPendente < 0.01) {
-    risk = Math.min(risk, 45);
-  }
-
-  if (totalPendente > 0 && valorAtrasado === 0 && valorVencendoEm30Dias === 0) {
-    risk = Math.min(risk, diasAteCasamento !== null && diasAteCasamento < 30 && percentualPendente > 0.4 ? risk : 20);
-  }
+  // Pendente distante conta como risco leve; urgencia e atraso aumentam o peso.
+  risk += riskContribution(4, percentualPendente, 18, 18);
+  risk += riskContribution(24, percentualAtrasado, 90, 58);
+  risk += riskContribution(12, percentualVencendo7, 55, 34);
+  risk += riskContribution(6, percentualVencendo8a30, 35, 22);
+  risk += riskContribution(3, percentualSemDataLimite, 18, 12);
+  risk += Math.min(8, fornecedoresSemData.length * 2);
 
   const score = clampRisk(risk);
   const classification = labelForFinancialRisk(score);
 
-  let motivo = 'Não há valores atrasados e os próximos vencimentos ainda estão distantes.';
+  let motivo = 'Nao ha valores pendentes relevantes.';
   if (valorAtrasado > 0) {
-    motivo = `Há ${formatMoney(valorAtrasado)} em pagamentos atrasados.`;
+    motivo = `Ha ${formatMoney(valorAtrasado)} em pagamentos atrasados.`;
   } else if (valorVencendoEm7Dias > 0) {
-    motivo = `Há ${formatMoney(valorVencendoEm7Dias)} vencendo nos próximos 7 dias.`;
+    motivo = `Ha ${formatMoney(valorVencendoEm7Dias)} vencendo nos proximos 7 dias.`;
   } else if (valorVencendoEm30Dias > 0) {
-    motivo = `Há ${formatMoney(valorVencendoEm30Dias)} vencendo nos próximos 30 dias.`;
-  } else if (diasAteCasamento !== null && diasAteCasamento < 30 && percentualPendente > 0.4) {
-    motivo = `O casamento está próximo e ${Math.round(percentualPendente * 100)}% do valor contratado ainda está pendente.`;
+    motivo = `Ha ${formatMoney(valorVencendoEm30Dias)} vencendo nos proximos 30 dias.`;
+  } else if (fornecedoresSemData.length > 0) {
+    motivo = `${fornecedoresSemData.length} fornecedor${fornecedoresSemData.length > 1 ? 'es' : ''} com valor pendente sem data limite de pagamento.`;
   } else if (totalPendente > 0) {
-    motivo = `Há ${formatMoney(totalPendente)} pendentes, mas sem vencimentos críticos no curto prazo.`;
+    motivo = `Ha ${formatMoney(totalPendente)} pendentes, mas sem vencimentos criticos no curto prazo.`;
   }
 
   return {
@@ -271,6 +254,8 @@ export function calculateFinancialHealth({
       valorAtrasado,
       valorVencendoEm7Dias,
       valorVencendoEm30Dias,
+      valorSemDataLimite,
+      fornecedoresSemDataLimite: fornecedoresSemData.length,
       percentualPago,
       percentualPendente,
       percentualAtrasado,
@@ -323,10 +308,10 @@ export function normalizeCategoryText(category: string) {
 export function toPrimaryCategory(category?: string | null) {
   const normalized = normalizeCategoryText(category ?? '');
   const aliasMap: Record<string, string> = {
-    fotografia: 'Foto e Vídeo',
-    filmagem: 'Foto e Vídeo',
-    musica: 'Música / DJ',
-    dj: 'Música / DJ',
+    fotografia: 'Foto e Video',
+    filmagem: 'Foto e Video',
+    musica: 'Musica / DJ',
+    dj: 'Musica / DJ',
     doces: 'Doces e Bolo',
     bolo: 'Doces e Bolo',
     vestido: 'Roupas dos Noivos',

@@ -24,7 +24,7 @@ import FormTextarea from '../components/FormTextarea';
 import Modal from '../components/Modal';
 import { useWedding } from '../hooks/useWedding';
 import { useWeddingTable } from '../hooks/useWeddingTable';
-import { BudgetCategory, BudgetItem, PaymentInstallment, Task, Vendor } from '../types';
+import { BudgetCategory, BudgetItem, Task, Vendor } from '../types';
 import { budgetCategories } from '../utils/constants';
 import { formatMoney } from '../utils/format';
 
@@ -41,7 +41,7 @@ type TimelineItem = {
 type AgendaType = 'task' | 'event' | 'payment' | 'reminder';
 type ViewMode = 'list' | 'calendar';
 type TypeFilter = 'all' | 'event' | 'task' | 'payment';
-type AgendaSource = 'task' | 'budget' | 'installment' | 'timeline' | 'wedding';
+type AgendaSource = 'task' | 'budget' | 'timeline' | 'wedding';
 
 type AgendaItem = {
   id: string;
@@ -218,7 +218,6 @@ export default function Agenda() {
   const { wedding } = useWedding();
   const tasks = useWeddingTable<Task>('tasks', 'due_date');
   const budgetItems = useWeddingTable<BudgetItem>('budget_items', 'due_date');
-  const paymentInstallments = useWeddingTable<PaymentInstallment>('payment_installments', 'due_date');
   const budgetCategoryRows = useWeddingTable<BudgetCategory>('budget_categories', 'sort_order');
   const vendors = useWeddingTable<Vendor>('vendors', 'name');
   const timeline = useWeddingTable<TimelineItem>('timeline_items', 'time');
@@ -245,8 +244,6 @@ export default function Agenda() {
   }, [budgetCategoryRows.rows]);
 
   const vendorById = useMemo(() => new Map(vendors.rows.map((vendor) => [vendor.id, vendor])), [vendors.rows]);
-  const budgetById = useMemo(() => new Map(budgetItems.rows.map((item) => [item.id, item])), [budgetItems.rows]);
-  const installmentBudgetIds = useMemo(() => new Set(paymentInstallments.rows.map((item) => item.budget_item_id).filter(Boolean) as string[]), [paymentInstallments.rows]);
 
   const agendaItems = useMemo<AgendaItem[]>(() => {
     const items: AgendaItem[] = [];
@@ -273,30 +270,8 @@ export default function Agenda() {
         });
       });
 
-    paymentInstallments.rows
-      .filter((installment) => installment.due_date)
-      .forEach((installment) => {
-        const budgetItem = installment.budget_item_id ? budgetById.get(installment.budget_item_id) : null;
-        const linkedVendor = installment.vendor_id ? vendorById.get(installment.vendor_id) : null;
-        const pending = Math.max(0, Number(installment.amount ?? 0) - Number(installment.paid_amount ?? 0));
-        items.push({
-          id: `installment-${installment.id}`,
-          sourceId: installment.id,
-          source: 'installment',
-          date: installment.due_date as string,
-          type: 'payment',
-          title: `Parcela ${installment.number} - ${budgetItem?.name ?? linkedVendor?.name ?? 'Fornecedor'}`,
-          description: `${budgetItem?.category ?? 'Financeiro'} · ${formatMoney(pending)} pendente`,
-          category: budgetItem?.category ?? 'Financeiro',
-          status: installment.status,
-          amount: Number(installment.amount ?? 0),
-          location: linkedVendor?.name ?? null,
-          href: '/orcamento'
-        });
-      });
-
     budgetItems.rows
-      .filter((item) => item.due_date && !installmentBudgetIds.has(item.id))
+      .filter((item) => item.due_date)
       .forEach((item) => {
         const pending = Number(item.contracted_value ?? 0) - Number(item.paid_value ?? 0);
         const linkedVendor = item.vendor_id ? vendorById.get(item.vendor_id) : null;
@@ -350,7 +325,7 @@ export default function Agenda() {
     }
 
     return items.sort((a, b) => `${a.date} ${a.time ?? ''}`.localeCompare(`${b.date} ${b.time ?? ''}`, 'pt-BR', { numeric: true }));
-  }, [budgetById, budgetItems.rows, installmentBudgetIds, paymentInstallments.rows, tasks.rows, timeline.rows, vendorById, wedding]);
+  }, [budgetItems.rows, tasks.rows, timeline.rows, vendorById, wedding]);
 
   const visibleItems = useMemo(() => {
     return agendaItems.filter((item) => {
@@ -479,38 +454,6 @@ export default function Agenda() {
     const status = nextStatus(item.type, item.status);
     if (item.source === 'task') await tasks.update(item.sourceId, { status });
     if (item.source === 'budget') await budgetItems.update(item.sourceId, { payment_status: status, payment_date: status === 'pago' ? today : null });
-    if (item.source === 'installment') {
-      const installment = paymentInstallments.rows.find((row) => row.id === item.sourceId);
-      if (!installment) return;
-      await paymentInstallments.update(item.sourceId, {
-        status,
-        paid_amount: status === 'pago' ? Number(installment.amount ?? 0) : 0,
-        paid_at: status === 'pago' ? today : null
-      } as Partial<PaymentInstallment>);
-
-      if (installment.budget_item_id) {
-        const related = paymentInstallments.rows.map((row) =>
-          row.id === installment.id
-            ? { ...row, status, paid_amount: status === 'pago' ? Number(row.amount ?? 0) : 0 }
-            : row
-        ).filter((row) => row.budget_item_id === installment.budget_item_id);
-        const paidValue = related.reduce((sum, row) => sum + (row.status === 'pago' ? Number(row.paid_amount || row.amount || 0) : 0), 0);
-        const budgetItem = budgetById.get(installment.budget_item_id);
-        if (budgetItem) {
-          await budgetItems.update(budgetItem.id, {
-            paid_value: paidValue,
-            payment_status: paidValue >= Number(budgetItem.contracted_value ?? 0) ? 'pago' : paidValue > 0 ? 'pago parcialmente' : 'pendente',
-            payment_date: status === 'pago' ? today : null
-          } as Partial<BudgetItem>);
-          if (budgetItem.vendor_id) {
-            const nextDue = related
-              .filter((row) => row.status !== 'pago' && row.due_date)
-              .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)))[0]?.due_date ?? budgetItem.due_date;
-            await vendors.update(budgetItem.vendor_id, { paid_value: paidValue, due_date: nextDue } as Partial<Vendor>);
-          }
-        }
-      }
-    }
   }
 
   function moveMonth(offset: number) {
@@ -547,7 +490,7 @@ export default function Agenda() {
             <p className="mt-1 inline-flex rounded-full border border-[#FCE4EA] bg-[#FFF1F5] px-2.5 py-1 text-xs font-bold text-[#E11D48]">{weddingCountdown}</p>
           )}
         </div>
-        <div className="flex items-center">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="grid grid-cols-2 rounded-2xl border border-[#F0EBE6] bg-white p-1 shadow-soft">
             <button type="button" onClick={() => setView('list')} className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-xl px-3 text-sm font-bold transition ${view === 'list' ? 'bg-[#E11D48] text-white shadow-rose' : 'text-[#71717A] hover:bg-[#FAFAFA] hover:text-[#1F2937]'}`}>
               <List size={16} /> Lista
@@ -556,6 +499,13 @@ export default function Agenda() {
               <CalendarDays size={16} /> Calendário
             </button>
           </div>
+          <button
+            type="button"
+            className="hidden min-h-10 items-center justify-center gap-1.5 rounded-xl bg-[#E11D48] px-3.5 text-sm font-bold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-[#BE123C] hover:shadow-rose md:inline-flex"
+            onClick={() => openCreate(selectedDay ?? today)}
+          >
+            <Plus size={16} /> Novo
+          </button>
         </div>
       </div>
 
@@ -600,14 +550,15 @@ export default function Agenda() {
         />
       )}
 
-      {/* FAB */}
+      {/* Mobile FAB */}
       <button
         type="button"
         id="agenda-fab-novo"
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] right-4 z-20 inline-flex min-h-12 items-center gap-2 rounded-full bg-[#E11D48] px-5 text-sm font-bold text-white shadow-rose transition hover:bg-[#BE123C] lg:bottom-6"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] right-4 z-20 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#E11D48] text-white shadow-rose transition hover:bg-[#BE123C] md:hidden"
         onClick={() => openCreate(selectedDay ?? today)}
+        aria-label="Novo item"
       >
-        <Plus size={18} /> Novo
+        <Plus size={20} />
       </button>
 
       {/* Modal */}
