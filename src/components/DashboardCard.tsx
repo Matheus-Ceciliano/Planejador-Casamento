@@ -19,8 +19,8 @@ export default function DashboardCard({ title, value, icon: Icon, tone = 'rose' 
     <div className="panel panel-hover p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-w-faint">{title}</p>
-          <p className="mt-2 text-2xl font-bold text-w-text">{value}</p>
+          <p className="text-[13px] font-semibold leading-[18px] text-w-faint">{title}</p>
+          <p className="mt-2 text-[32px] font-bold leading-9 text-w-text">{value}</p>
         </div>
         <span className={`rounded-2xl p-2.5 ${t.bg} ${t.icon}`}>
           <Icon size={20} />

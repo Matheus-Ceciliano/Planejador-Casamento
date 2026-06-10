@@ -522,7 +522,7 @@ export default function Agenda() {
       {/* Header */}
       <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between md:pt-0">
         <div className="min-w-0">
-          <h1 className="text-[1.55rem] font-bold leading-tight tracking-tight text-[#1F2937] sm:text-3xl">Central de Planejamento</h1>
+          <h1 className="page-title text-[#1F2937]">Central de Planejamento</h1>
           {weddingCountdown && (
             <p className="mt-1 inline-flex rounded-full border border-[#FCE4EA] bg-[#FFF1F5] px-2.5 py-1 text-xs font-bold text-[#E11D48]">{weddingCountdown}</p>
           )}

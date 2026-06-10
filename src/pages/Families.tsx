@@ -1,5 +1,5 @@
-import { CheckCircle2, ChevronDown, Edit2, Eye, Phone, Plus, Trash2, Users, XCircle } from 'lucide-react';
-import { FormEvent, useMemo, useState } from 'react';
+import { CheckCircle2, ChevronDown, Edit2, Eye, MoreHorizontal, Phone, Plus, Trash2, Users, XCircle } from 'lucide-react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import EmptyState from '../components/EmptyState';
 import FormInput from '../components/FormInput';
@@ -37,6 +37,10 @@ function orderMembers(members: Guest[], group: GuestGroup) {
   });
 }
 
+function initials(name: string) {
+  return name.split(' ').filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join('') || 'C';
+}
+
 function StatusBadge({ status }: { status: string }) {
   const style =
     status === 'confirmado'
@@ -53,16 +57,16 @@ function TypeBadge({ type }: { type: string }) {
 
 function Stat({ label, value, tone = 'neutral' }: { label: string; value: number; tone?: 'neutral' | 'success' | 'warning' | 'danger' }) {
   const toneClass = {
-    neutral: 'text-[#2D2A26]',
-    success: 'text-[#5F8D6D]',
-    warning: 'text-[#B07C45]',
-    danger: 'text-[#C46A6A]'
+    neutral: 'bg-white text-[#2D2A26] ring-[#E7E0D8]',
+    success: 'bg-[#F0FDF4] text-[#5F8D6D] ring-[#DCFCE7]',
+    warning: 'bg-[#FFFBEB] text-[#B07C45] ring-[#FEF3C7]',
+    danger: 'bg-[#FEF2F2] text-[#C46A6A] ring-[#FEE2E2]'
   }[tone];
 
   return (
-    <div className="rounded-lg bg-[#FAF8F5] px-3 py-2">
-      <p className={`text-lg font-semibold leading-none ${toneClass}`}>{value}</p>
-      <p className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-[#6F6760]">{label}</p>
+    <div className={`min-h-[64px] rounded-2xl px-3 py-2 ring-1 ${toneClass}`}>
+      <p className="text-lg font-extrabold leading-none sm:text-xl">{value}</p>
+      <p className="mt-1.5 truncate text-[9px] font-bold uppercase tracking-[0.12em] opacity-70 sm:text-[10px]">{label}</p>
     </div>
   );
 }
@@ -74,6 +78,7 @@ export default function Families() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<GuestGroup | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [actionOpen, setActionOpen] = useState('');
   const [form, setForm] = useState(blank);
 
   const membersByGroup = useMemo(
@@ -103,18 +108,27 @@ export default function Families() {
     });
   }
 
+  useEffect(() => {
+    function closeActions() {
+      setActionOpen('');
+    }
+
+    window.addEventListener('click', closeActions);
+    return () => window.removeEventListener('click', closeActions);
+  }, []);
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+    <div className="max-w-full space-y-5 overflow-x-hidden">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
           <h1 className="page-title">Famílias e grupos</h1>
-          <p className="mt-1 text-sm text-stone-500">Organize convidados por núcleos familiares, mantendo confirmações individuais.</p>
+          <p className="mt-1 text-xs leading-relaxed text-stone-500 sm:text-sm">Organize convidados por núcleos familiares, mantendo confirmações individuais.</p>
         </div>
-        <button className="btn-primary" onClick={() => start()}><Plus size={16} />Nova família</button>
+        <button className="btn-primary min-h-11 w-full justify-center rounded-2xl px-5 py-2.5 shadow-rose sm:w-auto" onClick={() => start()}><Plus size={16} />Nova família</button>
       </div>
 
       {groups.rows.length ? (
-        <section className="grid gap-4 xl:grid-cols-2">
+        <section className="grid max-w-full gap-4 md:grid-cols-2">
           {groups.rows.map((group) => {
             const members = membersByGroup.get(group.id) ?? [];
             const orderedMembers = orderMembers(members, group);
@@ -124,21 +138,43 @@ export default function Families() {
             const isOpen = expanded.has(group.id);
 
             return (
-              <article key={group.id} className="rounded-lg border border-[#E7E0D8] bg-white shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
-                <div className="p-4">
+              <article key={group.id} className="relative w-full max-w-full overflow-visible rounded-3xl border border-[#F0EBE6] bg-white shadow-soft transition hover:border-[#E5DDD8] hover:shadow-card">
+                <div className="p-3.5 sm:p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6F6760]">{group.side}</p>
-                      <h2 className="mt-1 break-words text-lg font-semibold text-[#2D2A26]">{group.name}</h2>
-                      <p className="mt-1 text-sm text-[#6F6760]">Chefe: <span className="font-medium text-[#2D2A26]">{group.responsible_name || 'Não definido'}</span></p>
+                    <div className="min-w-0 flex-1 overflow-hidden pr-1">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <h2 className="min-w-0 truncate text-xl font-bold leading-6 text-[#2D2A26] sm:text-[22px]">{group.name}</h2>
+                        <span className="shrink-0 rounded-full bg-[#B76E79]/10 px-2 py-0.5 text-[10px] font-bold text-[#B76E79] ring-1 ring-[#B76E79]/15 sm:text-xs">
+                          {members.length} {members.length === 1 ? 'membro' : 'membros'}
+                        </span>
+                      </div>
+                      <p className="mt-1 truncate text-[13px] font-medium text-[#6F6760] sm:text-sm">Chefe da família: <span className="font-semibold text-[#2D2A26]">{group.responsible_name || 'Não definido'}</span></p>
+                      <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#A59B92] sm:text-[11px]">{group.side}</p>
                     </div>
-                    <div className="flex shrink-0 gap-2">
-                      <button type="button" className="btn-secondary h-9 px-3" onClick={() => start(group)} title="Editar família" aria-label="Editar família">
-                        <Edit2 size={15} />
+                    <div className="flex shrink-0 gap-1.5" onClick={(event) => event.stopPropagation()}>
+                      <button type="button" className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#F0EBE6] bg-white text-[#6F6760] shadow-soft transition hover:border-[#B76E79]/35 hover:bg-[#FAF8F5] hover:text-[#B76E79] sm:h-9 sm:w-9" onClick={() => start(group)} title="Editar família" aria-label="Editar família">
+                        <Edit2 size={14} />
                       </button>
-                      <button type="button" className="btn-secondary h-9 px-3 text-[#C46A6A]" onClick={() => groups.remove(group.id)} title="Excluir família" aria-label="Excluir família">
-                        <Trash2 size={15} />
+                      <button
+                        type="button"
+                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#F0EBE6] bg-white text-[#6F6760] shadow-soft transition hover:border-[#B76E79]/35 hover:bg-[#FAF8F5] hover:text-[#2D2A26] sm:h-9 sm:w-9"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setActionOpen(actionOpen === group.id ? '' : group.id);
+                        }}
+                        title="Mais ações"
+                        aria-label="Mais ações"
+                        aria-expanded={actionOpen === group.id}
+                      >
+                        <MoreHorizontal size={16} />
                       </button>
+                      {actionOpen === group.id && (
+                        <div className="absolute right-3 top-14 z-50 w-48 overflow-hidden rounded-2xl border border-[#F0EBE6] bg-white shadow-float animate-scale-in">
+                          <button type="button" className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-[#C46A6A] hover:bg-[#FEF2F2]" onClick={() => groups.remove(group.id)}>
+                            <Trash2 size={15} /> Excluir família
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -151,7 +187,7 @@ export default function Families() {
 
                   <button
                     type="button"
-                    className="mt-4 flex w-full items-center justify-between rounded-lg border border-[#E7E0D8] bg-[#FAF8F5] px-3 py-2 text-sm font-semibold text-[#2D2A26] transition hover:border-[#B76E79]"
+                    className="mt-4 flex w-full items-center justify-between rounded-2xl border border-[#F0EBE6] bg-[#FAF8F5] px-3.5 py-2 text-[13px] font-bold text-[#2D2A26] transition hover:border-[#B76E79]/40 hover:bg-white sm:text-sm"
                     onClick={() => toggleExpanded(group.id)}
                     aria-expanded={isOpen}
                   >
@@ -161,43 +197,48 @@ export default function Families() {
                 </div>
 
                 {isOpen && (
-                  <div className="border-t border-[#E7E0D8] bg-[#FAF8F5] p-3">
+                  <div className="border-t border-[#F0EBE6] bg-[#FAF8F5] p-3">
                     {orderedMembers.length ? (
                       <div className="space-y-2">
                         {orderedMembers.map((guest) => {
                           const head = isFamilyHead(guest, group);
                           const role = head ? 'Chefe da família' : group.responsible_name ? `Dependente de ${group.responsible_name}` : 'Individual dentro da família';
                           return (
-                            <div key={guest.id} className={`rounded-lg border bg-white p-3 ${head ? 'border-[#B76E79] shadow-[0_10px_24px_rgba(216,167,160,0.16)]' : 'border-[#E7E0D8]'}`}>
-                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                <div className="min-w-0">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <p className="break-words text-sm font-semibold text-[#2D2A26]">{guest.full_name}</p>
-                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${head ? 'bg-[#B76E79]/20 text-[#B76E79]' : 'bg-[#E7E0D8] text-[#6F6760]'}`}>{role}</span>
-                                  </div>
-                                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                                    <TypeBadge type={guest.guest_type} />
-                                    <StatusBadge status={guest.invite_status} />
-                                  </div>
-                                  <div className="mt-2 grid gap-1 text-xs text-[#6F6760] sm:grid-cols-2">
-                                    {guest.phone ? (
-                                      <a className="inline-flex items-center gap-1 font-medium text-[#2D2A26] transition hover:text-[#B76E79]" href={buildWhatsAppChatLink(guest.phone)} target="_blank" rel="noreferrer">
-                                        <Phone size={12} />{guest.phone}
-                                      </a>
-                                    ) : (
-                                      <span className="inline-flex items-center gap-1"><Phone size={12} />—</span>
-                                    )}
-                                    <span>Acompanhantes: {Number(guest.companions ?? 0)}</span>
+                            <div key={guest.id} className={`rounded-2xl border bg-white p-2.5 ${head ? 'border-[#B76E79]/45 shadow-[0_10px_24px_rgba(216,167,160,0.14)]' : 'border-[#F0EBE6]'}`}>
+                              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="flex min-w-0 gap-2.5">
+                                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#FFF1F5] text-xs font-extrabold text-[#B76E79] ring-1 ring-[#FCE4EA]">
+                                    {initials(guest.full_name)}
+                                  </span>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                      <p className="min-w-0 truncate text-sm font-extrabold text-[#2D2A26]">{guest.full_name}</p>
+                                      <StatusBadge status={guest.invite_status} />
+                                    </div>
+                                    <p className="mt-1 truncate text-xs font-semibold text-[#6F6760]">{role}</p>
+                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                                      <TypeBadge type={guest.guest_type} />
+                                    </div>
+                                    <div className="mt-2 grid gap-1 text-xs text-[#6F6760] sm:grid-cols-2">
+                                      {guest.phone ? (
+                                        <a className="inline-flex min-w-0 items-center gap-1 font-medium text-[#2D2A26] transition hover:text-[#B76E79]" href={buildWhatsAppChatLink(guest.phone)} target="_blank" rel="noreferrer">
+                                          <Phone size={12} className="shrink-0" /><span className="truncate">{guest.phone}</span>
+                                        </a>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1"><Phone size={12} />—</span>
+                                      )}
+                                      <span className="truncate">Acompanhantes: {Number(guest.companions ?? 0)}</span>
+                                    </div>
                                   </div>
                                 </div>
-                                <div className="flex shrink-0 flex-wrap gap-2">
-                                  <button type="button" className="btn-secondary h-8 px-2 text-xs text-[#5F8D6D]" onClick={() => guests.update(guest.id, { invite_status: 'confirmado' })}>
+                                <div className="flex shrink-0 flex-wrap gap-2 pl-11 sm:pl-0">
+                                  <button type="button" className="btn-secondary min-h-8 px-2 text-xs text-[#5F8D6D]" onClick={() => guests.update(guest.id, { invite_status: 'confirmado' })}>
                                     <CheckCircle2 size={14} /> Confirmar
                                   </button>
-                                  <button type="button" className="btn-secondary h-8 px-2 text-xs text-[#C46A6A]" onClick={() => guests.update(guest.id, { invite_status: 'recusado' })}>
+                                  <button type="button" className="btn-secondary min-h-8 px-2 text-xs text-[#C46A6A]" onClick={() => guests.update(guest.id, { invite_status: 'recusado' })}>
                                     <XCircle size={14} /> Recusar
                                   </button>
-                                  <button type="button" className="btn-secondary h-8 px-2 text-xs" onClick={() => navigate('/convidados')}>
+                                  <button type="button" className="btn-secondary min-h-8 px-2 text-xs" onClick={() => navigate('/convidados')}>
                                     <Eye size={14} /> Detalhes
                                   </button>
                                 </div>

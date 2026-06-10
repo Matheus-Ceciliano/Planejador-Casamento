@@ -395,8 +395,8 @@ export default function Members() {
     <div className="max-w-full space-y-4 overflow-x-hidden pb-3 text-w-text sm:space-y-5 lg:pb-0" onClick={() => setActionOpen('')}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
-          <h1 className="text-[1.65rem] font-bold leading-tight tracking-tight text-w-text sm:text-3xl">Membros</h1>
-          <p className="mt-1 text-sm text-w-muted">Gerencie quem pode acessar e colaborar no planejamento do casamento.</p>
+          <h1 className="page-title">Membros</h1>
+          <p className="mt-1 text-[15px] font-normal leading-[22px] text-w-muted sm:text-base sm:leading-6">Gerencie quem pode acessar e colaborar no planejamento do casamento.</p>
         </div>
         <button className="btn-primary min-h-11 w-full justify-center rounded-2xl px-5 py-2.5 shadow-rose sm:w-auto" onClick={openInviteModal} disabled={!canManage}>
           <Plus size={17} /> Convidar membro
@@ -416,7 +416,7 @@ export default function Members() {
         <div className="min-w-0 max-w-full overflow-visible rounded-3xl border border-w-border bg-white/70 p-2.5 shadow-soft sm:p-4">
           <div className="mb-3 flex items-start justify-between gap-3 px-1">
             <div className="min-w-0">
-              <h2 className="text-sm font-extrabold text-w-text">Equipe do planejamento</h2>
+              <h2 className="section-title">Equipe do planejamento</h2>
               <p className="mt-0.5 text-xs font-medium text-w-muted">{members.rows.length} pessoas com acesso</p>
             </div>
             <span className="shrink-0 rounded-full bg-w-rose-lt px-2.5 py-1 text-[11px] font-bold text-w-rose">Colaborativo</span>
@@ -445,7 +445,7 @@ export default function Members() {
           <section className="rounded-3xl border border-w-border bg-white p-4 shadow-soft">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="text-sm font-extrabold text-w-text">Convites pendentes</h2>
+                <h2 className="section-title">Convites pendentes</h2>
                 <p className="mt-0.5 text-xs font-medium text-w-muted">{pendingInvites.length} aguardando aceite</p>
               </div>
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-w-rose-lt text-w-rose">
@@ -463,7 +463,7 @@ export default function Members() {
           <section className="rounded-3xl border border-w-border bg-white p-4 shadow-soft">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="text-sm font-extrabold text-w-text">Atividades recentes</h2>
+                <h2 className="section-title">Atividades recentes</h2>
                 <p className="mt-0.5 text-xs font-medium text-w-muted">Historico do acesso</p>
               </div>
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-w-surface text-w-muted">

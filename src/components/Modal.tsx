@@ -24,7 +24,7 @@ export default function Modal({ open, title, children, onClose }: Props) {
 
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-w-border bg-w-card px-5 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] sm:px-6 sm:py-5">
-          <h2 className="min-w-0 text-base font-bold leading-tight text-w-text sm:text-lg">
+          <h2 className="min-w-0 text-lg font-semibold leading-6 text-w-text">
             {title}
           </h2>
           <button

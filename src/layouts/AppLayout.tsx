@@ -1,7 +1,7 @@
 import {
-  CalendarDays, ChevronDown, Clock3, Files, Handshake,
+  CalendarDays, ChevronDown, Files, Handshake,
   Heart, Home, LogOut, Menu, MoreHorizontal,
-  Settings, Users, WalletCards, X,
+  Settings, Table2, Users, WalletCards, X,
 } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
@@ -17,7 +17,7 @@ const nav = [
   { to: '/convidados',   label: 'Convidados',      icon: Users },
   { to: '/orcamento',    label: 'Orçamento',       icon: WalletCards },
   { to: '/fornecedores', label: 'Fornecedores',    icon: Handshake },
-  { to: '/cronograma',   label: 'Cronograma',      icon: Clock3 },
+  { to: '/mesas',        label: 'Mesas',           icon: Table2 },
   { to: '/arquivos',     label: 'Arquivos',        icon: Files },
   { to: '/membros',      label: 'Membros',         icon: Users },
   { to: '/configuracoes',label: 'Configurações',   icon: Settings },
@@ -33,7 +33,7 @@ const mobileNav = [
 const mobileMoreNav = [
   { to: '/membros',       label: 'Membros',       icon: Users },
   { to: '/fornecedores',  label: 'Fornecedores',  icon: Handshake },
-  { to: '/mesas',         label: 'Mesas',         icon: Users },
+  { to: '/mesas',         label: 'Mesas',         icon: Table2 },
   { to: '/arquivos',      label: 'Arquivos',      icon: Files },
   { to: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
@@ -71,10 +71,10 @@ function Sidebar({ onNavigate, onSignOut }: { onNavigate?: () => void; onSignOut
             to={to}
             onClick={onNavigate}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
+              `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm leading-5 transition-all duration-150 ${
                 isActive
-                  ? 'bg-w-rose text-white shadow-rose'
-                  : 'text-w-muted hover:bg-w-surface hover:text-w-text'
+                  ? 'bg-w-rose font-semibold text-white shadow-rose'
+                  : 'font-medium text-w-muted hover:bg-w-surface hover:text-w-text'
               }`
             }
           >

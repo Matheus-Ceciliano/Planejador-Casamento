@@ -23,7 +23,7 @@
 
   color: var(--text);
   background: var(--surface);
-  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: 'cv11', 'ss01';
@@ -37,6 +37,8 @@ body {
   min-height: 100dvh;
   background: var(--surface);
   overflow-x: hidden;
+  font-size: 15px;
+  line-height: 22px;
 }
 
 button,
@@ -44,6 +46,11 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+.recharts-wrapper,
+.recharts-tooltip-wrapper {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif !important;
 }
 
 /* ── Safe-area helpers ──────────────────────────────────────────── */
@@ -179,7 +186,31 @@ textarea {
 
   /* ── Page title ── */
   .page-title {
-    @apply text-2xl font-bold tracking-tight text-w-text;
+    @apply text-[28px] font-bold leading-[34px] tracking-tight text-w-text sm:text-[32px] sm:leading-[38px];
+  }
+
+  .section-title {
+    @apply text-[22px] font-bold leading-7 text-w-text;
+  }
+
+  .card-title {
+    @apply text-lg font-semibold leading-6 text-w-text;
+  }
+
+  .body-copy {
+    @apply text-[15px] font-normal leading-[22px];
+  }
+
+  .text-small {
+    @apply text-[13px] font-normal leading-[18px];
+  }
+
+  .text-label {
+    @apply text-xs font-semibold leading-4 tracking-wide;
+  }
+
+  .kpi-number {
+    @apply text-[32px] font-bold leading-9;
   }
 
   /* ── Glass card ── */
@@ -241,7 +272,7 @@ textarea {
 
   /* ── Primary button ── */
   .btn-primary {
-    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-w-rose px-4 py-2 text-sm font-semibold text-white shadow-rose transition-all duration-150 ease-out hover:bg-[#BE123C] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] active:shadow-rose disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-w-rose px-4 py-2 text-[15px] font-semibold leading-5 text-white shadow-rose transition-all duration-150 ease-out hover:bg-[#BE123C] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] active:shadow-rose disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none;
   }
 
   .btn-primary:hover:not(:disabled) {
@@ -250,26 +281,26 @@ textarea {
 
   /* ── Secondary button ── */
   .btn-secondary {
-    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-w-border bg-w-card px-4 py-2 text-sm font-semibold text-w-text shadow-soft transition-all duration-150 ease-out hover:border-w-border-md hover:bg-w-surface hover:shadow-card active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-w-border bg-w-card px-4 py-2 text-[15px] font-semibold leading-5 text-w-text shadow-soft transition-all duration-150 ease-out hover:border-w-border-md hover:bg-w-surface hover:shadow-card active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   /* ── Ghost button ── */
   .btn-ghost {
-    @apply inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-w-muted transition-all duration-150 ease-out hover:bg-w-border hover:text-w-text active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[15px] font-medium leading-5 text-w-muted transition-all duration-150 ease-out hover:bg-w-border hover:text-w-text active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   /* ── Input ── */
   .input {
-    @apply min-h-10 w-full rounded-xl border border-w-border bg-w-card px-3.5 py-2.5 text-sm text-w-text shadow-soft outline-none placeholder:text-w-faint transition-all duration-150 ease-out focus:border-w-rose focus:bg-white focus:ring-2 focus:ring-w-rose/10 focus:shadow-card;
+    @apply min-h-10 w-full rounded-xl border border-w-border bg-w-card px-3.5 py-2.5 text-[15px] font-normal leading-5 text-w-text shadow-soft outline-none placeholder:text-w-faint transition-all duration-150 ease-out focus:border-w-rose focus:bg-white focus:ring-2 focus:ring-w-rose/10 focus:shadow-card;
   }
 
   /* ── Label ── */
   .label {
-    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-w-muted;
+    @apply mb-1.5 block text-xs font-semibold leading-4 uppercase tracking-wide text-w-muted;
   }
 
   .field-base {
-    @apply min-h-10 w-full rounded-xl border border-w-border bg-w-card px-3.5 py-2.5 text-sm text-w-text shadow-soft outline-none placeholder:text-w-faint transition-all duration-150 ease-out;
+    @apply min-h-10 w-full rounded-xl border border-w-border bg-w-card px-3.5 py-2.5 text-[15px] font-normal leading-5 text-w-text shadow-soft outline-none placeholder:text-w-faint transition-all duration-150 ease-out;
     -webkit-appearance: none;
     appearance: none;
   }
@@ -293,15 +324,15 @@ textarea {
   }
 
   .field-label {
-    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-w-muted;
+    @apply mb-1.5 block text-xs font-semibold leading-4 uppercase tracking-wide text-w-muted;
   }
 
   .field-hint {
-    @apply mt-1.5 text-xs leading-relaxed text-w-muted;
+    @apply mt-1.5 text-[13px] font-normal leading-[18px] text-w-muted;
   }
 
   .field-error-text {
-    @apply mt-1.5 text-xs font-semibold leading-relaxed text-w-red;
+    @apply mt-1.5 text-[13px] font-semibold leading-[18px] text-w-red;
   }
 
   .field-icon-left {
@@ -313,12 +344,12 @@ textarea {
   }
 
   .field-prefix {
-    @apply pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 select-none text-sm font-semibold text-w-muted;
+    @apply pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 select-none text-[15px] font-semibold leading-5 text-w-muted;
   }
 
   /* ── Badge variants ── */
   .badge {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold leading-4;
   }
 
   .badge-rose {

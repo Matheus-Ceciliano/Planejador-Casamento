@@ -62,7 +62,7 @@ export default function AppSelect({
 
   const triggerCls = [
     'field-base radix-select-trigger',
-    'relative flex h-12 w-full min-w-0 cursor-pointer select-none items-center justify-between gap-2 overflow-hidden whitespace-nowrap rounded-2xl text-left',
+    'relative flex h-11 w-full min-w-0 cursor-pointer select-none items-center justify-between gap-2 overflow-hidden whitespace-nowrap rounded-2xl text-left',
     hasLeft ? 'pl-[44px]' : '',
     // right padding for chevron
     'pr-[44px]',
@@ -148,7 +148,7 @@ export default function AppSelect({
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Buscar..."
                     autoFocus
-                    className="h-9 w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] pl-9 pr-3 text-sm text-[#1F2937] outline-none placeholder:text-[#9CA3AF] focus:border-[#E11D48] focus:bg-white transition-all"
+                    className="h-9 w-full rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] pl-9 pr-3 text-[15px] leading-5 text-[#1F2937] outline-none placeholder:text-[#9CA3AF] focus:border-[#E11D48] focus:bg-white transition-all"
                   />
                 </div>
               </div>
@@ -165,7 +165,7 @@ export default function AppSelect({
                   <Select.Item
                     key={`${opt.value || EMPTY_OPTION_VALUE}-${index}`}
                     value={opt.value === '' ? EMPTY_OPTION_VALUE : opt.value}
-                    className="radix-select-item group relative flex cursor-pointer select-none items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-[#1F2937] outline-none transition-colors hover:bg-[#FFF1F5] hover:text-[#E11D48] data-[disabled]:cursor-not-allowed data-[highlighted]:bg-[#FFF1F5] data-[highlighted]:text-[#E11D48] data-[state=checked]:bg-[#FFF1F5] data-[state=checked]:font-semibold data-[state=checked]:text-[#BE123C]"
+                    className="radix-select-item group relative flex cursor-pointer select-none items-center gap-2.5 rounded-xl px-3 py-2.5 text-[15px] font-medium leading-5 text-[#1F2937] outline-none transition-colors hover:bg-[#FFF1F5] hover:text-[#E11D48] data-[disabled]:cursor-not-allowed data-[highlighted]:bg-[#FFF1F5] data-[highlighted]:text-[#E11D48] data-[state=checked]:bg-[#FFF1F5] data-[state=checked]:font-semibold data-[state=checked]:text-[#BE123C]"
                   >
                     <Select.ItemText className="min-w-0 flex-1">
                       <span className="block min-w-0 truncate whitespace-nowrap">
@@ -178,7 +178,7 @@ export default function AppSelect({
                   </Select.Item>
                 ))
               ) : (
-                <div className="px-4 py-3 text-center text-sm text-[#9CA3AF]">
+                <div className="px-4 py-3 text-[15px] leading-5 text-[#9CA3AF]">
                   Nenhum resultado encontrado
                 </div>
               )}

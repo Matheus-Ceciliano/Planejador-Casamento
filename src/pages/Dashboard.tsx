@@ -37,25 +37,34 @@ const semanticColors = {
 };
 
 const financeColors = [semanticColors.blue, semanticColors.purple, semanticColors.green, semanticColors.amber];
-const guestColors = [semanticColors.green, semanticColors.amber, semanticColors.red];
 const paletteCycle = [semanticColors.blue, semanticColors.green, semanticColors.amber, semanticColors.purple, semanticColors.rose, semanticColors.orange, semanticColors.gray];
 const statusColors: Record<string, string> = {
   confirmado: semanticColors.green,
+  confirmada: semanticColors.green,
   confirmados: semanticColors.green,
   contratado: semanticColors.green,
+  contratada: semanticColors.green,
   pago: semanticColors.green,
+  paga: semanticColors.green,
   concluida: semanticColors.green,
   concluída: semanticColors.green,
+  concluido: semanticColors.green,
+  concluído: semanticColors.green,
   pendente: semanticColors.amber,
   pendentes: semanticColors.amber,
-  pesquisando: semanticColors.blue,
-  cotado: semanticColors.blue,
-  'em andamento': semanticColors.blue,
+  pesquisando: semanticColors.gray,
+  cotado: semanticColors.amber,
+  'em andamento': semanticColors.amber,
   recusado: semanticColors.red,
+  recusada: semanticColors.red,
   recusados: semanticColors.red,
   cancelado: semanticColors.red,
+  cancelada: semanticColors.red,
+  atrasado: semanticColors.red,
   atrasada: semanticColors.red,
-  vencido: semanticColors.red
+  vencido: semanticColors.red,
+  vencida: semanticColors.red,
+  vencidos: semanticColors.red
 };
 const financialHealthColors = {
   saudavel: semanticColors.green,
@@ -92,8 +101,8 @@ type KpiProps = {
   numericValue?: number;
   formatValue?: (value: number) => string;
   mobileValue?: string | number;
-  helper: string;
-  mobileHelper?: string;
+  helper: ReactNode;
+  mobileHelper?: ReactNode;
   icon: ReactNode;
   tone?: 'default' | 'rose' | 'gold' | 'red' | 'green';
   onClick: () => void;
@@ -120,13 +129,13 @@ function KpiCard({
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[9px] font-bold uppercase tracking-wider text-w-faint min-[380px]:text-[10px] sm:hidden">
+          <p className="truncate text-[13px] font-semibold leading-[18px] text-w-faint sm:hidden">
             {mobileTitle ?? title}
           </p>
-          <p className="hidden text-[10px] font-bold uppercase tracking-widest text-w-faint sm:block">
+          <p className="hidden text-[13px] font-semibold leading-[18px] text-w-faint sm:block">
             {title}
           </p>
-          <p className={`mt-1 min-w-0 truncate text-lg font-bold leading-tight tabular-nums min-[380px]:text-xl sm:text-2xl ${t.value}`}>
+          <p className={`mt-1 min-w-0 truncate text-2xl font-bold leading-8 tabular-nums sm:text-[32px] sm:leading-9 ${t.value}`}>
             <span className="block min-w-0 truncate sm:hidden">
               {mobileValue ?? (numericValue !== undefined ? <AnimatedNumber value={numericValue} format={formatValue} /> : value)}
             </span>
@@ -134,10 +143,10 @@ function KpiCard({
               {numericValue !== undefined ? <AnimatedNumber value={numericValue} format={formatValue} /> : value}
             </span>
           </p>
-          <p className="mt-1 line-clamp-1 text-[11px] text-w-muted sm:hidden">
+          <p className="mt-1 line-clamp-1 text-[13px] font-normal leading-[18px] text-w-muted sm:hidden">
             {mobileHelper ?? helper}
           </p>
-          <p className="mt-1 hidden text-xs text-w-muted sm:line-clamp-2 sm:block">
+          <p className="mt-1 hidden text-[13px] font-normal leading-[18px] text-w-muted sm:line-clamp-2 sm:block">
             {helper}
           </p>
         </div>
@@ -228,6 +237,17 @@ function displayStatus(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function colorForStatus(value: string) {
+  return statusColors[normalizeKey(value)] ?? semanticColors.gray;
+}
+
+function budgetVisual(pct: number, planned: number, contracted: number): { tone: KpiProps['tone']; color: string } {
+  if (!planned) return contracted > 0 ? { tone: 'red', color: semanticColors.red } : { tone: 'default', color: semanticColors.gray };
+  if (pct > 100) return { tone: 'red', color: semanticColors.red };
+  if (pct >= 80) return { tone: 'gold', color: semanticColors.amber };
+  return { tone: 'green', color: semanticColors.green };
+}
+
 function monthKey(value?: string | null) {
   if (!value) return 'Sem data';
   const date = new Date(`${value}T12:00:00`);
@@ -274,8 +294,7 @@ export default function Dashboard() {
   const overduePaymentsValue =
     overdueItems.reduce((sum, item) => sum + getPendingValue(item.contracted_value, item.paid_value), 0);
   const lateTasks       = tasks.rows.filter(isLateTask);
-  const contractedVendors = vendors.rows.filter((v) => v.status === 'contratado').length;
-  const budgetTone = planned > 0 ? (contracted > planned ? 'red' : 'green') : contracted > 0 ? 'red' : 'default';
+  const budgetState = budgetVisual(budgetPct, planned, contracted);
 
   const coupleName = [wedding?.bride_name, wedding?.groom_name].filter(Boolean).join(' & ') || wedding?.name || 'Dashboard';
   const shortName = [firstName(wedding?.bride_name), firstName(wedding?.groom_name)].filter(Boolean).join(' & ') || coupleName;
@@ -291,9 +310,9 @@ export default function Dashboard() {
   const hasFinanceData = financeChart.some((i) => i.value > 0);
 
   const guestStatusData = [
-    { name: 'Confirmados', value: confirmedGuests },
-    { name: 'Pendentes',   value: pendingGuests },
-    { name: 'Recusados',   value: refusedGuests },
+    { name: 'Confirmados', value: confirmedGuests, color: semanticColors.green },
+    { name: 'Pendentes',   value: pendingGuests, color: semanticColors.amber },
+    { name: 'Recusados',   value: refusedGuests, color: semanticColors.red },
   ].filter((i) => i.value > 0);
 
   const categorySpendData = useMemo(() => {
@@ -435,10 +454,22 @@ export default function Dashboard() {
           title="Convidados"
           value={totalGuests}
           numericValue={totalGuests}
-          helper={`${confirmedGuests} confirmados · ${pendingGuests} pendentes`}
-          mobileHelper={`${confirmedGuests} confirmados`}
+          helper={(
+            <>
+              <span className="font-semibold text-[#16A34A]">{confirmedGuests} confirmados</span>
+              <span className="text-w-muted"> · </span>
+              <span className="font-semibold text-[#D97706]">{pendingGuests} pendentes</span>
+              {!!refusedGuests && (
+                <>
+                  <span className="text-w-muted"> · </span>
+                  <span className="font-semibold text-[#DC2626]">{refusedGuests} recusados</span>
+                </>
+              )}
+            </>
+          )}
+          mobileHelper={<span className="font-semibold text-[#D97706]">{pendingGuests} pendentes</span>}
           icon={<Users size={18} />}
-          tone="default"
+          tone="rose"
           onClick={() => navigate('/convidados')}
         />
         <KpiCard
@@ -450,7 +481,7 @@ export default function Dashboard() {
           helper={`${formatMoney(contracted)} contratado (${budgetPct}%)`}
           mobileHelper={`${budgetPct}% usado`}
           icon={<WalletCards size={18} />}
-          tone={budgetTone}
+          tone={budgetState.tone}
           onClick={() => navigate('/orcamento')}
         />
         <KpiCard
@@ -473,7 +504,7 @@ export default function Dashboard() {
           mobileTitle="Agenda"
           value={lateTasks.length}
           numericValue={lateTasks.length}
-          helper={lateTasks.length ? 'Abrir itens atrasados na Agenda' : `${contractedVendors} fornecedores contratados`}
+          helper={lateTasks.length ? 'Atenção: há pendências atrasadas' : 'Nenhuma pendência atrasada'}
           mobileHelper={lateTasks.length ? `${lateTasks.length} atrasadas` : 'Em dia'}
           icon={<ListChecks size={18} />}
           tone={lateTasks.length > 0 ? 'gold' : 'green'}
@@ -528,9 +559,9 @@ export default function Dashboard() {
               <div>
                 <div className="mb-2 flex justify-between text-xs text-w-muted">
                   <span>Orçamento usado</span>
-                  <strong className={budgetPct > 100 ? 'text-[#DC2626]' : 'text-w-text'}>{budgetPct}%</strong>
+                  <strong className={budgetPct > 100 ? 'text-[#DC2626]' : budgetPct >= 80 ? 'text-[#D97706]' : 'text-[#16A34A]'}>{budgetPct}%</strong>
                 </div>
-                <ProgressBar value={budgetPct} color={budgetPct > 100 ? '#EF4444' : '#E11D48'} />
+                <ProgressBar value={budgetPct} color={budgetState.color} />
               </div>
               <div className="space-y-1.5 text-sm text-w-muted">
                 <div className="flex justify-between"><span>Planejado</span><strong className="text-w-text">{formatMoney(planned)}</strong></div>
@@ -608,7 +639,7 @@ export default function Dashboard() {
                 <ResponsiveContainer>
                   <PieChart>
                     <Pie data={guestStatusData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={96} paddingAngle={3} strokeWidth={0} isAnimationActive animationDuration={800}>
-                      {guestStatusData.map((_, i) => <Cell key={i} fill={guestColors[i]} />)}
+                      {guestStatusData.map((item) => <Cell key={item.name} fill={item.color} />)}
                     </Pie>
                     <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #F0EBE6', boxShadow: '0 8px 24px rgba(0,0,0,0.08)', fontFamily: 'inherit', fontSize: 13 }} />
                   </PieChart>
@@ -617,7 +648,7 @@ export default function Dashboard() {
               <div>
                 <p className="text-3xl font-extrabold text-w-text">{totalGuests}</p>
                 <p className="text-xs font-semibold text-w-muted">pessoas na lista</p>
-                <ChartLegend items={guestStatusData.map((item, index) => ({ ...item, color: guestColors[index] }))} />
+                <ChartLegend items={guestStatusData} />
               </div>
             </div>
           ) : (
@@ -654,7 +685,7 @@ export default function Dashboard() {
                   <XAxis dataKey="name" tick={{ fill: '#71717A', fontSize: 11, fontFamily: 'inherit' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: '#71717A', fontSize: 11, fontFamily: 'inherit' }} tickFormatter={(v) => compactMoney(Number(v))} axisLine={false} tickLine={false} width={70} />
                   <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #F0EBE6', boxShadow: '0 8px 24px rgba(0,0,0,0.08)', fontFamily: 'inherit', fontSize: 13 }} formatter={(v) => formatMoney(Number(v))} />
-                  <Bar dataKey="value" fill={semanticColors.blue} radius={[8, 8, 0, 0]} isAnimationActive animationDuration={800} />
+                  <Bar dataKey="value" fill={semanticColors.amber} radius={[8, 8, 0, 0]} isAnimationActive animationDuration={800} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -694,12 +725,12 @@ export default function Dashboard() {
                     <YAxis allowDecimals={false} tick={{ fill: '#71717A', fontSize: 11, fontFamily: 'inherit' }} axisLine={false} tickLine={false} width={36} />
                     <Tooltip contentStyle={{ borderRadius: 12, border: '1px solid #F0EBE6', boxShadow: '0 8px 24px rgba(0,0,0,0.08)', fontFamily: 'inherit', fontSize: 13 }} />
                     <Bar dataKey="value" radius={[8, 8, 0, 0]} isAnimationActive animationDuration={800}>
-                      {vendorStatusData.map((item, i) => <Cell key={item.name} fill={statusColors[item.name] ?? paletteCycle[i % paletteCycle.length]} />)}
+                      {vendorStatusData.map((item, i) => <Cell key={item.name} fill={colorForStatus(item.name) ?? paletteCycle[i % paletteCycle.length]} />)}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <ChartLegend items={vendorStatusData.map((item, i) => ({ ...item, color: statusColors[item.name] ?? paletteCycle[i % paletteCycle.length] }))} />
+              <ChartLegend items={vendorStatusData.map((item, i) => ({ ...item, color: colorForStatus(item.name) ?? paletteCycle[i % paletteCycle.length] }))} />
             </>
           ) : (
             <EmptyBox title="Sem fornecedores" text="Cadastre fornecedores para acompanhar contratações." />

@@ -9,13 +9,13 @@ export default function DataTable<T extends { id: string }>({ rows, columns }: {
   return (
     <div className="panel overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-w-border text-sm">
+        <table className="min-w-full divide-y divide-w-border text-sm leading-5">
           <thead className="bg-w-surface">
             <tr>
               {columns.map((column) => (
                 <th
                   key={column.header}
-                  className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-w-faint"
+                  className="px-4 py-3 text-left text-xs font-semibold leading-4 uppercase tracking-wide text-w-faint"
                 >
                   {column.header}
                 </th>
