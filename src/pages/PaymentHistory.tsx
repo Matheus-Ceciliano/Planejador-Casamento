@@ -327,6 +327,11 @@ export default function PaymentHistory() {
                       <span className="rounded-full bg-w-surface px-2.5 py-1 text-xs font-bold text-w-muted">Sem comprovante</span>
                     )}
                   </div>
+                  <div className="mt-3">
+                    <button type="button" className="btn-primary min-h-10 justify-center text-sm" onClick={() => setSelected(record)}>
+                      Detalhes
+                    </button>
+                  </div>
                 </article>
               );
             })}

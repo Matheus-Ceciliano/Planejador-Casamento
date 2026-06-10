@@ -1,4 +1,4 @@
-# Planejador de Casamento
+# OurDay
 
 App web em React, Vite, TypeScript, Tailwind CSS e Supabase para planejamento de casamento.
 

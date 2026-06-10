@@ -7,11 +7,11 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'logo.svg', 'offline.html'],
+      includeAssets: ['favicon.png', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'logo.png', 'logo-mark.png', 'offline.html'],
       manifest: {
-        name: 'Planejador de Casamento',
-        short_name: 'Casamento',
-        description: 'App para organizar convidados, fornecedores, financeiro e tarefas do casamento.',
+        name: 'OurDay',
+        short_name: 'OurDay',
+        description: 'Planeje o grande dia em um só lugar.',
         lang: 'pt-BR',
         start_url: '/',
         scope: '/',

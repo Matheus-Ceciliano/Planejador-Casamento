@@ -1,4 +1,4 @@
-import { Heart, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { ReactNode } from 'react';
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
@@ -20,10 +20,8 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
 
             {/* Brand */}
             <div className="relative flex items-center gap-3 text-base font-bold text-white">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm">
-                <Heart size={18} className="fill-white text-white" />
-              </span>
-              Planejador de Casamento
+              <img className="h-10 w-10 rounded-xl shadow-[0_12px_28px_rgba(0,0,0,0.18)]" src="/logo-mark.png" alt="" aria-hidden="true" />
+              OurDay
             </div>
 
             {/* Headline */}
@@ -31,14 +29,14 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
               <div className="mb-4 flex items-center gap-2">
                 <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold text-white/90 backdrop-blur-sm">
                   <Sparkles size={11} />
-                  Tudo em um só lugar
+                  Planejamento completo
                 </span>
               </div>
               <h1 className="text-4xl font-extrabold leading-tight tracking-tight text-white">
-                Um planejamento leve para um dia inesquecível.
+                Planeje o grande dia em um s? lugar.
               </h1>
               <p className="mt-4 text-sm leading-relaxed text-white/75">
-                Organize convidados, famílias, convites, orçamento e fornecedores com elegância.
+                Organize convidados, fam?lias, or?amento, agenda e fornecedores com eleg?ncia.
               </p>
 
               {/* Stats */}

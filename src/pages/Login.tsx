@@ -1,4 +1,4 @@
-import { Heart, Mail } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../layouts/AuthLayout';
@@ -41,10 +41,11 @@ export default function Login() {
 
         {/* Mobile brand */}
         <div className="mb-8 flex items-center gap-2.5 md:hidden">
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-w-rose shadow-rose">
-            <Heart size={15} className="fill-white text-white" />
-          </span>
-          <span className="text-sm font-bold text-w-text">Planejador de Casamento</span>
+          <img className="h-9 w-9 rounded-xl shadow-rose" src="/logo-mark.png" alt="" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="text-sm font-bold leading-4 text-w-text">OurDay</p>
+            <p className="truncate text-[11px] font-medium text-w-muted">Planeje o grande dia em um só lugar.</p>
+          </div>
         </div>
 
         <h1 className="text-3xl font-extrabold tracking-tight text-w-text">Bem-vindo</h1>

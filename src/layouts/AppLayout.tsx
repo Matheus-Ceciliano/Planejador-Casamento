@@ -1,6 +1,6 @@
 import {
   CalendarDays, ChevronDown, Files, Handshake,
-  Heart, Home, LogOut, Menu, MoreHorizontal,
+  Home, LogOut, Menu, MoreHorizontal,
   Receipt, Settings, Table2, Users, WalletCards, X,
 } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
@@ -43,9 +43,7 @@ const mobileMoreNav = [
 /* ── Logo mark ────────────────────────────────────────────────────── */
 function LogoMark() {
   return (
-    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-w-rose shadow-rose">
-      <Heart size={15} className="fill-white text-white" />
-    </div>
+    <img className="h-9 w-9 rounded-xl shadow-rose" src="/logo-mark.png" alt="" aria-hidden="true" />
   );
 }
 
@@ -57,8 +55,8 @@ function Sidebar({ onNavigate, onSignOut }: { onNavigate?: () => void; onSignOut
       <div className="flex h-16 items-center gap-3 border-b border-w-border px-5">
         <LogoMark />
         <div className="min-w-0">
-          <p className="text-sm font-bold tracking-tight text-w-text">Casamento</p>
-          <p className="text-[10px] font-medium text-w-faint">Planejador</p>
+          <p className="text-sm font-bold tracking-tight text-w-text">OurDay</p>
+          <p className="max-w-[132px] truncate text-[10px] font-medium text-w-faint">Grande dia em um só lugar</p>
         </div>
       </div>
 
@@ -188,7 +186,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
             {/* Event info */}
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-w-text">
-                {wedding?.name ?? 'Planejador de Casamento'}
+                {wedding?.name ?? 'OurDay'}
               </p>
               <p className="truncate text-xs text-w-faint">{user?.email}</p>
             </div>
