@@ -15,7 +15,7 @@ import {
   Users,
   XCircle
 } from 'lucide-react';
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import ConfirmDialog from '../components/ConfirmDialog';
 import FormSelect from '../components/FormSelect';
 import Modal from '../components/Modal';
@@ -105,7 +105,7 @@ type SummaryCardProps = {
 
 function SummaryCard({ label, value, icon: Icon, tone, helper }: SummaryCardProps) {
   return (
-    <article className="min-h-[104px] rounded-2xl border border-w-border bg-white p-3 shadow-soft transition hover:-translate-y-0.5 hover:border-w-border-md hover:shadow-card sm:min-h-[116px] sm:p-4">
+    <article className="min-h-[104px] w-full max-w-full rounded-2xl border border-w-border bg-white p-3 shadow-soft transition hover:-translate-y-0.5 hover:border-w-border-md hover:shadow-card sm:min-h-[116px] sm:p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-w-faint sm:text-[11px]">{label}</p>
@@ -132,29 +132,33 @@ type MemberCardProps = {
 
 function MemberCard({ member, canManage, isCurrentUser, actionOpen, onToggleActions, onEdit, onRemove }: MemberCardProps) {
   const removable = canManage && member.role !== 'owner' && !isCurrentUser;
+  const isOpen = actionOpen === member.id;
 
   return (
-    <article className="relative rounded-2xl border border-w-border bg-white p-3 shadow-soft transition hover:border-w-border-md hover:shadow-card sm:p-4">
-      <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-w-rose-lt to-white text-sm font-extrabold text-w-rose ring-1 ring-w-rose-md sm:h-11 sm:w-11">
+    <article
+      className={`relative w-full max-w-full overflow-visible rounded-2xl border border-w-border bg-white p-2.5 shadow-soft transition hover:border-w-border-md hover:shadow-card sm:p-4 ${isOpen ? 'z-40' : 'z-0'}`}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <div className="flex min-w-0 items-start gap-2.5 sm:gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-w-rose-lt to-white text-xs font-extrabold text-w-rose ring-1 ring-w-rose-md sm:h-11 sm:w-11 sm:rounded-2xl sm:text-sm">
           {initials(member.name)}
         </span>
 
-        <div className="min-w-0 flex-1 pr-8">
+        <div className="min-w-0 flex-1 overflow-hidden pr-9">
           <div className="flex min-w-0 items-center gap-2">
-            <h3 className="truncate text-sm font-extrabold leading-5 text-w-text sm:text-base">{member.name}</h3>
+            <h3 className="min-w-0 flex-1 truncate overflow-hidden text-sm font-extrabold leading-5 text-w-text sm:text-base">{member.name}</h3>
             {isCurrentUser && <span className="shrink-0 rounded-full bg-w-surface px-2 py-0.5 text-[10px] font-bold uppercase text-w-faint">Voce</span>}
           </div>
-          <p className="mt-0.5 truncate text-xs font-medium leading-4 text-w-muted">{member.email}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-w-faint">
-            <span className="inline-flex items-center gap-1">
+          <p className="mt-0.5 min-w-0 truncate overflow-hidden text-xs font-medium leading-4 text-w-muted">{member.email}</p>
+          <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] font-semibold text-w-faint sm:mt-2 sm:gap-x-3">
+            <span className="inline-flex min-w-0 items-center gap-1">
               <CalendarClock size={12} /> Ultimo acesso: Hoje
             </span>
-            <span className="inline-flex items-center gap-1 text-w-green">
+            <span className="inline-flex min-w-0 items-center gap-1 text-w-green">
               <CheckCircle2 size={12} /> Ativo
             </span>
           </div>
-          <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${roleTheme(member.role)}`}>
+          <span className={`mt-2 inline-flex max-w-full truncate rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${roleTheme(member.role)}`}>
             {roleLabels[member.role] ?? member.role}
           </span>
         </div>
@@ -162,17 +166,24 @@ function MemberCard({ member, canManage, isCurrentUser, actionOpen, onToggleActi
         <div className="absolute right-2.5 top-2.5 flex shrink-0 items-center gap-2">
           <button
             type="button"
-            className="rounded-xl p-2 text-w-muted transition hover:bg-w-surface hover:text-w-text"
-            onClick={() => onToggleActions(actionOpen === member.id ? '' : member.id)}
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-w-muted transition hover:bg-w-surface hover:text-w-text"
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleActions(isOpen ? '' : member.id);
+            }}
             aria-label="Acoes do membro"
+            aria-expanded={isOpen}
           >
             <MoreHorizontal size={18} />
           </button>
         </div>
       </div>
 
-      {actionOpen === member.id && (
-        <div className="absolute right-3 top-12 z-20 w-56 overflow-hidden rounded-2xl border border-w-border bg-white shadow-float animate-scale-in">
+      {isOpen && (
+        <div
+          className="absolute right-2 top-12 z-50 w-[min(14rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-w-border bg-white shadow-float animate-scale-in sm:right-3 sm:w-56"
+          onClick={(event) => event.stopPropagation()}
+        >
           <button type="button" className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-w-text hover:bg-w-surface" onClick={() => onEdit(member)}>
             <ShieldCheck size={15} /> Editar permissoes
           </button>
@@ -181,7 +192,7 @@ function MemberCard({ member, canManage, isCurrentUser, actionOpen, onToggleActi
           </button>
           <button
             type="button"
-            className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-w-red hover:bg-w-red-lt disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex w-full items-center gap-2 border-t border-w-border px-3 py-2.5 text-left text-sm font-semibold text-w-red hover:bg-w-red-lt disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!removable}
             onClick={() => removable && onRemove(member)}
           >
@@ -204,7 +215,7 @@ type InviteCardProps = {
 function InviteCard({ invite, copiedId, onCopy, onResend, onCancel }: InviteCardProps) {
   const status = inviteStatus(invite);
   return (
-    <article className="rounded-2xl border border-w-border bg-white p-3 shadow-soft">
+    <article className="w-full max-w-full rounded-2xl border border-w-border bg-white p-3 shadow-soft">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-extrabold leading-5 text-w-text">Convite para {roleLabels[invite.role] ?? invite.role}</p>
@@ -250,6 +261,15 @@ export default function Members() {
   });
   const [invitePermissions, setInvitePermissions] = useState<Record<string, boolean>>(defaultPermissions.bride);
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    function closeActions() {
+      setActionOpen('');
+    }
+
+    window.addEventListener('click', closeActions);
+    return () => window.removeEventListener('click', closeActions);
+  }, []);
 
   const currentMember = members.rows.find((member) => member.user_id === user?.id);
   const canManage = ['owner', 'bride', 'groom', 'noivo', 'noiva'].includes(currentMember?.role ?? '');
@@ -372,7 +392,7 @@ export default function Members() {
   }
 
   return (
-    <div className="space-y-4 pb-3 text-w-text sm:space-y-5 lg:pb-0">
+    <div className="max-w-full space-y-4 overflow-x-hidden pb-3 text-w-text sm:space-y-5 lg:pb-0" onClick={() => setActionOpen('')}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h1 className="text-[1.65rem] font-bold leading-tight tracking-tight text-w-text sm:text-3xl">Membros</h1>
@@ -385,15 +405,15 @@ export default function Members() {
 
       {message && <div className="rounded-2xl border border-w-border bg-white px-4 py-3 text-sm font-semibold text-w-muted shadow-soft">{message}</div>}
 
-      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
+      <section className="grid max-w-full grid-cols-2 gap-2.5 overflow-x-hidden sm:gap-3 xl:grid-cols-4">
         <SummaryCard label="Noivas" value={brides} icon={Heart} tone="bg-w-rose-lt text-w-rose" helper={`${brides} ${brides === 1 ? 'membro ativo' : 'membros ativos'}`} />
         <SummaryCard label="Noivos" value={grooms} icon={Users} tone="bg-[#EFF6FF] text-[#2563EB]" helper={`${grooms} ${grooms === 1 ? 'membro ativo' : 'membros ativos'}`} />
         <SummaryCard label="Cerimonialistas" value={planners} icon={UserCog} tone="bg-w-green-lt text-[#16A34A]" helper={`${planners} ${planners === 1 ? 'membro ativo' : 'membros ativos'}`} />
         <SummaryCard label="Visualizadores" value={viewers} icon={Mail} tone="bg-w-surface text-w-muted" helper={`${viewers} ${viewers === 1 ? 'acesso limitado' : 'acessos limitados'}`} />
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_390px]">
-        <div className="rounded-3xl border border-w-border bg-white/70 p-3 shadow-soft sm:p-4">
+      <section className="grid max-w-full gap-4 overflow-visible lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_390px]">
+        <div className="min-w-0 max-w-full overflow-visible rounded-3xl border border-w-border bg-white/70 p-2.5 shadow-soft sm:p-4">
           <div className="mb-3 flex items-start justify-between gap-3 px-1">
             <div className="min-w-0">
               <h2 className="text-sm font-extrabold text-w-text">Equipe do planejamento</h2>
@@ -402,7 +422,7 @@ export default function Members() {
             <span className="shrink-0 rounded-full bg-w-rose-lt px-2.5 py-1 text-[11px] font-bold text-w-rose">Colaborativo</span>
           </div>
 
-          <div className="grid gap-2.5">
+          <div className="grid min-w-0 max-w-full gap-2.5 overflow-visible">
             {members.rows.map((member) => (
               <MemberCard
                 key={member.id}
@@ -421,7 +441,7 @@ export default function Members() {
           </div>
         </div>
 
-        <aside className="space-y-4">
+        <aside className="min-w-0 max-w-full space-y-4 overflow-visible">
           <section className="rounded-3xl border border-w-border bg-white p-4 shadow-soft">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
