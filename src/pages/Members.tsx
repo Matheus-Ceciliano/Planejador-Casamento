@@ -105,17 +105,17 @@ type SummaryCardProps = {
 
 function SummaryCard({ label, value, icon: Icon, tone, helper }: SummaryCardProps) {
   return (
-    <article className="rounded-2xl border border-w-border bg-white p-3 shadow-soft transition hover:-translate-y-0.5 hover:border-w-border-md hover:shadow-card">
+    <article className="min-h-[104px] rounded-2xl border border-w-border bg-white p-3 shadow-soft transition hover:-translate-y-0.5 hover:border-w-border-md hover:shadow-card sm:min-h-[116px] sm:p-4">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-w-faint">{label}</p>
-          <p className="mt-1 text-2xl font-extrabold tracking-tight text-w-text">{value}</p>
+        <div className="min-w-0">
+          <p className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-w-faint sm:text-[11px]">{label}</p>
+          <p className="mt-1 text-[1.65rem] font-extrabold leading-none tracking-tight text-w-text sm:text-3xl">{value}</p>
         </div>
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${tone}`}>
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${tone}`}>
           <Icon size={15} />
         </span>
       </div>
-      <p className="mt-1.5 text-xs font-semibold text-w-muted">{helper}</p>
+      <p className="mt-2 truncate text-[11px] font-semibold text-w-muted sm:text-xs">{helper}</p>
     </article>
   );
 }
@@ -134,19 +134,19 @@ function MemberCard({ member, canManage, isCurrentUser, actionOpen, onToggleActi
   const removable = canManage && member.role !== 'owner' && !isCurrentUser;
 
   return (
-    <article className="relative rounded-3xl border border-w-border bg-white p-3.5 shadow-soft transition hover:border-w-border-md hover:shadow-card sm:p-4">
-      <div className="flex items-center gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-w-rose-lt to-white text-sm font-extrabold text-w-rose ring-1 ring-w-rose-md">
+    <article className="relative rounded-2xl border border-w-border bg-white p-3 shadow-soft transition hover:border-w-border-md hover:shadow-card sm:p-4">
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-w-rose-lt to-white text-sm font-extrabold text-w-rose ring-1 ring-w-rose-md sm:h-11 sm:w-11">
           {initials(member.name)}
         </span>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-sm font-extrabold text-w-text sm:text-base">{member.name}</h3>
-            {isCurrentUser && <span className="rounded-full bg-w-surface px-2 py-0.5 text-[10px] font-bold uppercase text-w-faint">Voce</span>}
+        <div className="min-w-0 flex-1 pr-8">
+          <div className="flex min-w-0 items-center gap-2">
+            <h3 className="truncate text-sm font-extrabold leading-5 text-w-text sm:text-base">{member.name}</h3>
+            {isCurrentUser && <span className="shrink-0 rounded-full bg-w-surface px-2 py-0.5 text-[10px] font-bold uppercase text-w-faint">Voce</span>}
           </div>
-          <p className="truncate text-xs font-medium text-w-muted">{member.email}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-w-faint">
+          <p className="mt-0.5 truncate text-xs font-medium leading-4 text-w-muted">{member.email}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-w-faint">
             <span className="inline-flex items-center gap-1">
               <CalendarClock size={12} /> Ultimo acesso: Hoje
             </span>
@@ -154,15 +154,15 @@ function MemberCard({ member, canManage, isCurrentUser, actionOpen, onToggleActi
               <CheckCircle2 size={12} /> Ativo
             </span>
           </div>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          <span className={`hidden rounded-full px-2.5 py-1 text-xs font-bold ring-1 sm:inline-flex ${roleTheme(member.role)}`}>
+          <span className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ${roleTheme(member.role)}`}>
             {roleLabels[member.role] ?? member.role}
           </span>
+        </div>
+
+        <div className="absolute right-2.5 top-2.5 flex shrink-0 items-center gap-2">
           <button
             type="button"
-            className="rounded-2xl p-2 text-w-muted transition hover:bg-w-surface hover:text-w-text"
+            className="rounded-xl p-2 text-w-muted transition hover:bg-w-surface hover:text-w-text"
             onClick={() => onToggleActions(actionOpen === member.id ? '' : member.id)}
             aria-label="Acoes do membro"
           >
@@ -171,14 +171,8 @@ function MemberCard({ member, canManage, isCurrentUser, actionOpen, onToggleActi
         </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between sm:hidden">
-        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${roleTheme(member.role)}`}>
-          {roleLabels[member.role] ?? member.role}
-        </span>
-      </div>
-
       {actionOpen === member.id && (
-        <div className="absolute right-3 top-14 z-20 w-56 overflow-hidden rounded-2xl border border-w-border bg-white shadow-float animate-scale-in">
+        <div className="absolute right-3 top-12 z-20 w-56 overflow-hidden rounded-2xl border border-w-border bg-white shadow-float animate-scale-in">
           <button type="button" className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-w-text hover:bg-w-surface" onClick={() => onEdit(member)}>
             <ShieldCheck size={15} /> Editar permissoes
           </button>
@@ -213,21 +207,20 @@ function InviteCard({ invite, copiedId, onCopy, onResend, onCancel }: InviteCard
     <article className="rounded-2xl border border-w-border bg-white p-3 shadow-soft">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-extrabold text-w-text">Convite para {roleLabels[invite.role] ?? invite.role}</p>
-          <p className="mt-1 truncate text-xs font-medium text-w-muted">{invite.created_by ? 'Link de acesso gerado' : 'Convite pendente'}</p>
+          <p className="truncate text-sm font-extrabold leading-5 text-w-text">Convite para {roleLabels[invite.role] ?? invite.role}</p>
+          <p className="mt-1 truncate text-xs font-semibold text-w-faint">Validade: {formatDate(invite.expires_at)}</p>
         </div>
-        <span className="rounded-full bg-w-gold-lt px-2 py-1 text-[10px] font-extrabold uppercase text-w-gold">{status}</span>
+        <span className="shrink-0 rounded-full bg-w-gold-lt px-2 py-1 text-[10px] font-extrabold uppercase text-w-gold">{status}</span>
       </div>
-      <p className="mt-2 text-xs font-semibold text-w-faint">Validade: {formatDate(invite.expires_at)}</p>
       <div className="mt-3 grid gap-2">
-        <button type="button" className="btn-primary w-full py-2 text-xs" onClick={() => onCopy(invite)}>
+        <button type="button" className="btn-primary min-h-9 w-full rounded-xl py-1.5 text-xs shadow-none" onClick={() => onCopy(invite)}>
           <Copy size={14} /> {copiedId === invite.id ? 'Link copiado' : 'Copiar link'}
         </button>
         <div className="grid grid-cols-2 gap-2">
-          <button type="button" className="btn-secondary px-2 py-2 text-xs" onClick={() => onResend(invite)}>
+          <button type="button" className="btn-secondary min-h-9 px-2 py-1.5 text-xs" onClick={() => onResend(invite)}>
             <Send size={13} /> Reenviar
           </button>
-          <button type="button" className="btn-secondary px-2 py-2 text-xs text-w-red" onClick={() => onCancel(invite)}>
+          <button type="button" className="btn-secondary min-h-9 px-2 py-1.5 text-xs text-w-red" onClick={() => onCancel(invite)}>
             <XCircle size={13} /> Cancelar
           </button>
         </div>
@@ -379,20 +372,20 @@ export default function Members() {
   }
 
   return (
-    <div className="space-y-4 text-w-text sm:space-y-5">
+    <div className="space-y-4 pb-3 text-w-text sm:space-y-5 lg:pb-0">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="page-title">Membros</h1>
+        <div className="min-w-0">
+          <h1 className="text-[1.65rem] font-bold leading-tight tracking-tight text-w-text sm:text-3xl">Membros</h1>
           <p className="mt-1 text-sm text-w-muted">Gerencie quem pode acessar e colaborar no planejamento do casamento.</p>
         </div>
-        <button className="btn-primary w-full justify-center rounded-2xl px-5 py-3 shadow-rose sm:w-auto" onClick={openInviteModal} disabled={!canManage}>
+        <button className="btn-primary min-h-11 w-full justify-center rounded-2xl px-5 py-2.5 shadow-rose sm:w-auto" onClick={openInviteModal} disabled={!canManage}>
           <Plus size={17} /> Convidar membro
         </button>
       </div>
 
       {message && <div className="rounded-2xl border border-w-border bg-white px-4 py-3 text-sm font-semibold text-w-muted shadow-soft">{message}</div>}
 
-      <section className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
         <SummaryCard label="Noivas" value={brides} icon={Heart} tone="bg-w-rose-lt text-w-rose" helper={`${brides} ${brides === 1 ? 'membro ativo' : 'membros ativos'}`} />
         <SummaryCard label="Noivos" value={grooms} icon={Users} tone="bg-[#EFF6FF] text-[#2563EB]" helper={`${grooms} ${grooms === 1 ? 'membro ativo' : 'membros ativos'}`} />
         <SummaryCard label="Cerimonialistas" value={planners} icon={UserCog} tone="bg-w-green-lt text-[#16A34A]" helper={`${planners} ${planners === 1 ? 'membro ativo' : 'membros ativos'}`} />
@@ -401,12 +394,12 @@ export default function Members() {
 
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_390px]">
         <div className="rounded-3xl border border-w-border bg-white/70 p-3 shadow-soft sm:p-4">
-          <div className="mb-3 flex items-center justify-between gap-3 px-1">
-            <div>
+          <div className="mb-3 flex items-start justify-between gap-3 px-1">
+            <div className="min-w-0">
               <h2 className="text-sm font-extrabold text-w-text">Equipe do planejamento</h2>
               <p className="mt-0.5 text-xs font-medium text-w-muted">{members.rows.length} pessoas com acesso</p>
             </div>
-            <span className="rounded-full bg-w-rose-lt px-3 py-1 text-xs font-bold text-w-rose">Acesso colaborativo</span>
+            <span className="shrink-0 rounded-full bg-w-rose-lt px-2.5 py-1 text-[11px] font-bold text-w-rose">Colaborativo</span>
           </div>
 
           <div className="grid gap-2.5">
@@ -431,11 +424,11 @@ export default function Members() {
         <aside className="space-y-4">
           <section className="rounded-3xl border border-w-border bg-white p-4 shadow-soft">
             <div className="flex items-center justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-sm font-extrabold text-w-text">Convites pendentes</h2>
                 <p className="mt-0.5 text-xs font-medium text-w-muted">{pendingInvites.length} aguardando aceite</p>
               </div>
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-w-rose-lt text-w-rose">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-w-rose-lt text-w-rose">
                 <Link2 size={17} />
               </span>
             </div>
@@ -449,23 +442,23 @@ export default function Members() {
 
           <section className="rounded-3xl border border-w-border bg-white p-4 shadow-soft">
             <div className="flex items-center justify-between gap-3">
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-sm font-extrabold text-w-text">Atividades recentes</h2>
                 <p className="mt-0.5 text-xs font-medium text-w-muted">Historico do acesso</p>
               </div>
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-w-surface text-w-muted">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-w-surface text-w-muted">
                 <CalendarClock size={17} />
               </span>
             </div>
-            <div className="mt-4 space-y-3">
+            <div className="mt-4">
               {activities.map((activity, index) => (
-                <div key={activity.id} className="relative flex gap-3 rounded-2xl bg-w-surface p-3">
-                  <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-w-rose ring-1 ring-w-border">
-                    <span className="h-2 w-2 rounded-full bg-w-rose" />
-                  </span>
-                  {index < activities.length - 1 && <span className="absolute left-6 top-10 h-6 w-px bg-w-border" />}
+                <div key={activity.id} className="relative flex gap-3 pb-4 last:pb-0">
+                  <div className="relative flex w-4 shrink-0 justify-center">
+                    <span className="mt-1.5 h-2.5 w-2.5 rounded-full bg-w-rose ring-4 ring-w-rose-lt" />
+                    {index < activities.length - 1 && <span className="absolute top-5 h-[calc(100%-0.75rem)] w-px bg-w-border" />}
+                  </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-w-text">{activity.text}</p>
+                    <p className="truncate text-sm font-bold leading-5 text-w-text">{activity.text}</p>
                     <p className="mt-0.5 text-xs font-semibold text-w-faint">{activity.time}</p>
                   </div>
                 </div>
@@ -475,10 +468,6 @@ export default function Members() {
           </section>
         </aside>
       </section>
-
-      <button className="btn-primary fixed bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] right-4 z-20 rounded-full px-5 lg:hidden" onClick={openInviteModal} disabled={!canManage}>
-        <Plus size={16} /> Convidar
-      </button>
 
       <Modal open={inviteOpen} title="Convidar membro" onClose={closeInviteModal}>
         <form className="space-y-5" onSubmit={submitInvite}>

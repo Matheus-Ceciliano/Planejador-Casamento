@@ -280,7 +280,7 @@ textarea {
 
   .field-base:focus,
   .radix-select-trigger[data-state='open'] {
-    @apply border-w-rose bg-white shadow-card ring-2 ring-w-rose/10;
+    @apply border-rose-400 bg-white shadow-soft ring-4 ring-rose-100;
   }
 
   .field-base:disabled {
@@ -314,14 +314,6 @@ textarea {
 
   .field-prefix {
     @apply pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 select-none text-sm font-semibold text-w-muted;
-  }
-
-  .radix-chevron {
-    @apply transition-transform duration-150 ease-out;
-  }
-
-  .radix-select-trigger[data-state='open'] .radix-chevron {
-    @apply rotate-180;
   }
 
   /* ── Badge variants ── */

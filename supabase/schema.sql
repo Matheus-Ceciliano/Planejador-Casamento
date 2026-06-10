@@ -114,6 +114,7 @@ create table if not exists public.guests (
   full_name text not null,
   phone text,
   group_id uuid references public.guest_groups(id) on delete set null,
+  origin_group text,
   guest_type text not null default 'adulto',
   invite_status text not null default 'não enviado',
   companions integer not null default 0 check (companions >= 0),

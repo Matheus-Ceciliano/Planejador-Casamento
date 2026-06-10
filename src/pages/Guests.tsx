@@ -3,7 +3,6 @@ import {
   ChevronDown,
   ChevronRight,
   Edit2,
-  Filter,
   HelpCircle,
   LayoutGrid,
   MoreVertical,
@@ -35,11 +34,6 @@ import { buildWhatsAppChatLink } from '../utils/whatsappService';
 type PrimaryFilter = 'all' | 'confirmed' | 'pending' | 'refused';
 type ViewMode = 'cards' | 'table';
 
-type SecondaryFilters = {
-  families:    boolean;
-  individuals: boolean;
-};
-
 type RegistrationStep = 'choose' | 'individual' | 'family';
 
 type DependentEntry = {
@@ -53,6 +47,7 @@ type GuestFormData = {
   full_name:       string;
   phone:           string;
   group_id:        string;
+  origin_group:    string;
   guest_type:      string;
   invite_status:   string;
   food_restriction: string;
@@ -67,13 +62,19 @@ const GUEST_TYPES = [
   { label: 'Convidado Especial', value: 'especial' },
 ];
 
+const ORIGIN_GROUPS = [
+  { label: 'Família da noiva', value: 'Família da noiva' },
+  { label: 'Família do noivo', value: 'Família do noivo' },
+  { label: 'Amigo do casal', value: 'Amigo do casal' },
+  { label: 'Igreja', value: 'Igreja' },
+  { label: 'Faculdade', value: 'Faculdade' },
+  { label: 'Trabalho', value: 'Trabalho' },
+  { label: 'Outros', value: 'Outros' },
+];
+
 const BLANK: GuestFormData = {
   full_name: '', phone: '', group_id: '', guest_type: 'adulto',
-  invite_status: 'pendente', food_restriction: '', notes: '',
-};
-
-const SEC_BLANK: SecondaryFilters = {
-  families: false, individuals: false,
+  origin_group: '', invite_status: 'pendente', food_restriction: '', notes: '',
 };
 
 function newDep(): DependentEntry {
@@ -103,6 +104,10 @@ function guestTypeLabel(type: string) {
   return GUEST_TYPES.find(item => item.value === type)?.label ?? type;
 }
 
+function originGroupLabel(value: string | null | undefined) {
+  return value?.trim() || 'Não informado';
+}
+
 function isResponsible(row: Guest, group?: GuestGroup | null) {
   return Boolean(group?.responsible_name && norm(row.full_name) === norm(group.responsible_name));
 }
@@ -130,6 +135,11 @@ function initials(name: string) {
 function familyName(responsible: string) {
   const p = responsible.trim().split(' ').filter(Boolean);
   return `Família ${p.length > 1 ? p[p.length-1] : p[0] ?? ''}`;
+}
+
+function familyDisplayName(group: GuestGroup) {
+  const p = (group.responsible_name ?? '').trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  return p.length ? `Família ${p.join(' ')}` : group.name;
 }
 
 // ─── Primitive UI (module-level — stable references) ────────────────────────────
@@ -173,9 +183,11 @@ function FamilyGroupHeader({ name, count, open = true, onToggle }: { name: strin
       <span className="flex min-w-0 items-center gap-2">
         {open ? <ChevronDown size={16} className="shrink-0 text-stone-400"/> : <ChevronRight size={16} className="shrink-0 text-stone-400"/>}
         <Users size={14} className="shrink-0 text-stone-400"/>
-        <span className="truncate text-sm font-semibold text-stone-700">{name}</span>
+        <span className="min-w-0 truncate text-xs font-semibold text-stone-700">
+          <span className="uppercase">{name}</span>
+          <span className="font-medium normal-case text-stone-400"> · {count} convidado{count !== 1 ? 's' : ''}</span>
+        </span>
       </span>
-      <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-500">{count}</span>
     </button>
   );
 }
@@ -331,6 +343,9 @@ function GuestCard({ row, group, familyLabel, allGuests, actionOpen = false, onT
             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] leading-4 text-stone-500">
               <span className="rounded-full bg-stone-100 px-2 py-0.5 font-semibold text-stone-600">{guestTypeLabel(row.guest_type)}</span>
               <span className="rounded-full bg-white px-2 py-0.5 font-medium text-stone-500 ring-1 ring-stone-200">{role}</span>
+              {row.origin_group && (
+                <span className="rounded-full bg-white px-2 py-0.5 font-medium text-stone-500 ring-1 ring-stone-200">{originGroupLabel(row.origin_group)}</span>
+              )}
             </div>
           </div>
           <div className="shrink-0" onClick={(event) => event.stopPropagation()}>
@@ -398,6 +413,9 @@ function GuestTable({ sections, groupById, allGuests, onEdit, onDelete, onRefuse
                       <td className="px-3 py-1.5">
                         <div className="min-w-0">
                           <p className="truncate text-sm font-semibold leading-5 text-event-text" title={row.full_name}>{row.full_name}</p>
+                          {row.origin_group && (
+                            <p className="truncate text-[10px] font-medium leading-4 text-stone-400">{originGroupLabel(row.origin_group)}</p>
+                          )}
                           <p className="truncate text-[11px] font-medium leading-4 text-stone-400">
                             {section.group ? (responsible ? 'Responsável' : 'Dependente') : 'Responsável'}
                           </p>
@@ -492,6 +510,7 @@ function GuestDetailsModal({ guest, group, familyMembers, allGuests, onClose, on
         <div className="grid gap-3 sm:grid-cols-2">
           <DetailItem label="Nome completo" value={guest.full_name}/>
           <DetailItem label="Tipo" value={guestTypeLabel(guest.guest_type)}/>
+          <DetailItem label="Grupo / Origem" value={originGroupLabel(guest.origin_group)}/>
           <DetailItem label="Papel na família" value={role}/>
           <DetailItem label="Família vinculada" value={familyLabel}/>
           <DetailItem
@@ -547,15 +566,32 @@ function GuestDetailsModal({ guest, group, familyMembers, allGuests, onClose, on
   );
 }
 
-function GuestEmptyState({ onAdd }: { onAdd: ()=>void }) {
+function GuestEmptyState({ hasGuests, hasFilters, onAdd, onClearFilters }: {
+  hasGuests: boolean;
+  hasFilters: boolean;
+  onAdd: ()=>void;
+  onClearFilters: ()=>void;
+}) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-stone-300 bg-white px-6 py-16 text-center">
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-stone-100"><UserPlus size={24} className="text-stone-400"/></div>
-      <h3 className="mt-4 text-base font-semibold text-event-text">Nenhum convidado encontrado</h3>
-      <p className="mx-auto mt-2 max-w-sm text-sm text-stone-500">Comece adicionando seus convidados para acompanhar confirmações e famílias.</p>
-      <button type="button" onClick={onAdd} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-event-rose px-4 py-2 text-sm font-medium text-white hover:bg-[#9F5965]">
-        <Plus size={15}/> Adicionar primeiro convidado
-      </button>
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-stone-300 bg-white px-6 py-10 text-center">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-stone-100"><UserPlus size={21} className="text-stone-400"/></div>
+      <h3 className="mt-4 text-base font-semibold text-event-text">
+        {hasFilters ? 'Nenhum convidado encontrado com esses filtros' : 'Nenhum convidado encontrado'}
+      </h3>
+      <p className="mx-auto mt-2 max-w-sm text-sm text-stone-500">
+        {hasFilters
+          ? 'Ajuste a busca ou limpe os filtros para ver a lista completa.'
+          : 'Comece adicionando seus convidados para acompanhar confirmações e famílias.'}
+      </p>
+      {hasFilters ? (
+        <button type="button" onClick={onClearFilters} className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg border border-stone-200 bg-white px-4 text-sm font-semibold text-stone-700 shadow-sm transition hover:border-stone-300 hover:bg-stone-50">
+          <X size={15}/> Limpar filtros
+        </button>
+      ) : !hasGuests ? (
+        <button type="button" onClick={onAdd} className="mt-5 inline-flex h-10 items-center gap-2 rounded-lg bg-event-rose px-4 text-sm font-medium text-white hover:bg-[#9F5965]">
+          <Plus size={15}/> Adicionar primeiro convidado
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -639,10 +675,16 @@ function EditGuestForm({ initial, groups, onSave, onClose }: {
           ]}
         />
         <AppSelect
-          label="Família / Grupo"
+          label="Família"
           value={form.group_id}
           onValueChange={v => setForm(f=>({...f, group_id: v}))}
           options={[{ label: 'Sem família', value: '' }, ...groups.map(g=>({ label: g.name, value: g.id }))]}
+        />
+        <AppSelect
+          label="Grupo / Origem"
+          value={form.origin_group}
+          onValueChange={v => setForm(f=>({...f, origin_group: v}))}
+          options={[{ label: 'Não informado', value: '' }, ...ORIGIN_GROUPS]}
         />
         <div className="col-span-full">
           <AppInput
@@ -714,10 +756,16 @@ function IndividualGuestForm({ groups, onSave, onClose, onBack }: {
           options={GUEST_TYPES}
         />
         <AppSelect
-          label="Família / Grupo"
+          label="Família"
           value={form.group_id}
           onValueChange={v => setForm(f=>({...f, group_id: v}))}
           options={[{ label: 'Sem família', value: '' }, ...groups.map(g=>({ label: g.name, value: g.id }))]}
+        />
+        <AppSelect
+          label="Grupo / Origem"
+          value={form.origin_group}
+          onValueChange={v => setForm(f=>({...f, origin_group: v}))}
+          options={[{ label: 'Não informado', value: '' }, ...ORIGIN_GROUPS]}
         />
         <div className="col-span-full">
           <AppTextarea
@@ -740,12 +788,13 @@ function IndividualGuestForm({ groups, onSave, onClose, onBack }: {
 // ─── FamilyForm — LOCAL STATE ────────────────────────────────────────────────────
 
 function FamilyForm({ onSave, onClose, onBack }: {
-  onSave: (responsible: {name:string; phone:string}, dependents: DependentEntry[]) => Promise<void>;
+  onSave: (responsible: {name:string; phone:string; origin_group:string}, dependents: DependentEntry[]) => Promise<void>;
   onClose: () => void;
   onBack: () => void;
 }) {
   const [resp, setResp]   = useState({ name: '', phone: '' });
   const [deps, setDeps]   = useState<DependentEntry[]>([]);
+  const [originGroup, setOriginGroup] = useState('');
   const [saving, setSaving] = useState(false);
 
   function addDep()           { setDeps(prev => [...prev, newDep()]); }
@@ -760,7 +809,7 @@ function FamilyForm({ onSave, onClose, onBack }: {
     e.preventDefault();
     if (!resp.name.trim()) return;
     setSaving(true);
-    try { await onSave(resp, deps); }
+    try { await onSave({ ...resp, origin_group: originGroup }, deps); }
     finally { setSaving(false); }
   }
 
@@ -789,6 +838,12 @@ function FamilyForm({ onSave, onClose, onBack }: {
             value={resp.phone}
             onChange={e => setResp(r=>({...r, phone: maskPhone(e.target.value)}))}
             placeholder="(00) 00000-0000"
+          />
+          <AppSelect
+            label="Grupo / Origem"
+            value={originGroup}
+            onValueChange={setOriginGroup}
+            options={[{ label: 'Não informado', value: '' }, ...ORIGIN_GROUPS]}
           />
         </div>
       </section>
@@ -882,22 +937,10 @@ export default function Guests() {
   const [search, setSearch]     = useState('');
   const [primary, setPrimary]   = useState<PrimaryFilter>('all');
   const [groupFilter, setGroupFilter] = useState('');
-  const [sec, setSec]           = useState<SecondaryFilters>({ ...SEC_BLANK });
-  const [showSec, setShowSec]   = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [originFilter, setOriginFilter] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [openActionId, setOpenActionId] = useState<string | null>(null);
-  const secRef = useRef<HTMLDivElement>(null);
-
-  // Close secondary filters when clicking outside
-  useEffect(() => {
-    if (!showSec) return;
-    function handle(e: MouseEvent) {
-      if (secRef.current && !secRef.current.contains(e.target as Node)) setShowSec(false);
-    }
-    document.addEventListener('mousedown', handle);
-    return () => document.removeEventListener('mousedown', handle);
-  }, [showSec]);
 
   // Lookup maps
   const groupById = useMemo(() => new Map(groups.rows.map(g=>[g.id,g.name])), [groups.rows]);
@@ -911,23 +954,41 @@ export default function Guests() {
     refused:   guests.rows.filter(g=>g.invite_status==='recusado').length,
   }), [guests.rows]);
 
-  const activeSecCount = Object.values(sec).filter(Boolean).length;
+  const activeFilterChips = useMemo(() => {
+    const chips: string[] = [];
+    if (search.trim()) chips.push(`Busca: ${search.trim()}`);
+    if (groupFilter) chips.push(groupById.get(groupFilter) ?? 'Família selecionada');
+    if (originFilter) chips.push(originGroupLabel(originFilter));
+    if (primary !== 'all') {
+      chips.push(primary === 'confirmed' ? 'Confirmados' : primary === 'pending' ? 'Pendentes' : 'Recusados');
+    }
+    return chips;
+  }, [search, groupFilter, originFilter, primary, groupById]);
+
+  const hasActiveFilters = activeFilterChips.length > 0;
+
+  function clearFilters() {
+    setSearch('');
+    setGroupFilter('');
+    setOriginFilter('');
+    setPrimary('all');
+  }
 
   // Filtered
   const filtered = useMemo(() => {
     return guests.rows.filter(g => {
       const fName = groupById.get(g.group_id ?? '') ?? '';
+      const originName = g.origin_group ?? '';
       const s = norm(search);
-      if (s && !norm(`${g.full_name} ${g.phone ?? ''} ${fName}`).includes(s)) return false;
+      if (s && !norm(`${g.full_name} ${g.phone ?? ''} ${fName} ${originName}`).includes(s)) return false;
       if (groupFilter && g.group_id !== groupFilter) return false;
+      if (originFilter && g.origin_group !== originFilter) return false;
       if (primary === 'confirmed' && g.invite_status !== 'confirmado') return false;
       if (primary === 'pending'   && !isPending(g.invite_status)) return false;
       if (primary === 'refused'   && g.invite_status !== 'recusado') return false;
-      if (sec.families    && !g.group_id)  return false;
-      if (sec.individuals &&  g.group_id)  return false;
       return true;
     });
-  }, [guests.rows, search, groupFilter, primary, sec, groupById]);
+  }, [guests.rows, search, groupFilter, originFilter, primary, groupById]);
 
   // Grouped
   const grouped = useMemo(() => {
@@ -958,7 +1019,7 @@ export default function Guests() {
   const tableSections = useMemo(() => {
     const sections: { key: string; label: string; group?: GuestGroup; rows: Guest[] }[] = grouped.withFamily.map(({ group, members }) => ({
       key: group.id,
-      label: group.name,
+      label: familyDisplayName(group),
       group,
       rows: members,
     }));
@@ -983,6 +1044,7 @@ export default function Guests() {
     await guests.update(editing.id, {
       ...form,
       group_id: form.group_id || null,
+      origin_group: form.origin_group || null,
       companions: 0,
     } as Partial<Guest>);
     closeModal();
@@ -992,13 +1054,14 @@ export default function Guests() {
     await guests.create({
       ...form,
       group_id: form.group_id || null,
+      origin_group: form.origin_group || null,
       companions: 0,
       gift_received: false,
     } as Partial<Guest>);
     closeModal();
   }
 
-  async function handleSaveFamily(resp: {name:string;phone:string}, deps: DependentEntry[]) {
+  async function handleSaveFamily(resp: {name:string;phone:string;origin_group:string}, deps: DependentEntry[]) {
     const grpName = familyName(resp.name);
     const newGroup = await groups.create({
       name:             grpName,
@@ -1011,6 +1074,7 @@ export default function Guests() {
     await guests.create({
       full_name: resp.name.trim(), phone: resp.phone||null,
       group_id: newGroup.id, guest_type:'adulto', invite_status:'pendente',
+      origin_group: resp.origin_group || null,
       companions:0, food_restriction:null, notes:null, gift_received:false,
     } as Partial<Guest>);
 
@@ -1019,6 +1083,7 @@ export default function Guests() {
       await guests.create({
         full_name: dep.name.trim(), phone: dep.phone||null,
         group_id: newGroup.id, guest_type: dep.guest_type, invite_status:'pendente',
+        origin_group: resp.origin_group || null,
         companions:0, food_restriction:null, notes:null, gift_received:false,
       } as Partial<Guest>);
     }
@@ -1059,6 +1124,7 @@ export default function Guests() {
     full_name: editing.full_name,
     phone: editing.phone ?? '',
     group_id: editing.group_id ?? '',
+    origin_group: editing.origin_group ?? '',
     guest_type: editing.guest_type,
     invite_status: editing.invite_status,
     food_restriction: editing.food_restriction ?? '',
@@ -1114,85 +1180,70 @@ export default function Guests() {
       </section>
 
       {/* ── Search + Filter bar ── */}
-      <section className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-white p-2.5 shadow-sm lg:flex-row lg:items-center">
-        {/* Search */}
-        <div className="min-w-[220px] flex-1">
-          <AppSearchInput
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            onClear={() => setSearch('')}
-            placeholder="Buscar convidado, telefone ou família..."
-          />
-        </div>
+      <section className="rounded-2xl border border-stone-200 bg-white p-3 shadow-sm">
+        <div className="grid gap-2 lg:grid-cols-[minmax(280px,1fr)_220px_220px_auto] lg:items-center">
+          <div className="min-w-0 lg:col-auto">
+            <AppSearchInput
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onClear={() => setSearch('')}
+              placeholder="Buscar convidado, telefone ou família..."
+              className="h-12 rounded-2xl pl-[48px] text-sm"
+            />
+          </div>
 
-        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] lg:flex lg:items-center lg:justify-end">
-          <AppSelect
-            value={groupFilter}
-            onValueChange={setGroupFilter}
-            placeholder="Todas as famílias"
-            options={[{ label: 'Todas as famílias', value: '' }, ...groups.rows.map(g=>({ label: g.name, value: g.id }))]}
-          />
+          <div className="grid min-w-0 grid-cols-2 gap-2 lg:contents">
+            <AppSelect
+              className="min-w-0"
+              value={groupFilter}
+              onValueChange={setGroupFilter}
+              placeholder="Todas as famílias"
+              options={[{ label: 'Todas as famílias', value: '' }, ...groups.rows.map(g=>({ label: g.name, value: g.id }))]}
+            />
 
-          <div className="flex h-8 rounded-lg border border-stone-200 bg-stone-50 p-0.5">
+            <AppSelect
+              className="min-w-0"
+              value={originFilter}
+              onValueChange={setOriginFilter}
+              placeholder="Todas as origens"
+              options={[{ label: 'Todas as origens', value: '' }, ...ORIGIN_GROUPS]}
+            />
+          </div>
+
+          <div className="flex h-12 w-full shrink-0 rounded-2xl border border-stone-200 bg-stone-50 p-1 shadow-sm sm:ml-auto sm:w-auto">
             <button type="button" onClick={()=>setViewMode('cards')}
-              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition ${
-                viewMode==='cards' ? 'bg-white text-event-text shadow-sm' : 'text-stone-500 hover:text-stone-700'
+              className={`inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3 text-sm font-semibold transition sm:flex-none ${
+                viewMode==='cards' ? 'bg-white text-event-text shadow-sm' : 'text-stone-500 hover:bg-white/70 hover:text-stone-700'
               }`}>
-              <LayoutGrid size={13}/> Cards
+              <LayoutGrid size={14}/> Cards
             </button>
             <button type="button" onClick={()=>setViewMode('table')}
-              className={`inline-flex items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition ${
-                viewMode==='table' ? 'bg-white text-event-text shadow-sm' : 'text-stone-500 hover:text-stone-700'
+              className={`inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-3 text-sm font-semibold transition sm:flex-none ${
+                viewMode==='table' ? 'bg-white text-event-text shadow-sm' : 'text-stone-500 hover:bg-white/70 hover:text-stone-700'
               }`}>
-              <Table2 size={13}/> Tabela
+              <Table2 size={14}/> Tabela
             </button>
-          </div>
-
-          <div className="relative" ref={secRef}>
-            <button type="button" onClick={()=>setShowSec(v=>!v)}
-              className={`relative flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition ${
-                activeSecCount>0 || showSec
-                  ? 'border-event-rose bg-event-rose text-white'
-                  : 'border-stone-200 bg-white text-stone-600 hover:border-stone-300'
-              }`}>
-              <Filter size={11}/>
-              Filtros Avançados
-              {activeSecCount>0 && (
-                <span className="ml-0.5 rounded-full bg-white/25 px-1.5 text-[10px] font-bold leading-5 text-white">
-                  {activeSecCount}
-                </span>
-              )}
-              <ChevronDown size={11} className={`transition-transform ${showSec?'rotate-180':''}`}/>
-            </button>
-
-            {showSec && (
-              <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-52 rounded-xl border border-stone-200 bg-white p-3 shadow-lg">
-                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-stone-400">Filtros adicionais</p>
-                {([
-                  { key:'families'    as keyof SecondaryFilters, label:'Apenas Famílias'    },
-                  { key:'individuals' as keyof SecondaryFilters, label:'Apenas Individuais' },
-                ] as const).map(({ key, label }) => (
-                  <label key={key} className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-stone-700 hover:bg-stone-50">
-                    <input type="checkbox" className="h-4 w-4 rounded accent-stone-800"
-                      checked={sec[key]} onChange={e=>setSec(s=>({...s,[key]:e.target.checked}))}/>
-                    {label}
-                  </label>
-                ))}
-                {activeSecCount>0 && (
-                  <button type="button" onClick={()=>setSec({...SEC_BLANK})}
-                    className="mt-2 w-full rounded-lg py-1.5 text-xs text-stone-500 hover:bg-stone-50 hover:text-stone-700">
-                    Limpar filtros
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         </div>
+
+        {hasActiveFilters && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {activeFilterChips.map((chip) => (
+              <span key={chip} className="inline-flex h-7 max-w-full items-center rounded-full bg-rose-50 px-3 text-xs font-semibold text-rose-700 ring-1 ring-rose-100">
+                <span className="max-w-[220px] truncate whitespace-nowrap">{chip}</span>
+              </span>
+            ))}
+            <button type="button" onClick={clearFilters}
+              className="inline-flex h-7 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-600 transition hover:border-stone-300 hover:bg-stone-50 hover:text-stone-800">
+              <X size={12}/> Limpar filtros
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Result count */}
       <p className="text-xs text-stone-400">
-        {filtered.length===0 ? 'Nenhum convidado encontrado'
+        {filtered.length===0 ? (hasActiveFilters ? 'Nenhum convidado encontrado com esses filtros' : 'Nenhum convidado encontrado')
           : `${filtered.length} convidado${filtered.length!==1?'s':''}`}
       </p>
 
@@ -1213,7 +1264,7 @@ export default function Guests() {
             const openGroup = expandedGroups[group.id] ?? false;
             return (
             <div key={group.id} className="space-y-3">
-              <FamilyGroupHeader name={group.name} count={members.length} open={openGroup} onToggle={()=>toggleGroup(group.id)}/>
+              <FamilyGroupHeader name={familyDisplayName(group)} count={members.length} open={openGroup} onToggle={()=>toggleGroup(group.id)}/>
               {openGroup && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                 {members.map(row => (
@@ -1233,7 +1284,7 @@ export default function Guests() {
             );
           })}
           {grouped.noFamily.length > 0 && (() => {
-            const openGroup = expandedGroups.__individuals ?? true;
+            const openGroup = expandedGroups.__individuals ?? false;
             return (
             <div className="space-y-3">
               <FamilyGroupHeader name="Individuais" count={grouped.noFamily.length} open={openGroup} onToggle={()=>toggleGroup('__individuals')}/>
@@ -1258,7 +1309,12 @@ export default function Guests() {
         </div>
         )
       ) : (
-        <GuestEmptyState onAdd={openNew}/>
+        <GuestEmptyState
+          hasGuests={guests.rows.length > 0}
+          hasFilters={hasActiveFilters}
+          onAdd={openNew}
+          onClearFilters={clearFilters}
+        />
       )}
 
       {/* ── Modal ── */}

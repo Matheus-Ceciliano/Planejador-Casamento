@@ -9,6 +9,7 @@ import Budget from './pages/Budget';
 import BudgetAnalysis from './pages/BudgetAnalysis';
 import BudgetDueDates from './pages/BudgetDueDates';
 import Dashboard from './pages/Dashboard';
+import Families from './pages/Families';
 import Files from './pages/Files';
 import Guests from './pages/Guests';
 import InviteAccept from './pages/InviteAccept';
@@ -53,6 +54,7 @@ function RoutesContent() {
       <Route path="/orcamento/:category" element={<Budget />} />
       <Route path="/categorias" element={<Navigate to="/orcamento" replace />} />
       <Route path="/fornecedores" element={<Vendors />} />
+      <Route path="/mesas" element={<Families />} />
       <Route path="/espacos" element={<Navigate to="/orcamento/espaco" replace />} />
       <Route path="/buffet" element={<Navigate to="/orcamento/buffet" replace />} />
       <Route path="/bebidas" element={<Navigate to="/orcamento/bebidas" replace />} />

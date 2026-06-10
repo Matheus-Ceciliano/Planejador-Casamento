@@ -1,7 +1,7 @@
 import {
   CalendarDays, ChevronDown, Clock3, Files, Handshake,
-  Heart, Home, LogOut, Menu,
-  Send, Settings, Users, WalletCards, X,
+  Heart, Home, LogOut, Menu, MoreHorizontal,
+  Settings, Users, WalletCards, X,
 } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
@@ -26,9 +26,16 @@ const nav = [
 const mobileNav = [
   { to: '/dashboard',   label: 'Início',     icon: Home },
   { to: '/convidados',  label: 'Convidados', icon: Users },
-  { to: '/agenda',      label: 'Agenda',     icon: Send },
-  { to: '/membros',     label: 'Membros',    icon: Users },
+  { to: '/agenda',      label: 'Agenda',     icon: CalendarDays },
   { to: '/orcamento',   label: 'Orçamento',  icon: WalletCards },
+];
+
+const mobileMoreNav = [
+  { to: '/membros',       label: 'Membros',       icon: Users },
+  { to: '/fornecedores',  label: 'Fornecedores',  icon: Handshake },
+  { to: '/mesas',         label: 'Mesas',         icon: Users },
+  { to: '/arquivos',      label: 'Arquivos',      icon: Files },
+  { to: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
 /* ── Logo mark ────────────────────────────────────────────────────── */
@@ -104,10 +111,12 @@ function Sidebar({ onNavigate, onSignOut }: { onNavigate?: () => void; onSignOut
 /* ── Main Layout ──────────────────────────────────────────────────── */
 export default function AppLayout({ children }: { children?: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const { signOut, user } = useAuth();
   const { wedding, weddings, selectWedding } = useWedding();
   const location = useLocation();
+  const moreActive = mobileMoreNav.some((item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`));
 
   useEffect(() => {
     const syncModalState = (event?: Event) => {
@@ -119,6 +128,10 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
     window.addEventListener('app:modal-state', syncModalState);
     return () => window.removeEventListener('app:modal-state', syncModalState);
   }, []);
+
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="min-h-[100dvh] overflow-x-hidden bg-w-surface">
@@ -218,24 +231,90 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
       </div>
 
       {/* ── Mobile Bottom Nav ── */}
-      <nav className={`fixed inset-x-0 bottom-0 z-[60] border-t border-w-border/80 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-2 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-xl lg:hidden ${modalOpen ? 'hidden' : ''}`}>
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-0.5">
+      {moreOpen && !modalOpen && (
+        <div className="fixed inset-0 z-[55] lg:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/15 backdrop-blur-[1px]"
+            aria-label="Fechar menu Mais"
+            onClick={() => setMoreOpen(false)}
+          />
+          <div className="absolute inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+4.9rem)] mx-auto max-w-md rounded-3xl border border-w-border bg-white p-3 shadow-[0_18px_60px_rgba(15,23,42,0.18)] animate-slide-up">
+            <div className="mb-2 flex items-center justify-between px-1">
+              <div>
+                <p className="text-sm font-bold text-w-text">Mais opções</p>
+                <p className="text-xs text-w-faint">Administração e organização</p>
+              </div>
+              <button
+                type="button"
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-w-muted transition hover:bg-w-surface hover:text-w-text"
+                aria-label="Fechar"
+                onClick={() => setMoreOpen(false)}
+              >
+                <X size={17} />
+              </button>
+            </div>
+            <div className="grid gap-1">
+              {mobileMoreNav.map(({ to, label, icon: Icon }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  className={({ isActive }) =>
+                    `flex min-h-12 items-center gap-3 rounded-2xl px-3 text-sm font-semibold transition-all duration-200 ${
+                      isActive
+                        ? 'bg-w-rose text-white shadow-rose'
+                        : 'text-w-muted hover:bg-w-surface hover:text-w-text'
+                    }`
+                  }
+                >
+                  {({ isActive }) => (
+                    <>
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${isActive ? 'bg-white/20' : 'bg-w-surface text-w-muted'}`}>
+                        <Icon size={18} />
+                      </span>
+                      <span className="min-w-0 truncate whitespace-nowrap">{label}</span>
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <nav className={`fixed inset-x-0 bottom-0 z-[60] border-t border-w-border/80 bg-white/95 px-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] pt-1.5 shadow-[0_-4px_24px_rgba(0,0,0,0.06)] backdrop-blur-xl lg:hidden ${modalOpen ? 'hidden' : ''}`}>
+        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
           {mobileNav.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
+              onClick={() => setMoreOpen(false)}
               className={({ isActive }) =>
-                `flex min-h-[52px] min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-0.5 text-[8px] font-bold uppercase tracking-normal transition-all duration-150 min-[390px]:px-1 min-[390px]:text-[9px] ${
+                `flex min-h-[50px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 text-[10px] font-bold tracking-normal transition-all duration-200 ${
                   isActive
                     ? 'bg-w-rose text-white shadow-rose'
                     : 'text-w-faint hover:bg-w-surface hover:text-w-muted'
                 }`
               }
             >
-              <Icon size={20} />
-              <span className="max-w-full truncate leading-none">{label}</span>
+              <Icon size={19} />
+              <span className="max-w-full truncate whitespace-nowrap leading-none">{label}</span>
             </NavLink>
           ))}
+          <button
+            type="button"
+            onClick={() => setMoreOpen((value) => !value)}
+            className={`flex min-h-[50px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 text-[10px] font-bold tracking-normal transition-all duration-200 ${
+              moreActive || moreOpen
+                ? 'bg-w-rose text-white shadow-rose'
+                : 'text-w-faint hover:bg-w-surface hover:text-w-muted'
+            }`}
+            aria-expanded={moreOpen}
+            aria-label="Abrir mais opções"
+          >
+            <MoreHorizontal size={20} />
+            <span className="max-w-full truncate whitespace-nowrap leading-none">Mais</span>
+          </button>
         </div>
       </nav>
     </div>

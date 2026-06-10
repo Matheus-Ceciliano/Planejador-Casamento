@@ -38,6 +38,7 @@ export default function AppSelect({
   onValueChange,
   id: externalId,
   name,
+  className,
 }: AppSelectProps) {
   const autoId = useId();
   const id = externalId ?? autoId;
@@ -48,6 +49,7 @@ export default function AppSelect({
   const hasLeft = Boolean(leftIcon);
   const showSearch = options.length > SEARCH_THRESHOLD;
   const [search, setSearch] = useState('');
+  const [open, setOpen] = useState(false);
 
   const filteredOptions = showSearch && search.trim()
     ? options.filter((opt) =>
@@ -60,7 +62,7 @@ export default function AppSelect({
 
   const triggerCls = [
     'field-base radix-select-trigger',
-    'flex w-full cursor-pointer select-none items-center justify-between gap-2 text-left',
+    'relative flex h-12 w-full min-w-0 cursor-pointer select-none items-center justify-between gap-2 overflow-hidden whitespace-nowrap rounded-2xl text-left',
     hasLeft ? 'pl-[44px]' : '',
     // right padding for chevron
     'pr-[44px]',
@@ -70,7 +72,7 @@ export default function AppSelect({
   ].filter(Boolean).join(' ');
 
   return (
-    <div className={`block w-full ${hasError ? 'field-error' : ''}`}>
+    <div className={`block w-full min-w-0 ${className ?? ''} ${hasError ? 'field-error' : ''}`}>
       {label && (
         <p className="field-label" id={`${id}-label`}>
           {label}
@@ -85,7 +87,10 @@ export default function AppSelect({
         onValueChange={(nextValue) => onValueChange?.(nextValue === EMPTY_OPTION_VALUE ? '' : nextValue)}
         disabled={disabled}
         name={name}
-        onOpenChange={(open) => { if (!open) setSearch(''); }}
+        onOpenChange={(nextOpen) => {
+          setOpen(nextOpen);
+          if (!nextOpen) setSearch('');
+        }}
       >
         <div className="relative">
           {hasLeft && (
@@ -106,12 +111,12 @@ export default function AppSelect({
             }
             className={triggerCls}
           >
-            <Select.Value placeholder={placeholder} />
+            <Select.Value placeholder={placeholder} className="block min-w-0 flex-1 truncate whitespace-nowrap" />
             <Select.Icon asChild>
               <ChevronDown
                 size={17}
                 strokeWidth={2.5}
-                className="radix-chevron absolute right-4 top-1/2 -translate-y-1/2 shrink-0 text-[#9CA3AF]"
+                className={`pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 shrink-0 text-[#9CA3AF] transition-transform duration-200 ease-out ${open ? 'rotate-180' : 'rotate-0'}`}
               />
             </Select.Icon>
           </Select.Trigger>
@@ -119,7 +124,7 @@ export default function AppSelect({
 
         <Select.Portal>
           <Select.Content
-            className="radix-select-content z-[10000] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-2xl border border-[#E9ECEF] bg-white shadow-[0_8px_40px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.06)]"
+            className="radix-select-content z-[10000] w-[var(--radix-select-trigger-width)] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-2xl border border-[#E9ECEF] bg-white shadow-[0_14px_36px_rgba(15,23,42,0.10),0_2px_8px_rgba(15,23,42,0.06)]"
             position="popper"
             sideOffset={6}
             align="start"
@@ -160,10 +165,12 @@ export default function AppSelect({
                   <Select.Item
                     key={`${opt.value || EMPTY_OPTION_VALUE}-${index}`}
                     value={opt.value === '' ? EMPTY_OPTION_VALUE : opt.value}
-                    className="radix-select-item group relative flex cursor-pointer select-none items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-[#1F2937] outline-none transition-colors hover:bg-[#FFF1F5] hover:text-[#E11D48] data-[disabled]:cursor-not-allowed data-[highlighted]:bg-[#FFF1F5] data-[highlighted]:text-[#E11D48] data-[state=checked]:font-semibold data-[state=checked]:text-[#E11D48]"
+                    className="radix-select-item group relative flex cursor-pointer select-none items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-[#1F2937] outline-none transition-colors hover:bg-[#FFF1F5] hover:text-[#E11D48] data-[disabled]:cursor-not-allowed data-[highlighted]:bg-[#FFF1F5] data-[highlighted]:text-[#E11D48] data-[state=checked]:bg-[#FFF1F5] data-[state=checked]:font-semibold data-[state=checked]:text-[#BE123C]"
                   >
-                    <Select.ItemText>
-                      {opt.label.charAt(0).toUpperCase() + opt.label.slice(1)}
+                    <Select.ItemText className="min-w-0 flex-1">
+                      <span className="block min-w-0 truncate whitespace-nowrap">
+                        {opt.label.charAt(0).toUpperCase() + opt.label.slice(1)}
+                      </span>
                     </Select.ItemText>
                     <Select.ItemIndicator className="ml-auto">
                       <Check size={15} strokeWidth={2.5} className="text-[#E11D48]" />

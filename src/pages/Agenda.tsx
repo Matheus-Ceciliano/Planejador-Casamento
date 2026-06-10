@@ -11,12 +11,14 @@ import {
   List,
   ListTodo,
   MapPin,
+  MoreHorizontal,
   Plus,
   Receipt,
+  Trash2,
   User,
   WalletCards
 } from 'lucide-react';
-import { FormEvent, ReactNode, useMemo, useState } from 'react';
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import FormInput from '../components/FormInput';
 import FormSelect from '../components/FormSelect';
@@ -204,6 +206,21 @@ function typeIcon(type: AgendaType) {
   return { task: ListTodo, event: CalendarClock, payment: WalletCards, reminder: AlertTriangle }[type];
 }
 
+function statusTone(status: string) {
+  if (['pago', 'concluida', 'concluÃ­da', 'realizado'].includes(status)) return 'bg-green-50 text-green-700 ring-green-100';
+  if (['vencido', 'atrasada'].includes(status)) return 'bg-red-50 text-red-700 ring-red-100';
+  if (['pendente', 'em andamento', 'agendado'].includes(status)) return 'bg-amber-50 text-amber-700 ring-amber-100';
+  return 'bg-slate-50 text-slate-600 ring-slate-100';
+}
+
+function paymentPriorityTone(item: AgendaItem, today: string) {
+  const currentStatus = statusForItem(item, today);
+  if (currentStatus === 'pago') return 'bg-green-500';
+  if (currentStatus === 'vencido') return 'bg-red-500';
+  if (daysBetween(today, item.date) <= 7) return 'bg-amber-500';
+  return 'bg-sky-400';
+}
+
 function nextStatus(type: AgendaType, current: string) {
   if (type === 'payment') return current === 'pago' ? 'pendente' : 'pago';
   if (type === 'event') return current === 'realizado' ? 'agendado' : 'realizado';
@@ -237,6 +254,16 @@ export default function Agenda() {
   const [form, setForm] = useState<AgendaForm>(() => formForDate(today));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [openMenuId, setOpenMenuId] = useState('');
+
+  useEffect(() => {
+    function closeMenu() {
+      setOpenMenuId('');
+    }
+
+    window.addEventListener('click', closeMenu);
+    return () => window.removeEventListener('click', closeMenu);
+  }, []);
 
   const categoryOptions = useMemo(() => {
     const names = budgetCategoryRows.rows.length ? budgetCategoryRows.rows.map((item) => item.name) : budgetCategories;
@@ -451,9 +478,19 @@ export default function Agenda() {
   }
 
   async function toggleDone(item: AgendaItem) {
+    setOpenMenuId('');
     const status = nextStatus(item.type, item.status);
     if (item.source === 'task') await tasks.update(item.sourceId, { status });
     if (item.source === 'budget') await budgetItems.update(item.sourceId, { payment_status: status, payment_date: status === 'pago' ? today : null });
+  }
+
+  async function removeItem(item: AgendaItem) {
+    setOpenMenuId('');
+    if (!['task', 'budget'].includes(item.source)) return;
+    const confirmed = window.confirm(`Excluir "${item.title}" da agenda?`);
+    if (!confirmed) return;
+    if (item.source === 'task') await tasks.remove(item.sourceId);
+    if (item.source === 'budget') await budgetItems.remove(item.sourceId);
   }
 
   function moveMonth(offset: number) {
@@ -481,21 +518,21 @@ export default function Agenda() {
   ];
 
   return (
-    <div className="space-y-4 text-[#1F2937]">
+    <div className="space-y-3 pb-28 text-[#1F2937] sm:space-y-4 md:pb-0" onClick={() => setOpenMenuId('')}>
       {/* Header */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="page-title text-[#1F2937]">Central de Planejamento</h1>
+      <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between md:pt-0">
+        <div className="min-w-0">
+          <h1 className="text-[1.55rem] font-bold leading-tight tracking-tight text-[#1F2937] sm:text-3xl">Central de Planejamento</h1>
           {weddingCountdown && (
             <p className="mt-1 inline-flex rounded-full border border-[#FCE4EA] bg-[#FFF1F5] px-2.5 py-1 text-xs font-bold text-[#E11D48]">{weddingCountdown}</p>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="grid grid-cols-2 rounded-2xl border border-[#F0EBE6] bg-white p-1 shadow-soft">
-            <button type="button" onClick={() => setView('list')} className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-xl px-3 text-sm font-bold transition ${view === 'list' ? 'bg-[#E11D48] text-white shadow-rose' : 'text-[#71717A] hover:bg-[#FAFAFA] hover:text-[#1F2937]'}`}>
+        <div className="flex flex-wrap items-center gap-2 md:justify-end">
+          <div className="grid w-full grid-cols-2 rounded-2xl border border-[#F0EBE6] bg-white p-1 shadow-soft sm:w-auto">
+            <button type="button" onClick={() => setView('list')} className={`inline-flex min-h-8 items-center justify-center gap-2 rounded-xl px-3 text-xs font-bold transition sm:min-h-9 sm:text-sm ${view === 'list' ? 'bg-[#E11D48] text-white shadow-rose' : 'bg-white text-[#71717A] hover:bg-[#FAFAFA] hover:text-[#1F2937]'}`}>
               <List size={16} /> Lista
             </button>
-            <button type="button" onClick={() => setView('calendar')} className={`inline-flex min-h-9 items-center justify-center gap-2 rounded-xl px-3 text-sm font-bold transition ${view === 'calendar' ? 'bg-[#E11D48] text-white shadow-rose' : 'text-[#71717A] hover:bg-[#FAFAFA] hover:text-[#1F2937]'}`}>
+            <button type="button" onClick={() => setView('calendar')} className={`inline-flex min-h-8 items-center justify-center gap-2 rounded-xl px-3 text-xs font-bold transition sm:min-h-9 sm:text-sm ${view === 'calendar' ? 'bg-[#E11D48] text-white shadow-rose' : 'bg-white text-[#71717A] hover:bg-[#FAFAFA] hover:text-[#1F2937]'}`}>
               <CalendarDays size={16} /> Calendário
             </button>
           </div>
@@ -511,16 +548,16 @@ export default function Agenda() {
 
       {/* Next Action Card */}
       {/* Filter Tabs — single row */}
-      <div className="flex gap-1.5 overflow-x-auto rounded-2xl border border-[#F0EBE6] bg-white/80 p-1.5 shadow-soft">
+      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 py-0.5 sm:mx-0 sm:rounded-2xl sm:border sm:border-[#F0EBE6] sm:bg-white/80 sm:p-1.5 sm:shadow-soft">
         {filterTabs.map((tab) => (
           <button
             key={tab.key}
             type="button"
             onClick={() => setTypeFilter(tab.key)}
-            className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-bold transition sm:text-sm ${
+            className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold shadow-soft ring-1 transition sm:rounded-xl sm:text-sm ${
               typeFilter === tab.key
-                ? 'bg-[#E11D48] text-white shadow-sm'
-                : 'text-[#71717A] hover:bg-[#F9F5F3] hover:text-[#1F2937]'
+                ? 'bg-[#E11D48] text-white ring-[#E11D48]'
+                : 'bg-white text-[#71717A] ring-[#F0EBE6] hover:bg-[#F9F5F3] hover:text-[#1F2937]'
             }`}
           >
             {tab.label}
@@ -530,7 +567,17 @@ export default function Agenda() {
 
       {/* Content */}
       {view === 'list' ? (
-        <AgendaList groups={groups} items={visibleItems} today={today} onEdit={openEdit} onToggle={toggleDone} onCreate={() => openCreate(today)} />
+        <AgendaList
+          groups={groups}
+          items={visibleItems}
+          today={today}
+          openMenuId={openMenuId}
+          onMenuToggle={setOpenMenuId}
+          onEdit={openEdit}
+          onToggle={toggleDone}
+          onDelete={removeItem}
+          onCreate={() => openCreate(today)}
+        />
       ) : (
         <CalendarPanel
           month={month}
@@ -547,6 +594,9 @@ export default function Agenda() {
           onCreate={openCreate}
           onEdit={openEdit}
           onToggle={toggleDone}
+          onDelete={removeItem}
+          openMenuId={openMenuId}
+          onMenuToggle={setOpenMenuId}
         />
       )}
 
@@ -554,7 +604,7 @@ export default function Agenda() {
       <button
         type="button"
         id="agenda-fab-novo"
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] right-4 z-20 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#E11D48] text-white shadow-rose transition hover:bg-[#BE123C] md:hidden"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] right-5 z-40 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#E11D48] text-white shadow-rose transition hover:bg-[#BE123C] md:hidden"
         onClick={() => openCreate(selectedDay ?? today)}
         aria-label="Novo item"
       >
@@ -640,21 +690,27 @@ function AgendaList({
   groups,
   items,
   today,
+  openMenuId,
+  onMenuToggle,
   onEdit,
   onToggle,
+  onDelete,
   onCreate
 }: {
   groups: { label: string; items: AgendaItem[]; accent: string }[];
   items: AgendaItem[];
   today: string;
+  openMenuId: string;
+  onMenuToggle: (id: string) => void;
   onEdit: (item: AgendaItem) => void;
   onToggle: (item: AgendaItem) => void;
+  onDelete: (item: AgendaItem) => void;
   onCreate: () => void;
 }) {
   if (!items.length) return <EmptyAgenda onCreate={onCreate} />;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 sm:space-y-5">
       {groups.map((group) => (
         <section key={group.label}>
           <div className="mb-2.5 flex items-center gap-2">
@@ -663,7 +719,18 @@ function AgendaList({
             <div className="h-px flex-1 bg-[#F0EBE6]/80" />
           </div>
           <div className="space-y-2">
-            {group.items.map((item) => <AgendaCard key={item.id} item={item} today={today} onEdit={onEdit} onToggle={onToggle} />)}
+            {group.items.map((item) => (
+              <AgendaCard
+                key={item.id}
+                item={item}
+                today={today}
+                menuOpen={openMenuId === item.id}
+                onMenuToggle={onMenuToggle}
+                onEdit={onEdit}
+                onToggle={onToggle}
+                onDelete={onDelete}
+              />
+            ))}
           </div>
         </section>
       ))}
@@ -672,7 +739,97 @@ function AgendaList({
 }
 
 /* ─── Agenda Card ─── */
-function AgendaCard({ item, today, onEdit, onToggle }: { item: AgendaItem; today: string; onEdit: (item: AgendaItem) => void; onToggle: (item: AgendaItem) => void }) {
+function AgendaCard({
+  item,
+  today,
+  menuOpen,
+  onMenuToggle,
+  onEdit,
+  onToggle,
+  onDelete
+}: {
+  item: AgendaItem;
+  today: string;
+  menuOpen: boolean;
+  onMenuToggle: (id: string) => void;
+  onEdit: (item: AgendaItem) => void;
+  onToggle: (item: AgendaItem) => void;
+  onDelete: (item: AgendaItem) => void;
+}) {
+  const currentStatus = statusForItem(item, today);
+  const actionable = item.source === 'task' || item.source === 'budget';
+  const isDone = ['concluida', 'concluÃ­da', 'pago', 'realizado'].includes(currentStatus);
+  const isOverdue = ['atrasada', 'vencido'].includes(currentStatus);
+  const Icon = typeIcon(item.type);
+  const isPayment = item.type === 'payment';
+  const actionLabel = item.type === 'payment' ? (isDone ? 'Marcar como pendente' : 'Marcar como pago') : isDone ? 'Reabrir item' : item.type === 'event' ? 'Marcar como realizado' : 'Marcar como concluido';
+
+  return (
+    <article
+      className={`relative flex gap-3 rounded-2xl border p-3 shadow-soft transition sm:p-3.5 ${isOverdue ? 'border-red-200 bg-red-50/40' : isDone ? 'border-[#F0EBE6] bg-[#FAFAFA]' : 'border-[#F0EBE6] bg-white hover:-translate-y-0.5 hover:border-[#E11D48]/25 hover:shadow-card'}`}
+      onClick={(event) => event.stopPropagation()}
+    >
+      {isPayment && <span className={`absolute left-0 top-4 h-10 w-1 rounded-r-full ${paymentPriorityTone(item, today)}`} />}
+
+      <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${typeTone(item.type)}`}>
+        <Icon size={16} />
+      </span>
+
+      <div className="min-w-0 flex-1 pr-8">
+        <div className="flex min-w-0 items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <p className={`truncate text-sm font-extrabold leading-5 sm:text-[15px] ${isDone ? 'text-[#A1A1AA] line-through' : 'text-[#1F2937]'}`}>{item.title}</p>
+            {isPayment && item.location && <p className="mt-0.5 truncate text-xs font-semibold text-[#71717A]">{item.location}</p>}
+          </div>
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ring-1 ${isOverdue ? 'bg-red-100 text-red-700 ring-red-100' : 'bg-[#FAFAFA] text-[#71717A] ring-[#F0EBE6]'}`}>{isOverdue ? 'Atrasado' : typeLabels[item.type]}</span>
+        </div>
+
+        <div className="mt-2 grid gap-1 text-xs font-semibold text-[#71717A] sm:flex sm:flex-wrap sm:gap-x-3 sm:gap-y-1">
+          <span className="inline-flex min-w-0 items-center gap-1">
+            <CalendarDays size={12} className="shrink-0" />
+            <span className="truncate">{isPayment ? 'Data' : item.type === 'task' || item.type === 'reminder' ? 'Prazo' : 'Data'}: {shortDateLabel(item.date)}</span>
+          </span>
+          {item.time && <span className="inline-flex min-w-0 items-center gap-1"><Clock3 size={12} className="shrink-0" /><span className="truncate">{item.time}</span></span>}
+          {!isPayment && item.location && <span className="inline-flex min-w-0 items-center gap-1"><MapPin size={12} className="shrink-0" /><span className="truncate">{item.location}</span></span>}
+          {item.amount !== undefined && <span className="inline-flex min-w-0 items-center gap-1"><Receipt size={12} className="shrink-0" /><span className="truncate">{formatMoney(item.amount)}</span></span>}
+        </div>
+
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ring-1 ${statusTone(currentStatus)}`}>{currentStatus}</span>
+          {item.priority && <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase text-[#71717A] ring-1 ring-[#F0EBE6]">{item.priority}</span>}
+        </div>
+      </div>
+
+      <div className="absolute right-2 top-2">
+        <button
+          type="button"
+          className="flex h-8 w-8 items-center justify-center rounded-xl text-[#71717A] transition hover:bg-[#FAFAFA] hover:text-[#1F2937]"
+          onClick={(event) => {
+            event.stopPropagation();
+            onMenuToggle(menuOpen ? '' : item.id);
+          }}
+          aria-label="Acoes do item"
+          aria-expanded={menuOpen}
+        >
+          <MoreHorizontal size={18} />
+        </button>
+
+        {menuOpen && (
+          <div className="absolute bottom-10 right-0 z-50 w-56 overflow-hidden rounded-2xl border border-[#F0EBE6] bg-white shadow-float animate-scale-in md:bottom-auto md:top-10" onClick={(event) => event.stopPropagation()}>
+            <Link to={item.href} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-[#1F2937] hover:bg-[#FAFAFA]">
+              <ExternalLink size={15} /> Ver detalhes
+            </Link>
+            {actionable && <button type="button" className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-[#1F2937] hover:bg-[#FAFAFA]" onClick={() => onEdit(item)}><CalendarClock size={15} /> Editar</button>}
+            {actionable && <button type="button" className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-[#1F2937] hover:bg-[#FAFAFA]" onClick={() => onToggle(item)}><CheckCircle2 size={15} /> {actionLabel}</button>}
+            {actionable && <button type="button" className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-red-600 hover:bg-red-50" onClick={() => onDelete(item)}><Trash2 size={15} /> Excluir</button>}
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function AgendaCardLegacy({ item, today, onEdit, onToggle }: { item: AgendaItem; today: string; onEdit: (item: AgendaItem) => void; onToggle: (item: AgendaItem) => void }) {
   const currentStatus = statusForItem(item, today);
   const actionable = item.source === 'task' || item.source === 'budget';
   const isDone = ['concluida', 'concluída', 'pago', 'realizado'].includes(currentStatus);
@@ -754,7 +911,10 @@ function CalendarPanel({
   onSelectDay,
   onCreate,
   onEdit,
-  onToggle
+  onToggle,
+  onDelete,
+  openMenuId,
+  onMenuToggle
 }: {
   month: Date;
   monthDays: Date[];
@@ -770,6 +930,9 @@ function CalendarPanel({
   onCreate: (date: string, type?: AgendaType) => void;
   onEdit: (item: AgendaItem) => void;
   onToggle: (item: AgendaItem) => void;
+  onDelete: (item: AgendaItem) => void;
+  openMenuId: string;
+  onMenuToggle: (id: string) => void;
 }) {
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -816,7 +979,7 @@ function CalendarPanel({
 
       <aside className="hidden rounded-xl border border-[#F0EBE6] bg-white p-4 shadow-[0_16px_36px_rgba(31,41,55,0.06)] xl:block">
         {selectedDay ? (
-          <DayItemsPanel selectedDay={selectedDay} items={selectedItems} today={today} onCreate={onCreate} onEdit={onEdit} onToggle={onToggle} />
+          <DayItemsPanel selectedDay={selectedDay} items={selectedItems} today={today} openMenuId={openMenuId} onMenuToggle={onMenuToggle} onCreate={onCreate} onEdit={onEdit} onToggle={onToggle} onDelete={onDelete} />
         ) : (
           <CalendarSidePanel weddingDate={weddingDate} weddingCountdown={weddingCountdown} />
         )}
@@ -824,7 +987,7 @@ function CalendarPanel({
 
       <section className="rounded-xl border border-[#F0EBE6] bg-white p-4 shadow-[0_-8px_26px_rgba(31,41,55,0.06)] xl:hidden">
         {selectedDay ? (
-          <DayItemsPanel selectedDay={selectedDay} items={selectedItems} today={today} onCreate={onCreate} onEdit={onEdit} onToggle={onToggle} />
+          <DayItemsPanel selectedDay={selectedDay} items={selectedItems} today={today} openMenuId={openMenuId} onMenuToggle={onMenuToggle} onCreate={onCreate} onEdit={onEdit} onToggle={onToggle} onDelete={onDelete} />
         ) : (
           <CalendarSidePanel weddingDate={weddingDate} weddingCountdown={weddingCountdown} />
         )}
@@ -834,7 +997,27 @@ function CalendarPanel({
 }
 
 /* ─── Day Items Panel ─── */
-function DayItemsPanel({ selectedDay, items, today, onCreate, onEdit, onToggle }: { selectedDay: string; items: AgendaItem[]; today: string; onCreate: (date: string, type?: AgendaType) => void; onEdit: (item: AgendaItem) => void; onToggle: (item: AgendaItem) => void }) {
+function DayItemsPanel({
+  selectedDay,
+  items,
+  today,
+  openMenuId,
+  onMenuToggle,
+  onCreate,
+  onEdit,
+  onToggle,
+  onDelete
+}: {
+  selectedDay: string;
+  items: AgendaItem[];
+  today: string;
+  openMenuId: string;
+  onMenuToggle: (id: string) => void;
+  onCreate: (date: string, type?: AgendaType) => void;
+  onEdit: (item: AgendaItem) => void;
+  onToggle: (item: AgendaItem) => void;
+  onDelete: (item: AgendaItem) => void;
+}) {
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-3">
@@ -846,7 +1029,16 @@ function DayItemsPanel({ selectedDay, items, today, onCreate, onEdit, onToggle }
       </div>
       <div className="space-y-2">
         {items.length ? items.map((item) => (
-          <AgendaCard key={item.id} item={item} today={today} onEdit={onEdit} onToggle={onToggle} />
+          <AgendaCard
+            key={item.id}
+            item={item}
+            today={today}
+            menuOpen={openMenuId === item.id}
+            onMenuToggle={onMenuToggle}
+            onEdit={onEdit}
+            onToggle={onToggle}
+            onDelete={onDelete}
+          />
         )) : (
           <div className="rounded-xl border border-dashed border-[#F0EBE6] bg-[#FAFAFA] px-4 py-8 text-center">
             <Clock3 className="mx-auto text-[#A1A1AA]" size={28} />
@@ -892,11 +1084,11 @@ function CalendarSidePanel({
 /* ─── Empty State ─── */
 function EmptyAgenda({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="rounded-xl border border-dashed border-[#F0EBE6] bg-white px-4 py-16 text-center">
+    <div className="rounded-2xl border border-dashed border-[#F0EBE6] bg-white px-4 py-12 text-center shadow-soft sm:py-16">
       <CalendarDays className="mx-auto text-[#E11D48]" size={36} />
-      <h3 className="mt-3 text-base font-bold text-[#1F2937]">Nenhum item encontrado</h3>
-      <p className="mx-auto mt-1 max-w-sm text-sm text-[#71717A]">Crie tarefas, eventos, vencimentos ou lembretes diretamente na Agenda.</p>
-      <button type="button" className="btn-primary mt-5 bg-[#E11D48] hover:bg-[#BE123C]" onClick={onCreate}><Plus size={16} /> Criar item</button>
+      <h3 className="mt-3 text-base font-bold text-[#1F2937]">Nenhum item na agenda</h3>
+      <p className="mx-auto mt-1 max-w-sm text-sm text-[#71717A]">Adicione eventos, tarefas ou vencimentos para organizar o planejamento.</p>
+      <button type="button" className="btn-primary mt-5 bg-[#E11D48] hover:bg-[#BE123C]" onClick={onCreate}><Plus size={16} /> Adicionar primeiro item</button>
     </div>
   );
 }

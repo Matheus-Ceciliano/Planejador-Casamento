@@ -48,6 +48,7 @@ export type Guest = {
   full_name: string;
   phone: string | null;
   group_id: string | null;
+  origin_group?: string | null;
   guest_type: string;
   invite_status: string;
   companions: number;
