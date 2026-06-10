@@ -5,6 +5,7 @@ import EmptyState from '../components/EmptyState';
 import FormInput from '../components/FormInput';
 import FormSelect from '../components/FormSelect';
 import FormTextarea from '../components/FormTextarea';
+import ConfirmDialog from '../components/ConfirmDialog';
 import Modal from '../components/Modal';
 import { useWeddingTable } from '../hooks/useWeddingTable';
 import { Guest, GuestGroup } from '../types';
@@ -80,6 +81,11 @@ export default function Families() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [actionOpen, setActionOpen] = useState('');
   const [form, setForm] = useState(blank);
+  const [confirming, setConfirming] = useState<Guest | null>(null);
+  const [refusing, setRefusing] = useState<Guest | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<GuestGroup | null>(null);
+  const [statusSubmitting, setStatusSubmitting] = useState(false);
+  const [toast, setToast] = useState('');
 
   const membersByGroup = useMemo(
     () => new Map(groups.rows.map((group) => [group.id, guests.rows.filter((guest) => guest.group_id === group.id)])),
@@ -108,6 +114,81 @@ export default function Families() {
     });
   }
 
+  function familyNameForGuest(guest: Guest | null) {
+    if (!guest?.group_id) return null;
+    return groups.rows.find((group) => group.id === guest.group_id)?.name ?? null;
+  }
+
+  function requestConfirmGuest(guest: Guest) {
+    if (guest.invite_status === 'confirmado') {
+      setToast('Este convidado já está confirmado.');
+      return;
+    }
+    setConfirming(guest);
+  }
+
+  function requestRefuseGuest(guest: Guest) {
+    if (guest.invite_status === 'recusado') {
+      setToast('Este convidado já está recusado.');
+      return;
+    }
+    setRefusing(guest);
+  }
+
+  async function confirmGuestPresence() {
+    if (!confirming || statusSubmitting) return;
+    const current = guests.rows.find((guest) => guest.id === confirming.id) ?? confirming;
+    if (current.invite_status === 'confirmado') {
+      setConfirming(null);
+      setToast('Este convidado já está confirmado.');
+      return;
+    }
+    setStatusSubmitting(true);
+    try {
+      await guests.update(confirming.id, { invite_status: 'confirmado' });
+      setConfirming(null);
+      setToast('Presença confirmada com sucesso.');
+    } finally {
+      setStatusSubmitting(false);
+    }
+  }
+
+  async function refuseGuestPresence() {
+    if (!refusing || statusSubmitting) return;
+    const current = guests.rows.find((guest) => guest.id === refusing.id) ?? refusing;
+    if (current.invite_status === 'recusado') {
+      setRefusing(null);
+      setToast('Este convidado já está recusado.');
+      return;
+    }
+    setStatusSubmitting(true);
+    try {
+      await guests.update(refusing.id, { invite_status: 'recusado' });
+      setRefusing(null);
+      setToast('Presença marcada como recusada.');
+    } finally {
+      setStatusSubmitting(false);
+    }
+  }
+
+  async function confirmDeleteGroup() {
+    if (!deletingGroup || statusSubmitting) return;
+    setStatusSubmitting(true);
+    try {
+      await groups.remove(deletingGroup.id);
+      setDeletingGroup(null);
+      setToast('Família excluída com sucesso.');
+    } finally {
+      setStatusSubmitting(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(''), 3200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
   useEffect(() => {
     function closeActions() {
       setActionOpen('');
@@ -119,6 +200,11 @@ export default function Families() {
 
   return (
     <div className="max-w-full space-y-5 overflow-x-hidden">
+      {toast && (
+        <div className="fixed left-4 right-4 top-[calc(env(safe-area-inset-top)+1rem)] z-[10020] mx-auto max-w-md rounded-2xl border border-[#F0EBE6] bg-white px-4 py-3 text-sm font-semibold text-[#2D2A26] shadow-float animate-slide-up sm:left-auto sm:right-6 sm:top-6">
+          {toast}
+        </div>
+      )}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           <h1 className="page-title">Famílias e grupos</h1>
@@ -170,7 +256,7 @@ export default function Families() {
                       </button>
                       {actionOpen === group.id && (
                         <div className="absolute right-3 top-14 z-50 w-48 overflow-hidden rounded-2xl border border-[#F0EBE6] bg-white shadow-float animate-scale-in">
-                          <button type="button" className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-[#C46A6A] hover:bg-[#FEF2F2]" onClick={() => groups.remove(group.id)}>
+                          <button type="button" className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-semibold text-[#C46A6A] hover:bg-[#FEF2F2]" onClick={() => { setActionOpen(''); setDeletingGroup(group); }}>
                             <Trash2 size={15} /> Excluir família
                           </button>
                         </div>
@@ -232,10 +318,10 @@ export default function Families() {
                                   </div>
                                 </div>
                                 <div className="flex shrink-0 flex-wrap gap-2 pl-11 sm:pl-0">
-                                  <button type="button" className="btn-secondary min-h-8 px-2 text-xs text-[#5F8D6D]" onClick={() => guests.update(guest.id, { invite_status: 'confirmado' })}>
+                                  <button type="button" disabled={guest.invite_status === 'confirmado'} className="btn-secondary min-h-8 px-2 text-xs text-[#5F8D6D]" onClick={() => requestConfirmGuest(guest)}>
                                     <CheckCircle2 size={14} /> Confirmar
                                   </button>
-                                  <button type="button" className="btn-secondary min-h-8 px-2 text-xs text-[#C46A6A]" onClick={() => guests.update(guest.id, { invite_status: 'recusado' })}>
+                                  <button type="button" disabled={guest.invite_status === 'recusado'} className="btn-secondary min-h-8 px-2 text-xs text-[#C46A6A]" onClick={() => requestRefuseGuest(guest)}>
                                     <XCircle size={14} /> Recusar
                                   </button>
                                   <button type="button" className="btn-secondary min-h-8 px-2 text-xs" onClick={() => navigate('/convidados')}>
@@ -272,6 +358,57 @@ export default function Families() {
           <button className="btn-primary">Salvar</button>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(confirming)}
+        title="Confirmar presença?"
+        description="Tem certeza que deseja confirmar a presença deste convidado?"
+        confirmLabel="Sim, confirmar presença"
+        variant="success"
+        loading={statusSubmitting}
+        details={confirming ? [
+          { label: 'Convidado', value: confirming.full_name },
+          { label: 'Família', value: familyNameForGuest(confirming) || 'Individual' },
+          { label: 'Tipo', value: confirming.guest_type },
+          { label: 'Origem', value: confirming.origin_group || 'Não informado' },
+          { label: 'Status atual', value: confirming.invite_status }
+        ] : undefined}
+        onCancel={() => setConfirming(null)}
+        onConfirm={confirmGuestPresence}
+      />
+
+      <ConfirmDialog
+        open={Boolean(refusing)}
+        title="Recusar presença?"
+        description="Tem certeza que deseja marcar este convidado como recusado?"
+        confirmLabel="Sim, recusar presença"
+        variant="danger"
+        loading={statusSubmitting}
+        details={refusing ? [
+          { label: 'Convidado', value: refusing.full_name },
+          { label: 'Família', value: familyNameForGuest(refusing) || 'Individual' },
+          { label: 'Tipo', value: refusing.guest_type },
+          { label: 'Origem', value: refusing.origin_group || 'Não informado' },
+          { label: 'Status atual', value: refusing.invite_status }
+        ] : undefined}
+        onCancel={() => setRefusing(null)}
+        onConfirm={refuseGuestPresence}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deletingGroup)}
+        title="Excluir família?"
+        description="Essa ação pode remover informações importantes. Tem certeza que deseja continuar?"
+        confirmLabel="Sim, excluir"
+        variant="danger"
+        loading={statusSubmitting}
+        details={deletingGroup ? [
+          { label: 'Família', value: deletingGroup.name },
+          { label: 'Membros', value: membersByGroup.get(deletingGroup.id)?.length ?? 0 }
+        ] : undefined}
+        onCancel={() => setDeletingGroup(null)}
+        onConfirm={confirmDeleteGroup}
+      />
     </div>
   );
 }

@@ -20,13 +20,15 @@ import {
 } from 'lucide-react';
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import ConfirmDialog from '../components/ConfirmDialog';
 import FormInput from '../components/FormInput';
 import FormSelect from '../components/FormSelect';
 import FormTextarea from '../components/FormTextarea';
 import Modal from '../components/Modal';
+import { useAuth } from '../hooks/useAuth';
 import { useWedding } from '../hooks/useWedding';
 import { useWeddingTable } from '../hooks/useWeddingTable';
-import { BudgetCategory, BudgetItem, Task, Vendor } from '../types';
+import { BudgetCategory, BudgetItem, PaymentRecord, Task, Vendor } from '../types';
 import { budgetCategories } from '../utils/constants';
 import { formatMoney } from '../utils/format';
 
@@ -231,10 +233,20 @@ function formForDate(date: string, type: AgendaType = 'task'): AgendaForm {
   return { ...blankForm, type, date, category: type === 'payment' ? 'Outros' : type === 'event' ? 'Evento' : type === 'reminder' ? 'Lembrete' : 'Documentação', status: statusesByType[type][0] };
 }
 
+function nextApNumber(records: PaymentRecord[]) {
+  const next = records.reduce((max, record) => {
+    const match = record.ap_number?.match(/^AP-(\d+)$/i);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0) + 1;
+  return `AP-${String(next).padStart(4, '0')}`;
+}
+
 export default function Agenda() {
+  const { user } = useAuth();
   const { wedding } = useWedding();
   const tasks = useWeddingTable<Task>('tasks', 'due_date');
   const budgetItems = useWeddingTable<BudgetItem>('budget_items', 'due_date');
+  const paymentRecords = useWeddingTable<PaymentRecord>('payment_history', 'created_at');
   const budgetCategoryRows = useWeddingTable<BudgetCategory>('budget_categories', 'sort_order');
   const vendors = useWeddingTable<Vendor>('vendors', 'name');
   const timeline = useWeddingTable<TimelineItem>('timeline_items', 'time');
@@ -255,6 +267,11 @@ export default function Agenda() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [openMenuId, setOpenMenuId] = useState('');
+  const [paymentConfirmItem, setPaymentConfirmItem] = useState<AgendaItem | null>(null);
+  const [statusConfirmItem, setStatusConfirmItem] = useState<AgendaItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<AgendaItem | null>(null);
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     function closeMenu() {
@@ -477,20 +494,104 @@ export default function Agenda() {
     }
   }
 
-  async function toggleDone(item: AgendaItem) {
+  function toggleDone(item: AgendaItem) {
     setOpenMenuId('');
-    const status = nextStatus(item.type, item.status);
-    if (item.source === 'task') await tasks.update(item.sourceId, { status });
-    if (item.source === 'budget') await budgetItems.update(item.sourceId, { payment_status: status, payment_date: status === 'pago' ? today : null });
+    setStatusConfirmItem(item);
   }
 
-  async function removeItem(item: AgendaItem) {
+  async function confirmStatusChange() {
+    if (!statusConfirmItem) return;
+    const item = statusConfirmItem;
+    const status = nextStatus(item.type, item.status);
+    if (item.source === 'budget' && status === 'pago') {
+      setStatusConfirmItem(null);
+      setPaymentConfirmItem(item);
+      return;
+    }
+    if (item.source === 'task') await tasks.update(item.sourceId, { status });
+    if (item.source === 'budget') await budgetItems.update(item.sourceId, { payment_status: status, payment_date: status === 'pago' ? today : null });
+    setStatusConfirmItem(null);
+    setSuccessMessage(status === 'pago' ? 'Vencimento marcado como pago.' : 'Status atualizado com sucesso.');
+    window.setTimeout(() => setSuccessMessage(''), 3000);
+  }
+
+  async function confirmAgendaPayment() {
+    if (!paymentConfirmItem || paymentSubmitting) return;
+
+    const payment = budgetItems.rows.find((item) => item.id === paymentConfirmItem.sourceId);
+    if (!payment || payment.payment_status === 'pago') {
+      setPaymentConfirmItem(null);
+      return;
+    }
+
+    setPaymentSubmitting(true);
+    try {
+      const pendingAmount = Math.max(0, Number(payment.contracted_value ?? 0) - Number(payment.paid_value ?? 0));
+      if (pendingAmount <= 0) {
+        setPaymentConfirmItem(null);
+        return;
+      }
+      const nextPaid = Number(payment.paid_value ?? 0) + pendingAmount;
+      const paymentRecord = await paymentRecords.create({
+        ap_number: nextApNumber(paymentRecords.rows),
+        vendor_id: payment.vendor_id,
+        budget_item_id: payment.id,
+        payment_id: null,
+        amount: pendingAmount,
+        payment_method: payment.payment_method,
+        payment_date: today,
+        confirmed_at: new Date().toISOString(),
+        confirmed_by: user?.id ?? null,
+        notes: payment.notes,
+        receipt_file_url: payment.receipt_url,
+        status: 'confirmed',
+        canceled_at: null,
+        canceled_by: null,
+        cancel_reason: null
+      } as Partial<PaymentRecord>);
+      await budgetItems.update(paymentConfirmItem.sourceId, {
+        paid_value: nextPaid,
+        payment_status: 'pago',
+        payment_date: today
+      });
+      if (payment.vendor_id) {
+        const vendor = vendors.rows.find((row) => row.id === payment.vendor_id);
+        await vendors.update(payment.vendor_id, {
+          paid_value: Number(vendor?.paid_value ?? 0) + pendingAmount,
+          due_date: payment.due_date
+        } as Partial<Vendor>);
+      }
+      setPaymentConfirmItem(null);
+      setSuccessMessage(`Pagamento confirmado com sucesso. AP gerada: ${paymentRecord.ap_number}`);
+      window.setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String((error as { message?: string })?.message ?? '');
+      if (message.includes("Could not find the table 'public.payment_history'")) {
+        setPaymentConfirmItem(null);
+        setSuccessMessage('A tabela payment_history ainda não existe no Supabase. Aplique o SQL supabase/payment-history.sql e tente novamente.');
+        window.setTimeout(() => setSuccessMessage(''), 5000);
+        return;
+      }
+      throw error;
+    } finally {
+      setPaymentSubmitting(false);
+    }
+  }
+
+  function removeItem(item: AgendaItem) {
     setOpenMenuId('');
     if (!['task', 'budget'].includes(item.source)) return;
-    const confirmed = window.confirm(`Excluir "${item.title}" da agenda?`);
-    if (!confirmed) return;
+    setDeletingItem(item);
+  }
+
+  async function confirmRemoveItem() {
+    if (!deletingItem) return;
+    const item = deletingItem;
     if (item.source === 'task') await tasks.remove(item.sourceId);
     if (item.source === 'budget') await budgetItems.remove(item.sourceId);
+    setDeletingItem(null);
+    setSuccessMessage('Item excluído com sucesso.');
+    window.setTimeout(() => setSuccessMessage(''), 3000);
   }
 
   function moveMonth(offset: number) {
@@ -611,6 +712,12 @@ export default function Agenda() {
         <Plus size={20} />
       </button>
 
+      {successMessage && (
+        <div className="fixed left-4 right-4 top-4 z-50 mx-auto max-w-sm rounded-2xl border border-green-100 bg-white px-4 py-3 text-sm font-semibold text-[#166534] shadow-[0_18px_42px_rgba(22,101,52,0.16)]">
+          {successMessage}
+        </div>
+      )}
+
       {/* Modal */}
       <Modal open={modalOpen} title={editingItem ? 'Editar item da agenda' : 'Novo item da agenda'} onClose={() => setModalOpen(false)}>
         <form onSubmit={saveItem} className="space-y-4">
@@ -682,6 +789,53 @@ export default function Agenda() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(paymentConfirmItem)}
+        title="Confirmar pagamento?"
+        description="Tem certeza que deseja confirmar este pagamento? Essa a??o ser? registrada no hist?rico financeiro."
+        confirmLabel="Sim, confirmar pagamento"
+        variant="success"
+        loading={paymentSubmitting}
+        details={paymentConfirmItem ? [
+          { label: 'Item', value: paymentConfirmItem.title },
+          ...(paymentConfirmItem.amount !== undefined ? [{ label: 'Valor', value: formatMoney(paymentConfirmItem.amount) }] : []),
+          { label: 'Vencimento', value: numericDateLabel(paymentConfirmItem.date) }
+        ] : undefined}
+        onCancel={() => setPaymentConfirmItem(null)}
+        onConfirm={confirmAgendaPayment}
+      />
+
+      <ConfirmDialog
+        open={Boolean(statusConfirmItem)}
+        title={statusConfirmItem && ['pago', 'conclu?da', 'concluida', 'realizado'].includes(nextStatus(statusConfirmItem.type, statusConfirmItem.status)) ? 'Confirmar altera??o?' : 'Alterar status?'}
+        description="Essa a??o altera o status deste item. Tem certeza que deseja continuar?"
+        confirmLabel="Sim, alterar"
+        variant={statusConfirmItem && ['pago', 'conclu?da', 'concluida', 'realizado'].includes(nextStatus(statusConfirmItem.type, statusConfirmItem.status)) ? 'success' : 'warning'}
+        details={statusConfirmItem ? [
+          { label: 'Item', value: statusConfirmItem.title },
+          { label: 'Status atual', value: statusConfirmItem.status },
+          { label: 'Novo status', value: nextStatus(statusConfirmItem.type, statusConfirmItem.status) },
+          { label: 'Data', value: numericDateLabel(statusConfirmItem.date) }
+        ] : undefined}
+        onCancel={() => setStatusConfirmItem(null)}
+        onConfirm={confirmStatusChange}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deletingItem)}
+        title="Excluir item?"
+        description="Essa a??o pode remover informa??es importantes. Tem certeza que deseja continuar?"
+        confirmLabel="Sim, excluir"
+        variant="danger"
+        details={deletingItem ? [
+          { label: 'Item', value: deletingItem.title },
+          { label: 'Tipo', value: typeLabels[deletingItem.type] },
+          { label: 'Data', value: numericDateLabel(deletingItem.date) }
+        ] : undefined}
+        onCancel={() => setDeletingItem(null)}
+        onConfirm={confirmRemoveItem}
+      />
     </div>
   );
 }

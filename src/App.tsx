@@ -15,6 +15,7 @@ import Guests from './pages/Guests';
 import InviteAccept from './pages/InviteAccept';
 import Login from './pages/Login';
 import Members from './pages/Members';
+import PaymentHistory from './pages/PaymentHistory';
 import Register from './pages/Register';
 import Settings from './pages/Settings';
 import Timeline from './pages/Timeline';
@@ -51,6 +52,7 @@ function RoutesContent() {
       <Route path="/orcamento" element={<Budget />} />
       <Route path="/orcamento/analise" element={<BudgetAnalysis />} />
       <Route path="/orcamento/vencimentos" element={<BudgetDueDates />} />
+      <Route path="/historico-pagamentos" element={<PaymentHistory />} />
       <Route path="/orcamento/:category" element={<Budget />} />
       <Route path="/categorias" element={<Navigate to="/orcamento" replace />} />
       <Route path="/fornecedores" element={<Vendors />} />

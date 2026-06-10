@@ -117,6 +117,28 @@ export type PaymentInstallment = {
   updated_at?: string;
 };
 
+export type PaymentRecord = {
+  id: string;
+  wedding_id: string;
+  ap_number: string;
+  vendor_id: string | null;
+  budget_item_id: string | null;
+  payment_id: string | null;
+  amount: number;
+  payment_method: string | null;
+  payment_date: string | null;
+  confirmed_at: string | null;
+  confirmed_by: string | null;
+  notes: string | null;
+  receipt_file_url: string | null;
+  status: 'confirmed' | 'canceled';
+  canceled_at: string | null;
+  canceled_by: string | null;
+  cancel_reason: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
 export type Vendor = {
   id: string;
   wedding_id: string;

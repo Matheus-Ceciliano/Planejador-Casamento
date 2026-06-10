@@ -23,9 +23,10 @@ import FormSelect from '../components/FormSelect';
 import FormTextarea from '../components/FormTextarea';
 import Modal from '../components/Modal';
 import ResponsiveFilters from '../components/ResponsiveFilters';
+import { useAuth } from '../hooks/useAuth';
 import { useWedding } from '../hooks/useWedding';
 import { useWeddingTable } from '../hooks/useWeddingTable';
-import { BudgetCategory, BudgetItem, Vendor } from '../types';
+import { BudgetCategory, BudgetItem, PaymentRecord, Vendor } from '../types';
 import { budgetCategories, categorySlugMap } from '../utils/constants';
 import { getPaymentStatus, getPendingValue, isBudgetOverdue, isContractedVendor, toPrimaryCategory } from '../utils/finance';
 import { formatDate, formatMoney } from '../utils/format';
@@ -98,6 +99,22 @@ function paymentHistory(notes?: string | null) {
     .map((line) => line.trim())
     .filter((line) => line.startsWith(paymentHistoryPrefix))
     .map((line) => line.slice(paymentHistoryPrefix.length));
+}
+
+function paymentRecordStatusLabel(status: string) {
+  return status === 'canceled' ? 'Cancelado' : 'Confirmado';
+}
+
+function paymentRecordTone(status: string) {
+  return status === 'canceled' ? 'badge-red' : 'badge-green';
+}
+
+function nextApNumber(records: PaymentRecord[]) {
+  const next = records.reduce((max, record) => {
+    const match = record.ap_number?.match(/^AP-(\d+)$/i);
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 0) + 1;
+  return `AP-${String(next).padStart(4, '0')}`;
 }
 
 function dueBucket(item: BudgetItem) {
@@ -189,10 +206,12 @@ function BudgetProgress({ committed, planned, pct }: { committed: number; planne
 export default function Budget() {
   const navigate = useNavigate();
   const params = useParams();
+  const { user } = useAuth();
   const { wedding } = useWedding();
   const items = useWeddingTable<BudgetItem>('budget_items', 'due_date');
   const vendors = useWeddingTable<Vendor>('vendors', 'name');
   const categories = useWeddingTable<BudgetCategory>('budget_categories', 'sort_order');
+  const paymentRecords = useWeddingTable<PaymentRecord>('payment_history', 'created_at');
   const initial = params.category ? categorySlugMap[params.category] ?? 'Outros' : 'Todos';
   const [active, setActive] = useState(initial);
   const [open, setOpen] = useState(false);
@@ -201,15 +220,20 @@ export default function Budget() {
   const [detailNotes, setDetailNotes] = useState('');
   const [deleting, setDeleting] = useState<BudgetItem | null>(null);
   const [paying, setPaying] = useState<BudgetItem | null>(null);
+  const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
+  const [paymentSubmitting, setPaymentSubmitting] = useState(false);
   const [form, setForm] = useState({ ...blank, category: initial === 'Todos' ? 'Buffet' : initial });
   const [paymentForm, setPaymentForm] = useState(paymentBlank);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [dueFilter, setDueFilter] = useState('');
   const [message, setMessage] = useState('');
+  const [selectedPaymentRecord, setSelectedPaymentRecord] = useState<PaymentRecord | null>(null);
+  const [cancelingPaymentRecord, setCancelingPaymentRecord] = useState<PaymentRecord | null>(null);
   const syncInFlight = useRef(new Set<string>());
 
   const vendorById = useMemo(() => new Map(vendors.rows.map((vendor) => [vendor.id, vendor])), [vendors.rows]);
+  const itemById = useMemo(() => new Map(items.rows.map((item) => [item.id, item])), [items.rows]);
   const selectedDetailItem = detailItem ? items.rows.find((item) => item.id === detailItem.id) ?? detailItem : null;
   const selectedDetailVendor = selectedDetailItem?.vendor_id ? vendorById.get(selectedDetailItem.vendor_id) : undefined;
 
@@ -369,12 +393,33 @@ export default function Budget() {
     event.preventDefault();
     if (!paying) return;
 
-    const currentPaid = Number(paying.paid_value ?? 0);
     const paymentAmount = Number(paymentForm.amount ?? 0);
     const remaining = getPendingValue(paying.contracted_value, paying.paid_value);
 
     if (paymentAmount <= 0 || paymentAmount > remaining || !paymentForm.payment_date || !paymentForm.payment_method) return;
 
+    setPaymentConfirmOpen(true);
+  }
+
+  async function confirmPayment() {
+    if (!paying || paymentSubmitting) return;
+
+    const currentPaid = Number(paying.paid_value ?? 0);
+    const paymentAmount = Number(paymentForm.amount ?? 0);
+    const remaining = getPendingValue(paying.contracted_value, paying.paid_value);
+
+    if (remaining <= 0) {
+      setMessage('Este pagamento já foi confirmado.');
+      setPaymentConfirmOpen(false);
+      return;
+    }
+
+    if (paymentAmount <= 0 || paymentAmount > remaining || !paymentForm.payment_date || !paymentForm.payment_method) {
+      setPaymentConfirmOpen(false);
+      return;
+    }
+
+    setPaymentSubmitting(true);
     const nextPaid = currentPaid + paymentAmount;
     const historyEntry = buildPaymentHistoryEntry(
       paymentAmount,
@@ -383,23 +428,95 @@ export default function Budget() {
       paymentForm.receipt_url,
       paymentForm.notes
     );
-    await items.update(paying.id, {
-      paid_value: nextPaid,
-      payment_status: getPaymentStatus(paying.contracted_value, nextPaid),
-      payment_date: paymentForm.payment_date,
-      payment_method: paymentForm.payment_method || paying.payment_method,
-      receipt_url: paymentForm.receipt_url || paying.receipt_url,
-      notes: [paying.notes, historyEntry].filter(Boolean).join('\n')
-    } as Partial<BudgetItem>);
-    if (paying.vendor_id) {
-      await vendors.update(paying.vendor_id, { paid_value: nextPaid, due_date: paying.due_date } as Partial<Vendor>);
+    try {
+      const paymentRecord = await paymentRecords.create({
+        ap_number: nextApNumber(paymentRecords.rows),
+        vendor_id: paying.vendor_id,
+        budget_item_id: paying.id,
+        payment_id: null,
+        amount: paymentAmount,
+        payment_method: paymentForm.payment_method || null,
+        payment_date: paymentForm.payment_date || null,
+        confirmed_at: new Date().toISOString(),
+        confirmed_by: user?.id ?? null,
+        notes: paymentForm.notes || null,
+        receipt_file_url: paymentForm.receipt_url || paying.receipt_url || null,
+        status: 'confirmed',
+        canceled_at: null,
+        canceled_by: null,
+        cancel_reason: null
+      } as Partial<PaymentRecord>);
+
+      await items.update(paying.id, {
+        paid_value: nextPaid,
+        payment_status: getPaymentStatus(paying.contracted_value, nextPaid),
+        payment_date: paymentForm.payment_date,
+        payment_method: paymentForm.payment_method || paying.payment_method,
+        receipt_url: paymentForm.receipt_url || paying.receipt_url,
+        notes: [paying.notes, historyEntry].filter(Boolean).join('\n')
+      } as Partial<BudgetItem>);
+      if (paying.vendor_id) {
+        await vendors.update(paying.vendor_id, { paid_value: nextPaid, due_date: paying.due_date } as Partial<Vendor>);
+      }
+      setMessage(`Pagamento confirmado com sucesso. AP gerada: ${paymentRecord.ap_number}`);
+      setPaymentConfirmOpen(false);
+      setPaying(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String((error as { message?: string })?.message ?? '');
+      if (message.includes("Could not find the table 'public.payment_history'")) {
+        setMessage('A tabela payment_history ainda não existe no Supabase. Aplique o SQL supabase/payment-history.sql e tente confirmar novamente.');
+        setPaymentConfirmOpen(false);
+        return;
+      }
+      throw error;
+    } finally {
+      setPaymentSubmitting(false);
     }
-    setMessage(`Pagamento registrado para ${paying.name}.`);
-    setPaying(null);
+  }
+
+  async function cancelPaymentRecord() {
+    if (!cancelingPaymentRecord || paymentSubmitting || cancelingPaymentRecord.status !== 'confirmed') return;
+
+    const item = cancelingPaymentRecord.budget_item_id ? itemById.get(cancelingPaymentRecord.budget_item_id) : undefined;
+    if (!item) {
+      setMessage('Não foi possível localizar o item financeiro desta AP.');
+      setCancelingPaymentRecord(null);
+      return;
+    }
+
+    setPaymentSubmitting(true);
+    try {
+      const amount = Number(cancelingPaymentRecord.amount ?? 0);
+      const nextPaid = Math.max(0, Number(item.paid_value ?? 0) - amount);
+      await items.update(item.id, {
+        paid_value: nextPaid,
+        payment_status: getPaymentStatus(item.contracted_value, nextPaid)
+      } as Partial<BudgetItem>);
+
+      if (item.vendor_id) {
+        const vendor = vendorById.get(item.vendor_id);
+        await vendors.update(item.vendor_id, {
+          paid_value: Math.max(0, Number(vendor?.paid_value ?? 0) - amount),
+          due_date: item.due_date
+        } as Partial<Vendor>);
+      }
+
+      await paymentRecords.update(cancelingPaymentRecord.id, {
+        status: 'canceled',
+        canceled_at: new Date().toISOString(),
+        canceled_by: user?.id ?? null
+      } as Partial<PaymentRecord>);
+      setMessage('Pagamento cancelado. O saldo foi recalculado.');
+      setCancelingPaymentRecord(null);
+      setSelectedPaymentRecord(null);
+    } finally {
+      setPaymentSubmitting(false);
+    }
   }
 
   function startPayment(item: BudgetItem) {
     setPaying(item);
+    setPaymentConfirmOpen(false);
     setPaymentForm({
       ...paymentBlank,
       amount: getPendingValue(item.contracted_value, item.paid_value),
@@ -592,7 +709,23 @@ export default function Budget() {
 
             <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
               <h3 className="text-sm font-bold text-w-text">Pagamentos</h3>
-              {paymentHistory(selectedDetailItem.notes).length > 0 ? (
+              {paymentRecords.rows.filter((record) => record.budget_item_id === selectedDetailItem.id).length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {paymentRecords.rows.filter((record) => record.budget_item_id === selectedDetailItem.id).map((record) => (
+                    <button
+                      key={record.id}
+                      type="button"
+                      className="grid w-full gap-2 rounded-xl bg-w-surface p-3 text-left text-sm sm:grid-cols-[auto_1fr_auto_auto] sm:items-center"
+                      onClick={() => setSelectedPaymentRecord(record)}
+                    >
+                      <span className="font-bold text-w-rose">{record.ap_number}</span>
+                      <span className="font-semibold text-w-text">{formatMoney(record.amount)} · {record.payment_method || '-'}</span>
+                      <span className="font-semibold text-w-muted">{formatDate(record.payment_date)}</span>
+                      <span className={paymentRecordTone(record.status)}>{paymentRecordStatusLabel(record.status)}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : paymentHistory(selectedDetailItem.notes).length > 0 ? (
                 <div className="mt-3 space-y-2">
                   {paymentHistory(selectedDetailItem.notes).map((entry, index) => (
                     <div key={`${entry}-${index}`} className="rounded-xl bg-w-surface p-3 text-sm font-semibold text-w-text">
@@ -675,7 +808,14 @@ export default function Budget() {
         </form>
       </Modal>
 
-      <Modal open={Boolean(paying)} title="Registrar pagamento" onClose={() => setPaying(null)}>
+      <Modal
+        open={Boolean(paying)}
+        title="Registrar pagamento"
+        onClose={() => {
+          setPaymentConfirmOpen(false);
+          setPaying(null);
+        }}
+      >
         {paying && (
           (() => {
             const vendorName = paying.vendor_id ? vendorById.get(paying.vendor_id)?.name ?? paying.name : paying.name;
@@ -829,9 +969,99 @@ export default function Budget() {
       </Modal>
 
       <ConfirmDialog
+        open={paymentConfirmOpen}
+        title="Confirmar pagamento?"
+        description="Tem certeza que deseja confirmar este pagamento? Essa a??o ser? registrada no hist?rico financeiro."
+        confirmLabel="Sim, confirmar pagamento"
+        variant="success"
+        loading={paymentSubmitting}
+        details={paying ? [
+          { label: 'Fornecedor', value: paying.vendor_id ? vendorById.get(paying.vendor_id)?.name ?? paying.name : paying.name },
+          { label: 'Valor', value: formatMoney(Number(paymentForm.amount ?? 0)) },
+          { label: 'Forma', value: paymentForm.payment_method || '-' },
+          { label: 'Vencimento', value: paying.due_date ? formatDate(paying.due_date) : '-' }
+        ] : undefined}
+        onCancel={() => setPaymentConfirmOpen(false)}
+        onConfirm={confirmPayment}
+      />
+
+      <Modal open={Boolean(selectedPaymentRecord)} title="Detalhes do pagamento" onClose={() => setSelectedPaymentRecord(null)}>
+        {selectedPaymentRecord && (
+          (() => {
+            const vendor = selectedPaymentRecord.vendor_id ? vendorById.get(selectedPaymentRecord.vendor_id) : undefined;
+            const item = selectedPaymentRecord.budget_item_id ? itemById.get(selectedPaymentRecord.budget_item_id) : undefined;
+            return (
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-w-border bg-w-surface p-4">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-w-faint">Autorização de pagamento</p>
+                    <h3 className="mt-1 text-2xl font-bold text-w-text">{selectedPaymentRecord.ap_number}</h3>
+                  </div>
+                  <span className={paymentRecordTone(selectedPaymentRecord.status)}>{paymentRecordStatusLabel(selectedPaymentRecord.status)}</span>
+                </div>
+
+                <dl className="grid gap-3 rounded-2xl border border-w-border bg-white p-4 text-sm shadow-soft sm:grid-cols-2">
+                  <div><dt className="text-xs font-bold uppercase text-w-faint">Fornecedor</dt><dd className="mt-1 font-semibold text-w-text">{vendor?.name ?? '-'}</dd></div>
+                  <div><dt className="text-xs font-bold uppercase text-w-faint">Item financeiro</dt><dd className="mt-1 font-semibold text-w-text">{item?.name ?? '-'}</dd></div>
+                  <div><dt className="text-xs font-bold uppercase text-w-faint">Valor</dt><dd className="mt-1 font-semibold text-w-text">{formatMoney(selectedPaymentRecord.amount)}</dd></div>
+                  <div><dt className="text-xs font-bold uppercase text-w-faint">Forma</dt><dd className="mt-1 font-semibold text-w-text">{selectedPaymentRecord.payment_method || '-'}</dd></div>
+                  <div><dt className="text-xs font-bold uppercase text-w-faint">Data do pagamento</dt><dd className="mt-1 font-semibold text-w-text">{formatDate(selectedPaymentRecord.payment_date)}</dd></div>
+                  <div><dt className="text-xs font-bold uppercase text-w-faint">Data da confirmação</dt><dd className="mt-1 font-semibold text-w-text">{selectedPaymentRecord.confirmed_at ? formatDate(selectedPaymentRecord.confirmed_at.slice(0, 10)) : '-'}</dd></div>
+                  <div><dt className="text-xs font-bold uppercase text-w-faint">Usuário responsável</dt><dd className="mt-1 font-semibold text-w-text">{selectedPaymentRecord.confirmed_by || '-'}</dd></div>
+                  <div><dt className="text-xs font-bold uppercase text-w-faint">Comprovante</dt><dd className="mt-1 font-semibold text-w-text">{selectedPaymentRecord.receipt_file_url ? 'Anexado' : 'Nenhum comprovante anexado'}</dd></div>
+                  <div className="sm:col-span-2"><dt className="text-xs font-bold uppercase text-w-faint">Observação</dt><dd className="mt-1 font-semibold text-w-text">{selectedPaymentRecord.notes || '-'}</dd></div>
+                </dl>
+
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  {selectedPaymentRecord.status === 'confirmed' && (
+                    <button type="button" className="btn-secondary text-[#DC2626]" onClick={() => setCancelingPaymentRecord(selectedPaymentRecord)}>
+                      Cancelar pagamento
+                    </button>
+                  )}
+                  {selectedPaymentRecord.receipt_file_url ? (
+                    <a className="btn-secondary text-center" href={selectedPaymentRecord.receipt_file_url} target="_blank" rel="noreferrer">
+                      Ver comprovante
+                    </a>
+                  ) : (
+                    <button type="button" className="btn-secondary" onClick={() => setMessage('Nenhum comprovante anexado para esta AP.')}>
+                      Ver comprovante
+                    </button>
+                  )}
+                  <button type="button" className="btn-primary" onClick={() => setSelectedPaymentRecord(null)}>Fechar</button>
+                </div>
+              </div>
+            );
+          })()
+        )}
+      </Modal>
+
+      <ConfirmDialog
+        open={Boolean(cancelingPaymentRecord)}
+        title="Cancelar pagamento?"
+        description="Tem certeza que deseja cancelar este pagamento? O valor ser? removido do total pago e o saldo restante ser? recalculado. A AP continuar? registrada no hist?rico."
+        confirmLabel="Sim, cancelar pagamento"
+        variant="danger"
+        loading={paymentSubmitting}
+        details={cancelingPaymentRecord ? [
+          { label: 'AP', value: cancelingPaymentRecord.ap_number },
+          { label: 'Valor', value: formatMoney(cancelingPaymentRecord.amount) },
+          { label: 'Forma', value: cancelingPaymentRecord.payment_method || '-' }
+        ] : undefined}
+        onCancel={() => setCancelingPaymentRecord(null)}
+        onConfirm={cancelPaymentRecord}
+      />
+
+      <ConfirmDialog
         open={Boolean(deleting)}
-        title="Excluir gasto"
-        message="Tem certeza que deseja excluir este gasto avulso? Essa ação não poderá ser desfeita."
+        title="Excluir item?"
+        description="Essa ação pode remover informações importantes. Tem certeza que deseja continuar?"
+        confirmLabel="Sim, excluir"
+        variant="danger"
+        details={deleting ? [
+          { label: 'Item', value: deleting.name },
+          { label: 'Categoria', value: deleting.category },
+          { label: 'Valor', value: formatMoney(Number(deleting.contracted_value ?? deleting.estimated_value ?? 0)) }
+        ] : undefined}
         onCancel={() => setDeleting(null)}
         onConfirm={async () => {
           if (!deleting) return;

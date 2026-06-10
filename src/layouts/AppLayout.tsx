@@ -1,7 +1,7 @@
 import {
   CalendarDays, ChevronDown, Files, Handshake,
   Heart, Home, LogOut, Menu, MoreHorizontal,
-  Settings, Table2, Users, WalletCards, X,
+  Receipt, Settings, Table2, Users, WalletCards, X,
 } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
@@ -16,6 +16,7 @@ const nav = [
   { to: '/agenda',       label: 'Agenda',          icon: CalendarDays },
   { to: '/convidados',   label: 'Convidados',      icon: Users },
   { to: '/orcamento',    label: 'Orçamento',       icon: WalletCards },
+  { to: '/historico-pagamentos', label: 'Pagamentos', icon: Receipt },
   { to: '/fornecedores', label: 'Fornecedores',    icon: Handshake },
   { to: '/mesas',        label: 'Mesas',           icon: Table2 },
   { to: '/arquivos',     label: 'Arquivos',        icon: Files },
@@ -33,6 +34,7 @@ const mobileNav = [
 const mobileMoreNav = [
   { to: '/membros',       label: 'Membros',       icon: Users },
   { to: '/fornecedores',  label: 'Fornecedores',  icon: Handshake },
+  { to: '/historico-pagamentos', label: 'Pagamentos', icon: Receipt },
   { to: '/mesas',         label: 'Mesas',         icon: Table2 },
   { to: '/arquivos',      label: 'Arquivos',      icon: Files },
   { to: '/configuracoes', label: 'Configurações', icon: Settings },
@@ -83,7 +85,7 @@ function Sidebar({ onNavigate, onSignOut }: { onNavigate?: () => void; onSignOut
                 <span className={`rounded-lg p-1 ${isActive ? 'bg-white/20' : ''}`}>
                   <Icon size={16} />
                 </span>
-                {label}
+                <span className="min-w-0 truncate">{label}</span>
               </>
             )}
           </NavLink>

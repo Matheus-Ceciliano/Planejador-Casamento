@@ -27,7 +27,7 @@ import Modal from '../components/Modal';
 import ResponsiveFilters from '../components/ResponsiveFilters';
 import { useWeddingTable } from '../hooks/useWeddingTable';
 import { supabase } from '../lib/supabase';
-import { BudgetCategory, BudgetItem, FileRecord, Vendor } from '../types';
+import { BudgetCategory, BudgetItem, FileRecord, PaymentRecord, Vendor } from '../types';
 import { vendorCategories } from '../utils/constants';
 import { getPaymentStatus, getPendingValue, isContractedVendor, normalizeVendorStatus, toPrimaryCategory } from '../utils/finance';
 import { formatDate, formatMoney } from '../utils/format';
@@ -103,6 +103,14 @@ function paymentHistory(notes?: string | null) {
     .map((line) => line.trim())
     .filter((line) => line.startsWith(paymentHistoryPrefix))
     .map((line) => line.slice(paymentHistoryPrefix.length));
+}
+
+function paymentRecordStatusLabel(status: string) {
+  return status === 'canceled' ? 'Cancelado' : 'Confirmado';
+}
+
+function paymentRecordTone(status: string) {
+  return status === 'canceled' ? 'badge-red' : 'badge-green';
 }
 
 function CategorySelect({
@@ -257,10 +265,12 @@ export default function Vendors() {
   const budgetItems = useWeddingTable<BudgetItem>('budget_items', 'due_date');
   const customCategories = useWeddingTable<BudgetCategory>('budget_categories', 'sort_order');
   const files = useWeddingTable<FileRecord>('files', 'created_at');
+  const paymentRecords = useWeddingTable<PaymentRecord>('payment_history', 'created_at');
   const [form, setForm] = useState<VendorForm>(blankVendor);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Vendor | null>(null);
   const [deleting, setDeleting] = useState<Vendor | null>(null);
+  const [statusChange, setStatusChange] = useState<{ vendor: Vendor; status: string; forceBudgetCreate: boolean } | null>(null);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -401,7 +411,14 @@ export default function Vendors() {
     setOpen(false);
   }
 
-  async function changeStatus(vendor: Vendor, status: string, forceBudgetCreate = false) {
+  function changeStatus(vendor: Vendor, status: string, forceBudgetCreate = false) {
+    setStatusChange({ vendor, status, forceBudgetCreate });
+  }
+
+  async function confirmStatusChange() {
+    if (!statusChange) return;
+    const { vendor, status, forceBudgetCreate } = statusChange;
+    setStatusChange(null);
     if (normalizeVendorWorkflowStatus(status) === 'contratado' && !isContractedVendor(vendor)) {
       openPaymentModal(vendor);
       return;
@@ -482,6 +499,7 @@ export default function Vendors() {
 
   const selectedBudgetItems = editing ? budgetByVendor.get(editing.id) ?? [] : [];
   const selectedFiles = editing ? files.rows.filter((file) => file.vendor_id === editing.id) : [];
+  const selectedPaymentRecords = editing ? paymentRecords.rows.filter((record) => record.vendor_id === editing.id) : [];
   const statusOptions = [{ label: 'Todos', value: '' }, ...statusColumns.map((item) => ({ label: item.label, value: item.key }))];
   const clearFilters = () => {
     setSearch('');
@@ -681,6 +699,33 @@ export default function Vendors() {
 
             {editing && <Timeline vendor={{ ...editing, ...form } as Vendor} budgetItems={selectedBudgetItems} />}
 
+            {editing && (
+              <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold text-w-text">Histórico de pagamentos</h3>
+                    <p className="mt-0.5 text-xs font-medium text-w-muted">{selectedPaymentRecords.length} APs deste fornecedor.</p>
+                  </div>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {selectedPaymentRecords.length ? selectedPaymentRecords.map((record) => (
+                    <div key={record.id} className="grid gap-2 rounded-xl bg-w-surface p-3 text-sm sm:grid-cols-[auto_1fr_auto_auto] sm:items-center">
+                      <span className="font-bold text-w-rose">{record.ap_number}</span>
+                      <span className="font-semibold text-w-text">{formatMoney(record.amount)} · {record.payment_method || '-'}</span>
+                      <span className={paymentRecordTone(record.status)}>{paymentRecordStatusLabel(record.status)}</span>
+                      {record.receipt_file_url ? (
+                        <a className="btn-secondary px-3 py-1.5 text-xs" href={record.receipt_file_url} target="_blank" rel="noreferrer">Comprovante</a>
+                      ) : (
+                        <span className="text-xs font-semibold text-w-muted">Sem comprovante</span>
+                      )}
+                    </div>
+                  )) : (
+                    <p className="rounded-xl bg-w-surface p-3 text-sm font-semibold text-w-muted">Nenhuma AP registrada para este fornecedor.</p>
+                  )}
+                </div>
+              </section>
+            )}
+
             <details className="rounded-2xl border border-w-border bg-white p-4 shadow-soft" open={Boolean(editing)}>
               <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold">
                 Documentos
@@ -784,8 +829,16 @@ export default function Vendors() {
 
       <ConfirmDialog
         open={Boolean(deleting)}
-        title="Excluir fornecedor"
-        message={`Tem certeza que deseja excluir ${deleting?.name ?? 'este fornecedor'}?`}
+        title="Excluir fornecedor definitivamente?"
+        description="Essa ação pode remover informações importantes. Tem certeza que deseja continuar?"
+        confirmLabel="Sim, excluir"
+        variant="danger"
+        details={deleting ? [
+          { label: 'Fornecedor', value: deleting.name },
+          { label: 'Categoria', value: toPrimaryCategory(deleting.category) },
+          { label: 'Valor', value: formatMoney(Number(deleting.contracted_value ?? 0)) },
+          { label: 'Status atual', value: deleting.status }
+        ] : undefined}
         onCancel={() => setDeleting(null)}
         onConfirm={async () => {
           if (!deleting) return;
@@ -794,6 +847,22 @@ export default function Vendors() {
           setDeleting(null);
           setOpen(false);
         }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(statusChange)}
+        title="Alterar status do fornecedor?"
+        description="Essa ação altera o fluxo do fornecedor e pode afetar o orçamento vinculado."
+        confirmLabel="Sim, alterar"
+        variant={statusChange?.status === 'cancelado' ? 'danger' : statusChange?.status === 'contratado' ? 'success' : 'warning'}
+        details={statusChange ? [
+          { label: 'Fornecedor', value: statusChange.vendor.name },
+          { label: 'Status atual', value: statusChange.vendor.status },
+          { label: 'Novo status', value: normalizeVendorWorkflowStatus(statusChange.status) },
+          { label: 'Categoria', value: toPrimaryCategory(statusChange.vendor.category) }
+        ] : undefined}
+        onCancel={() => setStatusChange(null)}
+        onConfirm={confirmStatusChange}
       />
     </div>
   );

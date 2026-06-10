@@ -247,7 +247,9 @@ export default function Members() {
   const invites = useWeddingTable<WeddingInvite>('wedding_invites', 'created_at');
   const [inviteOpen, setInviteOpen] = useState(false);
   const [permissionOpen, setPermissionOpen] = useState<WeddingMember | null>(null);
+  const [confirmingPermissions, setConfirmingPermissions] = useState(false);
   const [removing, setRemoving] = useState<WeddingMember | null>(null);
+  const [cancelingInvite, setCancelingInvite] = useState<WeddingInvite | null>(null);
   const [copiedId, setCopiedId] = useState('');
   const [message, setMessage] = useState('');
   const [inviteError, setInviteError] = useState('');
@@ -347,8 +349,7 @@ export default function Members() {
     setPermissions({ ...(defaultPermissions[member.role] ?? defaultPermissions.viewer), ...(member.permissions ?? {}) });
   }
 
-  async function savePermissions(event: FormEvent) {
-    event.preventDefault();
+  async function confirmSavePermissions() {
     if (!permissionOpen) return;
     const { error } = await supabase
       .from('wedding_members')
@@ -358,6 +359,7 @@ export default function Members() {
       setMessage(error.message);
       return;
     }
+    setConfirmingPermissions(false);
     setPermissionOpen(null);
     setMessage('Permissoes atualizadas.');
     await members.refresh();
@@ -381,12 +383,14 @@ export default function Members() {
     setMessage('Link copiado para reenviar o convite.');
   }
 
-  async function cancelInvite(invite: WeddingInvite) {
-    const { error } = await supabase.rpc('revoke_wedding_invite', { invite_id: invite.id });
+  async function confirmCancelInvite() {
+    if (!cancelingInvite) return;
+    const { error } = await supabase.rpc('revoke_wedding_invite', { invite_id: cancelingInvite.id });
     if (error) {
       setMessage(error.message);
       return;
     }
+    setCancelingInvite(null);
     setMessage('Convite cancelado.');
     await invites.refresh();
   }
@@ -454,7 +458,7 @@ export default function Members() {
             </div>
             <div className="mt-3 grid gap-2.5">
               {pendingInvites.map((invite) => (
-                <InviteCard key={invite.id} invite={invite} copiedId={copiedId} onCopy={copyInvite} onResend={resendInvite} onCancel={cancelInvite} />
+                <InviteCard key={invite.id} invite={invite} copiedId={copiedId} onCopy={copyInvite} onResend={resendInvite} onCancel={setCancelingInvite} />
               ))}
               {!pendingInvites.length && <p className="rounded-2xl bg-w-surface p-4 text-sm font-semibold text-w-muted">Nenhum convite pendente.</p>}
             </div>
@@ -565,7 +569,7 @@ export default function Members() {
 
       <Modal open={Boolean(permissionOpen)} title="Permissoes do membro" onClose={() => setPermissionOpen(null)}>
         {permissionOpen && (
-          <form className="space-y-4" onSubmit={savePermissions}>
+          <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); setConfirmingPermissions(true); }}>
             <div className="flex items-center gap-3 rounded-3xl bg-w-surface p-4">
               <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-w-rose-lt text-sm font-extrabold text-w-rose">{initials(permissionOpen.name)}</span>
               <div className="min-w-0">
@@ -603,10 +607,48 @@ export default function Members() {
 
       <ConfirmDialog
         open={Boolean(removing)}
-        title="Remover membro"
-        message={`Remover ${removing?.name ?? 'este membro'} do planejamento?`}
+        title="Remover membro?"
+        description="Este membro perderá o acesso ao planejamento. Tem certeza que deseja continuar?"
+        confirmLabel="Sim, remover"
+        variant="danger"
+        details={removing ? [
+          { label: 'Membro', value: removing.name },
+          { label: 'E-mail', value: removing.email },
+          { label: 'Função', value: roleLabels[removing.role] ?? removing.role }
+        ] : undefined}
         onCancel={() => setRemoving(null)}
-        onConfirm={() => removing && removeMember(removing)}
+        onConfirm={() => {
+          if (!removing) return;
+          return removeMember(removing);
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmingPermissions}
+        title="Alterar permissões?"
+        description="Essa mudança pode alterar o que este membro pode visualizar ou editar no planejamento."
+        confirmLabel="Sim, alterar"
+        variant="warning"
+        details={permissionOpen ? [
+          { label: 'Membro', value: permissionOpen.name },
+          { label: 'Função', value: roleLabels[permissionOpen.role] ?? permissionOpen.role }
+        ] : undefined}
+        onCancel={() => setConfirmingPermissions(false)}
+        onConfirm={confirmSavePermissions}
+      />
+
+      <ConfirmDialog
+        open={Boolean(cancelingInvite)}
+        title="Cancelar convite?"
+        description="Este convite deixará de permitir acesso ao planejamento. Tem certeza que deseja continuar?"
+        confirmLabel="Sim, cancelar convite"
+        variant="danger"
+        details={cancelingInvite ? [
+          { label: 'Função', value: roleLabels[cancelingInvite.role] ?? cancelingInvite.role },
+          { label: 'Validade', value: formatDate(cancelingInvite.expires_at) }
+        ] : undefined}
+        onCancel={() => setCancelingInvite(null)}
+        onConfirm={confirmCancelInvite}
       />
     </div>
   );

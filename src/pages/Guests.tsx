@@ -932,6 +932,9 @@ export default function Guests() {
   // Confirm dialogs
   const [deleting, setDeleting] = useState<Guest | null>(null);
   const [refusing, setRefusing] = useState<Guest | null>(null);
+  const [confirming, setConfirming] = useState<Guest | null>(null);
+  const [statusSubmitting, setStatusSubmitting] = useState(false);
+  const [toast, setToast] = useState('');
 
   // Filters
   const [search, setSearch]     = useState('');
@@ -1016,6 +1019,12 @@ export default function Guests() {
     setOpenActionId(null);
   }
 
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(''), 3200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
   const tableSections = useMemo(() => {
     const sections: { key: string; label: string; group?: GuestGroup; rows: Guest[] }[] = grouped.withFamily.map(({ group, members }) => ({
       key: group.id,
@@ -1090,8 +1099,32 @@ export default function Guests() {
     closeModal();
   }
 
-  async function handleConfirm(id: string) {
-    await guests.update(id, { invite_status: 'confirmado' });
+  function handleConfirm(id: string) {
+    const guest = guests.rows.find((row) => row.id === id) ?? null;
+    if (!guest) return;
+    if (guest.invite_status === 'confirmado') {
+      setToast('Este convidado já está confirmado.');
+      return;
+    }
+    setConfirming(guest);
+  }
+
+  async function handleConfirmPresence() {
+    if (!confirming || statusSubmitting) return;
+    const current = guests.rows.find((row) => row.id === confirming.id) ?? confirming;
+    if (current.invite_status === 'confirmado') {
+      setConfirming(null);
+      setToast('Este convidado já está confirmado.');
+      return;
+    }
+    setStatusSubmitting(true);
+    try {
+      await guests.update(confirming.id, { invite_status: 'confirmado' });
+      setConfirming(null);
+      setToast('Presença confirmada com sucesso.');
+    } finally {
+      setStatusSubmitting(false);
+    }
   }
 
   async function handleConfirmDelete() {
@@ -1108,9 +1141,20 @@ export default function Guests() {
   }
 
   async function handleConfirmRefuse() {
-    if (!refusing) return;
-    await guests.update(refusing.id, { invite_status: 'recusado' });
-    setRefusing(null);
+    if (!refusing || statusSubmitting) return;
+    if (refusing.invite_status === 'recusado') {
+      setRefusing(null);
+      setToast('Este convidado já está recusado.');
+      return;
+    }
+    setStatusSubmitting(true);
+    try {
+      await guests.update(refusing.id, { invite_status: 'recusado' });
+      setRefusing(null);
+      setToast('Presença marcada como recusada.');
+    } finally {
+      setStatusSubmitting(false);
+    }
   }
 
   // Modal title
@@ -1135,6 +1179,8 @@ export default function Guests() {
     () => guests.rows.find(guest => guest.id === detailGuestId) ?? null,
     [detailGuestId, guests.rows]
   );
+  const confirmingFamilyName = confirming?.group_id ? groupById.get(confirming.group_id) ?? null : null;
+  const refusingFamilyName = refusing?.group_id ? groupById.get(refusing.group_id) ?? null : null;
   const detailGroup = detailGuest?.group_id ? groupByIdFull.get(detailGuest.group_id) ?? null : null;
   const detailFamilyMembers = useMemo(() => {
     if (!detailGuest) return [];
@@ -1154,6 +1200,11 @@ export default function Guests() {
 
   return (
     <div className="space-y-4 text-event-text">
+      {toast && (
+        <div className="fixed left-4 right-4 top-[calc(env(safe-area-inset-top)+1rem)] z-[10020] mx-auto max-w-md rounded-2xl border border-stone-200 bg-white px-4 py-3 text-sm font-semibold text-stone-800 shadow-float animate-slide-up sm:left-auto sm:right-6 sm:top-6">
+          {toast}
+        </div>
+      )}
 
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4">
@@ -1364,9 +1415,38 @@ export default function Guests() {
 
       {/* ── Confirm refuse ── */}
       <ConfirmDialog
+        open={Boolean(confirming)}
+        title="Confirmar presença?"
+        description="Tem certeza que deseja confirmar a presença deste convidado?"
+        confirmLabel="Sim, confirmar presença"
+        variant="success"
+        loading={statusSubmitting}
+        details={confirming ? [
+          { label: 'Convidado', value: confirming.full_name },
+          { label: 'Família', value: confirmingFamilyName || 'Individual' },
+          { label: 'Tipo', value: guestTypeLabel(confirming.guest_type) },
+          { label: 'Origem', value: confirming.origin_group || 'Não informado' },
+          { label: 'Status atual', value: confirming.invite_status },
+          ...(Number(confirming.companions ?? 0) > 0 ? [{ label: 'Acomp.', value: Number(confirming.companions ?? 0) }] : [])
+        ] : undefined}
+        onCancel={()=>setConfirming(null)}
+        onConfirm={handleConfirmPresence}/>
+
+      <ConfirmDialog
         open={Boolean(refusing)}
-        title="Marcar como recusado"
-        message={`Deseja marcar ${refusing?.full_name??'este convidado'} como recusado?`}
+        title="Recusar presença?"
+        description="Tem certeza que deseja marcar este convidado como recusado?"
+        confirmLabel="Sim, recusar presença"
+        variant="danger"
+        loading={statusSubmitting}
+        details={refusing ? [
+          { label: 'Convidado', value: refusing.full_name },
+          { label: 'Família', value: refusingFamilyName || 'Individual' },
+          { label: 'Tipo', value: guestTypeLabel(refusing.guest_type) },
+          { label: 'Origem', value: refusing.origin_group || 'Não informado' },
+          { label: 'Status atual', value: refusing.invite_status },
+          ...(Number(refusing.companions ?? 0) > 0 ? [{ label: 'Acomp.', value: Number(refusing.companions ?? 0) }] : [])
+        ] : undefined}
         onCancel={()=>setRefusing(null)}
         onConfirm={handleConfirmRefuse}/>
     </div>

@@ -1,5 +1,6 @@
 import { Download, Plus, Trash2 } from 'lucide-react';
 import { FormEvent, useMemo, useState } from 'react';
+import ConfirmDialog from '../components/ConfirmDialog';
 import DataTable from '../components/DataTable';
 import FileUpload from '../components/FileUpload';
 import FormInput from '../components/FormInput';
@@ -20,6 +21,7 @@ export default function Files() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(blank);
   const [category, setCategory] = useState('');
+  const [deleting, setDeleting] = useState<FileRecord | null>(null);
 
   const rows = useMemo(() => files.rows.filter((file) => !category || file.category === category), [category, files.rows]);
   const activeFilterCount = category ? 1 : 0;
@@ -53,7 +55,7 @@ export default function Files() {
         { header: 'Nome', render: (row) => row.name },
         { header: 'Categoria', render: (row) => row.category },
         { header: 'URL', render: (row) => <a className="text-rosew-500 hover:underline" href={row.file_url} target="_blank">Abrir</a> },
-        { header: 'Ações', render: (row) => <div className="flex gap-2"><a className="btn-secondary px-3" href={row.file_url} target="_blank"><Download size={15} /></a><button className="btn-secondary px-3" onClick={() => files.remove(row.id)}><Trash2 size={15} /></button></div> }
+        { header: 'Ações', render: (row) => <div className="flex gap-2"><a className="btn-secondary px-3" href={row.file_url} target="_blank"><Download size={15} /></a><button className="btn-secondary px-3" onClick={() => setDeleting(row)}><Trash2 size={15} /></button></div> }
       ]} />
 
       <Modal open={open} title="Novo arquivo" onClose={() => setOpen(false)}>
@@ -68,6 +70,25 @@ export default function Files() {
           <button className="btn-primary" disabled={!form.file_url}>Salvar</button>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        title="Excluir arquivo?"
+        description="Essa ação pode remover informações importantes. Tem certeza que deseja continuar?"
+        confirmLabel="Sim, excluir"
+        variant="danger"
+        details={deleting ? [
+          { label: 'Arquivo', value: deleting.name },
+          { label: 'Categoria', value: deleting.category }
+        ] : undefined}
+        onCancel={() => setDeleting(null)}
+        onConfirm={async () => {
+          if (!deleting) return;
+          await files.remove(deleting.id);
+          setDeleting(null);
+        }}
+      />
     </div>
   );
 }
+
