@@ -171,17 +171,36 @@ function CategorySelect({
   );
 }
 
-function Kpi({ label, value, helper, tone, icon: Icon }: { label: string; value: string; helper: string; tone: string; icon: typeof Wallet }) {
+function Kpi({
+  label,
+  value,
+  helper,
+  tone,
+  icon: Icon,
+  accent = 'border-w-border bg-white',
+  iconTone = 'bg-white text-w-muted ring-w-border',
+  bar = 'bg-w-border'
+}: {
+  label: string;
+  value: string;
+  helper: string;
+  tone: string;
+  icon: typeof Wallet;
+  accent?: string;
+  iconTone?: string;
+  bar?: string;
+}) {
   return (
-    <div className="card-metric p-3 sm:p-3">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-w-faint sm:text-[11px]">{label}</p>
-        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-w-surface ${tone}`}>
-          <Icon size={13} />
+    <div className={`relative overflow-hidden rounded-2xl border p-3.5 shadow-[0_12px_28px_rgba(15,23,42,0.06)] ${accent}`}>
+      <span className={`absolute inset-x-0 top-0 h-1 ${bar}`} />
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-w-faint">{label}</p>
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ring-1 ${iconTone}`}>
+          <Icon size={16} />
         </span>
       </div>
-      <p className="mt-1.5 truncate text-[21px] font-bold leading-tight text-w-text sm:text-[24px]">{value}</p>
-      <p className={`mt-1 text-xs font-semibold ${tone}`}>{helper}</p>
+      <p className={`mt-1.5 truncate text-[22px] font-bold leading-7 ${tone}`}>{value}</p>
+      <p className="mt-1 text-xs font-medium text-w-muted">{helper}</p>
     </div>
   );
 }
@@ -541,10 +560,10 @@ export default function Budget() {
 
       {message && <div className="rounded-2xl border border-[#BBF7D0] bg-[#F0FDF4] p-3 text-sm font-medium text-[#15803D]">{message}</div>}
       <section className="grid grid-cols-1 gap-2.5 min-[380px]:grid-cols-2 lg:grid-cols-4">
-        <Kpi label="Orçamento total" value={formatMoney(totals.planned)} helper="Planejado" tone="text-w-muted" icon={Wallet} />
-        <Kpi label="Comprometido" value={formatMoney(totals.committed)} helper={`${totals.committedPct}% do total`} tone="text-w-rose" icon={CreditCard} />
-        <Kpi label="Pago" value={formatMoney(totals.paid)} helper={`${totals.paidPct}% pago`} tone="text-[#22C55E]" icon={DollarSign} />
-        <Kpi label="Em aberto" value={formatMoney(totals.pending)} helper="A pagar" tone="text-[#F59E0B]" icon={CalendarClock} />
+        <Kpi label="Orçamento total" value={formatMoney(totals.planned)} helper="Planejado" tone="text-[#2563EB]" icon={Wallet} accent="border-blue-100 bg-blue-50/50" iconTone="bg-white text-[#2563EB] ring-blue-100" bar="bg-[#2563EB]" />
+        <Kpi label="Comprometido" value={formatMoney(totals.committed)} helper={`${totals.committedPct}% do total`} tone="text-w-rose" icon={CreditCard} accent="border-rose-100 bg-rose-50/50" iconTone="bg-white text-w-rose ring-rose-100" bar="bg-w-rose" />
+        <Kpi label="Pago" value={formatMoney(totals.paid)} helper={`${totals.paidPct}% pago`} tone="text-[#15803D]" icon={DollarSign} accent="border-emerald-100 bg-emerald-50/50" iconTone="bg-white text-[#16A34A] ring-emerald-100" bar="bg-[#16A34A]" />
+        <Kpi label="Em aberto" value={formatMoney(totals.pending)} helper="A pagar" tone="text-[#B45309]" icon={CalendarClock} accent="border-amber-100 bg-amber-50/55" iconTone="bg-white text-[#D97706] ring-amber-100" bar="bg-[#F59E0B]" />
       </section>
 
       <BudgetProgress committed={totals.committed} planned={totals.planned} pct={totals.committedPct} />
@@ -1077,3 +1096,4 @@ export default function Budget() {
     </div>
   );
 }
+

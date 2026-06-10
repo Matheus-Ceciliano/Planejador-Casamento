@@ -4,8 +4,9 @@ import {
   Receipt, Settings, Table2, Users, WalletCards, X,
 } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatedPage } from '../components/Animated';
+import ConfirmDialog from '../components/ConfirmDialog';
 import InstallPWAButton from '../components/InstallPWAButton';
 import { useAuth } from '../hooks/useAuth';
 import { useWedding } from '../hooks/useWedding';
@@ -94,10 +95,10 @@ function Sidebar({ onNavigate, onSignOut }: { onNavigate?: () => void; onSignOut
         <div className="border-t border-w-border p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
           <button
             type="button"
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-w-muted transition hover:bg-w-surface hover:text-w-text"
+            className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-w-muted transition hover:bg-red-50 hover:text-[#DC2626]"
             onClick={onSignOut}
           >
-            <span className="rounded-lg p-1">
+            <span className="rounded-lg p-1 text-[#DC2626]">
               <LogOut size={16} />
             </span>
             Sair da conta
@@ -113,10 +114,32 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const { signOut, user } = useAuth();
   const { wedding, weddings, selectWedding } = useWedding();
   const location = useLocation();
+  const navigate = useNavigate();
   const moreActive = mobileMoreNav.some((item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`));
+
+  function requestSignOut() {
+    setOpen(false);
+    setMoreOpen(false);
+    setConfirmingSignOut(true);
+  }
+
+  async function confirmSignOut() {
+    if (signingOut) return;
+
+    setSigningOut(true);
+    try {
+      await signOut();
+      setConfirmingSignOut(false);
+      navigate('/login', { replace: true });
+    } finally {
+      setSigningOut(false);
+    }
+  }
 
   useEffect(() => {
     const syncModalState = (event?: Event) => {
@@ -138,7 +161,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
 
       {/* ── Desktop Sidebar ── */}
       <div className={`fixed inset-y-0 left-0 z-50 hidden w-64 border-r border-w-border bg-white lg:block ${modalOpen ? 'hidden lg:hidden' : ''}`}>
-        <Sidebar />
+        <Sidebar onSignOut={requestSignOut} />
       </div>
 
       {/* ── Mobile Drawer ── */}
@@ -159,10 +182,7 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
             </button>
             <Sidebar
               onNavigate={() => setOpen(false)}
-              onSignOut={() => {
-                setOpen(false);
-                signOut();
-              }}
+              onSignOut={requestSignOut}
             />
           </div>
         </div>
@@ -211,14 +231,6 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
               </label>
             )}
 
-            {/* Sign out */}
-            <button
-              className="btn-secondary hidden px-3 py-2 sm:inline-flex"
-              onClick={signOut}
-              aria-label="Sair"
-            >
-              <LogOut size={16} />
-            </button>
           </div>
         </header>
 
@@ -277,6 +289,18 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
                   )}
                 </NavLink>
               ))}
+              <div className="mt-2 border-t border-w-border pt-2">
+                <button
+                  type="button"
+                  className="flex min-h-12 w-full items-center gap-3 rounded-2xl px-3 text-sm font-semibold text-w-muted transition hover:bg-red-50 hover:text-[#DC2626]"
+                  onClick={requestSignOut}
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-50 text-[#DC2626]">
+                    <LogOut size={18} />
+                  </span>
+                  <span className="min-w-0 truncate whitespace-nowrap">Sair da conta</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -317,6 +341,17 @@ export default function AppLayout({ children }: { children?: ReactNode }) {
           </button>
         </div>
       </nav>
+
+      <ConfirmDialog
+        open={confirmingSignOut}
+        title="Sair da conta?"
+        description="Tem certeza que deseja sair da sua conta?"
+        confirmLabel="Sim, sair"
+        variant="danger"
+        loading={signingOut}
+        onCancel={() => setConfirmingSignOut(false)}
+        onConfirm={confirmSignOut}
+      />
     </div>
   );
 }

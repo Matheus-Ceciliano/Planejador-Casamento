@@ -58,16 +58,17 @@ function TypeBadge({ type }: { type: string }) {
 
 function Stat({ label, value, tone = 'neutral' }: { label: string; value: number; tone?: 'neutral' | 'success' | 'warning' | 'danger' }) {
   const toneClass = {
-    neutral: 'bg-white text-[#2D2A26] ring-[#E7E0D8]',
-    success: 'bg-[#F0FDF4] text-[#5F8D6D] ring-[#DCFCE7]',
-    warning: 'bg-[#FFFBEB] text-[#B07C45] ring-[#FEF3C7]',
-    danger: 'bg-[#FEF2F2] text-[#C46A6A] ring-[#FEE2E2]'
+    neutral: { card: 'border-rose-100 bg-rose-50/50', value: 'text-[#B76E79]', bar: 'bg-[#B76E79]' },
+    success: { card: 'border-emerald-100 bg-emerald-50/50', value: 'text-[#15803D]', bar: 'bg-[#16A34A]' },
+    warning: { card: 'border-amber-100 bg-amber-50/55', value: 'text-[#B45309]', bar: 'bg-[#F59E0B]' },
+    danger: { card: 'border-red-100 bg-red-50/50', value: 'text-[#DC2626]', bar: 'bg-[#DC2626]' }
   }[tone];
 
   return (
-    <div className={`min-h-[64px] rounded-2xl px-3 py-2 ring-1 ${toneClass}`}>
-      <p className="text-lg font-extrabold leading-none sm:text-xl">{value}</p>
-      <p className="mt-1.5 truncate text-[9px] font-bold uppercase tracking-[0.12em] opacity-70 sm:text-[10px]">{label}</p>
+    <div className={`relative min-h-[64px] overflow-hidden rounded-2xl border px-3 py-2 shadow-[0_10px_22px_rgba(15,23,42,0.05)] ${toneClass.card}`}>
+      <span className={`absolute inset-x-0 top-0 h-1 ${toneClass.bar}`} />
+      <p className={`text-lg font-extrabold leading-none sm:text-xl ${toneClass.value}`}>{value}</p>
+      <p className="mt-1.5 truncate text-[9px] font-bold uppercase tracking-[0.12em] text-[#6F6760] sm:text-[10px]">{label}</p>
     </div>
   );
 }

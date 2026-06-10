@@ -79,17 +79,29 @@ export default function BudgetDueDates() {
       </div>
 
       <section className="grid gap-3 md:grid-cols-3">
-        <div className="rounded-lg border border-[#E7E0D8] bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#6F6760]">Itens exibidos</p>
-          <p className="mt-2 text-2xl font-semibold">{rows.length}</p>
+        <div className="relative overflow-hidden rounded-2xl border border-blue-100 bg-blue-50/50 p-3.5 shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
+          <span className="absolute inset-x-0 top-0 h-1 bg-[#2563EB]" />
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-[#6F6760]">Itens exibidos</p>
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-[#2563EB] ring-1 ring-blue-100"><CheckCircle2 size={16} /></span>
+          </div>
+          <p className="mt-1.5 text-[22px] font-bold leading-7 text-[#2563EB]">{rows.length}</p>
         </div>
-        <div className="rounded-lg border border-[#E7E0D8] bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#6F6760]">Total pendente</p>
-          <p className="mt-2 text-2xl font-semibold text-[#B07C45]">{formatMoney(pendingTotal)}</p>
+        <div className="relative overflow-hidden rounded-2xl border border-amber-100 bg-amber-50/55 p-3.5 shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
+          <span className="absolute inset-x-0 top-0 h-1 bg-[#F59E0B]" />
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-[#6F6760]">Total pendente</p>
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-[#D97706] ring-1 ring-amber-100"><CalendarClock size={16} /></span>
+          </div>
+          <p className="mt-1.5 truncate text-[22px] font-bold leading-7 text-[#B45309]">{formatMoney(pendingTotal)}</p>
         </div>
-        <div className="rounded-lg border border-[#C46A6A]/20 bg-white p-4 shadow-[0_16px_38px_rgba(58,43,39,0.06)]">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#6F6760]">Vencidos</p>
-          <p className="mt-2 text-2xl font-semibold text-[#C46A6A]">{overdueCount}</p>
+        <div className="relative overflow-hidden rounded-2xl border border-red-100 bg-red-50/50 p-3.5 shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
+          <span className="absolute inset-x-0 top-0 h-1 bg-[#DC2626]" />
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-[#6F6760]">Vencidos</p>
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-[#DC2626] ring-1 ring-red-100"><AlertTriangle size={16} /></span>
+          </div>
+          <p className="mt-1.5 text-[22px] font-bold leading-7 text-[#DC2626]">{overdueCount}</p>
         </div>
       </section>
 

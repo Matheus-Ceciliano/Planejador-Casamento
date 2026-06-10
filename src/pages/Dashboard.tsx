@@ -109,11 +109,11 @@ type KpiProps = {
 };
 
 const kpiTones = {
-  default: { icon: 'bg-w-surface text-w-muted',       ring: 'border-w-border',    value: 'text-w-text'     },
-  rose:    { icon: 'bg-w-rose-lt text-w-rose',         ring: 'border-w-rose/30',   value: 'text-w-rose'     },
-  gold:    { icon: 'bg-w-gold-lt text-[#D97706]',      ring: 'border-w-gold/40 ring-1 ring-w-gold/10', value: 'text-[#D97706]'  },
-  red:     { icon: 'bg-w-red-lt text-[#DC2626]',       ring: 'border-[#EF4444]/25 ring-1 ring-[#EF4444]/10', value: 'text-[#DC2626]' },
-  green:   { icon: 'bg-w-green-lt text-[#16A34A]',     ring: 'border-[#22C55E]/25 ring-1 ring-[#22C55E]/10', value: 'text-[#16A34A]'  },
+  default: { icon: 'bg-white text-w-muted ring-w-border',       accent: 'border-w-border bg-white',          value: 'text-w-text',    bar: 'bg-w-border' },
+  rose:    { icon: 'bg-white text-w-rose ring-rose-100',         accent: 'border-rose-100 bg-rose-50/50',     value: 'text-w-rose',    bar: 'bg-w-rose' },
+  gold:    { icon: 'bg-white text-[#D97706] ring-amber-100',     accent: 'border-amber-100 bg-amber-50/55',   value: 'text-[#B45309]', bar: 'bg-[#F59E0B]' },
+  red:     { icon: 'bg-white text-[#DC2626] ring-red-100',       accent: 'border-red-100 bg-red-50/50',       value: 'text-[#DC2626]', bar: 'bg-[#DC2626]' },
+  green:   { icon: 'bg-white text-[#16A34A] ring-emerald-100',   accent: 'border-emerald-100 bg-emerald-50/50', value: 'text-[#15803D]', bar: 'bg-[#16A34A]' },
 };
 
 function KpiCard({
@@ -125,8 +125,9 @@ function KpiCard({
     <button
       type="button"
       onClick={onClick}
-      className={`group min-w-0 overflow-hidden rounded-2xl border bg-w-card p-3 text-left shadow-card transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-float min-[380px]:p-3.5 sm:p-4 ${t.ring}`}
+      className={`group relative min-w-0 overflow-hidden rounded-2xl border p-3 text-left shadow-[0_12px_28px_rgba(15,23,42,0.06)] transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-float min-[380px]:p-3.5 sm:p-4 ${t.accent}`}
     >
+      <span className={`absolute inset-x-0 top-0 h-1 ${t.bar}`} />
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-semibold leading-[18px] text-w-faint sm:hidden">
@@ -150,7 +151,7 @@ function KpiCard({
             {helper}
           </p>
         </div>
-        <span className={`shrink-0 rounded-xl p-1.5 min-[380px]:p-2 ${t.icon} transition-transform duration-150 group-hover:scale-110`}>
+        <span className={`shrink-0 rounded-xl p-1.5 ring-1 min-[380px]:p-2 ${t.icon} transition-transform duration-150 group-hover:scale-110`}>
           {icon}
         </span>
       </div>

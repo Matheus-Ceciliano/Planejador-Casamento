@@ -41,21 +41,26 @@ function Kpi({
   value,
   helper,
   tone = 'text-w-text',
+  iconTone = 'text-w-muted bg-white/80 ring-w-border',
   icon: Icon,
-  accent = 'border-w-border bg-white'
+  accent = 'border-w-border bg-white',
+  bar = 'bg-w-border'
 }: {
   label: string;
   value: string;
   helper: string;
   tone?: string;
+  iconTone?: string;
   icon: typeof Receipt;
   accent?: string;
+  bar?: string;
 }) {
   return (
     <div className={`relative overflow-hidden rounded-2xl border p-3.5 shadow-[0_12px_28px_rgba(15,23,42,0.06)] ${accent}`}>
+      <span className={`absolute inset-x-0 top-0 h-1 ${bar}`} />
       <div className="flex items-start justify-between gap-3">
         <p className="text-[11px] font-bold uppercase tracking-wide text-w-faint">{label}</p>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/80 text-w-muted ring-1 ring-w-border">
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ring-1 ${iconTone}`}>
           <Icon size={16} />
         </span>
       </div>
@@ -195,11 +200,56 @@ export default function PaymentHistory() {
       {message && <div className="rounded-2xl border border-[#BBF7D0] bg-[#F0FDF4] p-3 text-sm font-medium text-[#15803D]">{message}</div>}
 
       <section className="grid grid-cols-2 gap-2.5 xl:grid-cols-5">
-        <Kpi label="Total pago" value={formatMoney(summary.totalPaid)} helper="APs confirmadas" tone={summary.totalPaid > 0 ? 'text-[#16A34A]' : 'text-w-text'} icon={WalletCards} accent={summary.totalPaid > 0 ? 'border-green-100 bg-green-50/35' : 'border-w-border bg-white'} />
-        <Kpi label="Confirmados" value={String(summary.confirmed)} helper="Pagamentos ativos" tone={summary.confirmed > 0 ? 'text-[#16A34A]' : 'text-w-text'} icon={CheckCircle2} accent="border-w-border bg-white" />
-        <Kpi label="Cancelados" value={String(summary.canceled)} helper="Mantidos para auditoria" tone={summary.canceled > 0 ? 'text-[#DC2626]' : 'text-w-text'} icon={XCircle} accent={summary.canceled > 0 ? 'border-red-100 bg-red-50/30' : 'border-w-border bg-white'} />
-        <Kpi label="Comprovantes" value={String(summary.receipts)} helper="Anexos vinculados" tone={summary.receipts > 0 ? 'text-w-rose' : 'text-w-text'} icon={Paperclip} accent={summary.receipts > 0 ? 'border-rose-100 bg-rose-50/30' : 'border-w-border bg-white'} />
-        <Kpi label="Período" value={formatMoney(summary.periodTotal)} helper="Total filtrado" tone="text-w-text" icon={CalendarClock} accent="border-w-border bg-white" />
+        <Kpi
+          label="Total pago"
+          value={formatMoney(summary.totalPaid)}
+          helper="APs confirmadas"
+          tone="text-[#15803D]"
+          icon={WalletCards}
+          accent="border-emerald-100 bg-emerald-50/50"
+          iconTone="bg-white text-[#16A34A] ring-emerald-100"
+          bar="bg-[#16A34A]"
+        />
+        <Kpi
+          label="Confirmados"
+          value={String(summary.confirmed)}
+          helper="Pagamentos ativos"
+          tone="text-[#2563EB]"
+          icon={CheckCircle2}
+          accent="border-blue-100 bg-blue-50/50"
+          iconTone="bg-white text-[#2563EB] ring-blue-100"
+          bar="bg-[#2563EB]"
+        />
+        <Kpi
+          label="Cancelados"
+          value={String(summary.canceled)}
+          helper="Mantidos para auditoria"
+          tone="text-[#DC2626]"
+          icon={XCircle}
+          accent="border-red-100 bg-red-50/50"
+          iconTone="bg-white text-[#DC2626] ring-red-100"
+          bar="bg-[#DC2626]"
+        />
+        <Kpi
+          label="Comprovantes"
+          value={String(summary.receipts)}
+          helper="Anexos vinculados"
+          tone="text-w-rose"
+          icon={Paperclip}
+          accent="border-rose-100 bg-rose-50/50"
+          iconTone="bg-white text-w-rose ring-rose-100"
+          bar="bg-w-rose"
+        />
+        <Kpi
+          label="Per?odo"
+          value={formatMoney(summary.periodTotal)}
+          helper="Total filtrado"
+          tone="text-[#B45309]"
+          icon={CalendarClock}
+          accent="border-amber-100 bg-amber-50/55"
+          iconTone="bg-white text-[#D97706] ring-amber-100"
+          bar="bg-[#F59E0B]"
+        />
       </section>
 
       <section className="rounded-2xl border border-w-border bg-white p-3 shadow-[0_12px_30px_rgba(15,23,42,0.06)] sm:p-4">

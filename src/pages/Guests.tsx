@@ -157,20 +157,19 @@ function KpiCard({ label, value, icon, tone, active, onClick }: {
   tone: 'neutral'|'success'|'warning'|'danger'; active: boolean; onClick: () => void;
 }) {
   const t = {
-    neutral: { ring:'border-event-rose bg-event-rose',       icon:'bg-stone-100 text-stone-500',    val:'text-event-text' },
-    success: { ring:'border-[#5F8D6D] bg-[#5F8D6D]',       icon:'bg-[#5F8D6D]/10 text-[#5F8D6D]', val:'text-[#5F8D6D]' },
-    warning: { ring:'border-[#D4A373] bg-[#D4A373]',       icon:'bg-[#D4A373]/12 text-[#B07C45]', val:'text-[#B07C45]' },
-    danger:  { ring:'border-[#C46A6A] bg-[#C46A6A]',       icon:'bg-[#C46A6A]/10 text-[#C46A6A]', val:'text-[#C46A6A]' },
+    neutral: { accent:'border-rose-100 bg-rose-50/50',       icon:'bg-white text-event-rose ring-rose-100',    val:'text-event-rose', bar:'bg-event-rose', active:'ring-event-rose/25' },
+    success: { accent:'border-emerald-100 bg-emerald-50/50', icon:'bg-white text-[#16A34A] ring-emerald-100', val:'text-[#15803D]', bar:'bg-[#16A34A]', active:'ring-[#16A34A]/25' },
+    warning: { accent:'border-amber-100 bg-amber-50/55',     icon:'bg-white text-[#D97706] ring-amber-100',   val:'text-[#B45309]', bar:'bg-[#F59E0B]', active:'ring-[#F59E0B]/25' },
+    danger:  { accent:'border-red-100 bg-red-50/50',         icon:'bg-white text-[#DC2626] ring-red-100',     val:'text-[#DC2626]', bar:'bg-[#DC2626]', active:'ring-[#DC2626]/25' },
   }[tone];
   return (
     <button type="button" onClick={onClick}
-      className={`flex items-center gap-3 rounded-xl border p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${
-        active ? `${t.ring} text-white shadow-md` : 'border-stone-200 bg-white hover:border-stone-300'
-      }`}>
-      <span className={`inline-flex rounded-lg p-2 ${active ? 'bg-white/20 text-white' : t.icon}`}>{icon}</span>
+      className={`relative flex items-center gap-3 overflow-hidden rounded-2xl border p-3 text-left shadow-[0_12px_28px_rgba(15,23,42,0.06)] transition-all hover:-translate-y-0.5 hover:shadow-md ${t.accent} ${active ? `ring-2 ${t.active}` : ''}`}>
+      <span className={`absolute inset-x-0 top-0 h-1 ${t.bar}`} />
+      <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ${t.icon}`}>{icon}</span>
       <div>
-        <p className={`text-xl font-bold leading-none ${active ? 'text-white' : t.val}`}>{value}</p>
-        <p className={`mt-0.5 text-xs font-medium ${active ? 'text-white/80' : 'text-stone-500'}`}>{label}</p>
+        <p className={`text-xl font-bold leading-none ${t.val}`}>{value}</p>
+        <p className="mt-0.5 text-xs font-medium text-stone-500">{label}</p>
       </div>
     </button>
   );

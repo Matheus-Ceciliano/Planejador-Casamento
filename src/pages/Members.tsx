@@ -99,20 +99,24 @@ type SummaryCardProps = {
   label: string;
   value: number;
   icon: typeof Heart;
-  tone: string;
+  accent: string;
+  iconTone: string;
+  valueTone: string;
+  bar: string;
   helper: string;
 };
 
-function SummaryCard({ label, value, icon: Icon, tone, helper }: SummaryCardProps) {
+function SummaryCard({ label, value, icon: Icon, accent, iconTone, valueTone, bar, helper }: SummaryCardProps) {
   return (
-    <article className="min-h-[104px] w-full max-w-full rounded-2xl border border-w-border bg-white p-3 shadow-soft transition hover:-translate-y-0.5 hover:border-w-border-md hover:shadow-card sm:min-h-[116px] sm:p-4">
+    <article className={`relative min-h-[104px] w-full max-w-full overflow-hidden rounded-2xl border p-3 shadow-[0_12px_28px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-card sm:min-h-[116px] sm:p-4 ${accent}`}>
+      <span className={`absolute inset-x-0 top-0 h-1 ${bar}`} />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-w-faint sm:text-[11px]">{label}</p>
-          <p className="mt-1 text-[1.65rem] font-extrabold leading-none tracking-tight text-w-text sm:text-3xl">{value}</p>
+          <p className={`mt-1 text-[1.65rem] font-extrabold leading-none tracking-tight sm:text-3xl ${valueTone}`}>{value}</p>
         </div>
-        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${tone}`}>
-          <Icon size={15} />
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ring-1 ${iconTone}`}>
+          <Icon size={16} />
         </span>
       </div>
       <p className="mt-2 truncate text-[11px] font-semibold text-w-muted sm:text-xs">{helper}</p>
@@ -410,10 +414,10 @@ export default function Members() {
       {message && <div className="rounded-2xl border border-w-border bg-white px-4 py-3 text-sm font-semibold text-w-muted shadow-soft">{message}</div>}
 
       <section className="grid max-w-full grid-cols-2 gap-2.5 overflow-x-hidden sm:gap-3 xl:grid-cols-4">
-        <SummaryCard label="Noivas" value={brides} icon={Heart} tone="bg-w-rose-lt text-w-rose" helper={`${brides} ${brides === 1 ? 'membro ativo' : 'membros ativos'}`} />
-        <SummaryCard label="Noivos" value={grooms} icon={Users} tone="bg-[#EFF6FF] text-[#2563EB]" helper={`${grooms} ${grooms === 1 ? 'membro ativo' : 'membros ativos'}`} />
-        <SummaryCard label="Cerimonialistas" value={planners} icon={UserCog} tone="bg-w-green-lt text-[#16A34A]" helper={`${planners} ${planners === 1 ? 'membro ativo' : 'membros ativos'}`} />
-        <SummaryCard label="Visualizadores" value={viewers} icon={Mail} tone="bg-w-surface text-w-muted" helper={`${viewers} ${viewers === 1 ? 'acesso limitado' : 'acessos limitados'}`} />
+        <SummaryCard label="Noivas" value={brides} icon={Heart} accent="border-rose-100 bg-rose-50/50" iconTone="bg-white text-w-rose ring-rose-100" valueTone="text-w-rose" bar="bg-w-rose" helper={`${brides} ${brides === 1 ? 'membro ativo' : 'membros ativos'}`} />
+        <SummaryCard label="Noivos" value={grooms} icon={Users} accent="border-blue-100 bg-blue-50/50" iconTone="bg-white text-[#2563EB] ring-blue-100" valueTone="text-[#2563EB]" bar="bg-[#2563EB]" helper={`${grooms} ${grooms === 1 ? 'membro ativo' : 'membros ativos'}`} />
+        <SummaryCard label="Cerimonialistas" value={planners} icon={UserCog} accent="border-emerald-100 bg-emerald-50/50" iconTone="bg-white text-[#16A34A] ring-emerald-100" valueTone="text-[#15803D]" bar="bg-[#16A34A]" helper={`${planners} ${planners === 1 ? 'membro ativo' : 'membros ativos'}`} />
+        <SummaryCard label="Visualizadores" value={viewers} icon={Mail} accent="border-amber-100 bg-amber-50/55" iconTone="bg-white text-[#D97706] ring-amber-100" valueTone="text-[#B45309]" bar="bg-[#F59E0B]" helper={`${viewers} ${viewers === 1 ? 'acesso limitado' : 'acessos limitados'}`} />
       </section>
 
       <section className="grid max-w-full gap-4 overflow-visible lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_390px]">
