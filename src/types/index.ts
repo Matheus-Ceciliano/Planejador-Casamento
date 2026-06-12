@@ -48,6 +48,7 @@ export type Guest = {
   full_name: string;
   phone: string | null;
   group_id: string | null;
+  table_id?: string | null;
   origin_group?: string | null;
   guest_type: string;
   invite_status: string;
@@ -58,6 +59,26 @@ export type Guest = {
   // WhatsApp invite field (added via whatsapp-invite.sql)
   rsvp_token: string | null;
   invite_sent_at: string | null;
+};
+
+export type WeddingTable = {
+  id: string;
+  wedding_id: string;
+  name: string;
+  capacity: number;
+  type: string;
+  notes: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type TableGuest = {
+  id: string;
+  wedding_id: string;
+  table_id: string;
+  guest_id: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type GuestGroup = {

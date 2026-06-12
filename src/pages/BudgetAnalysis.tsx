@@ -66,6 +66,7 @@ export default function BudgetAnalysis() {
     .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)))[0];
   const expensiveCategory = categoryData[0];
   const health = calculateFinancialHealth({
+    orcamentoPlanejado: planned,
     totalContratado: committed,
     totalPago: paid,
     itensFinanceiros: items.rows,
@@ -102,10 +103,11 @@ export default function BudgetAnalysis() {
         <div className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-card">
           <div className="flex items-center gap-2">
             <HeartPulse size={17} className={healthTone} />
-            <h2 className="text-sm font-bold">Saude financeira</h2>
+            <h2 className="text-sm font-bold">Saúde financeira</h2>
           </div>
           <p className={`mt-4 text-3xl font-bold ${healthTone}`}>{health.label}</p>
-          <p className="mt-1 text-sm font-semibold text-w-text">Risco {health.score}%</p>
+          <p className="mt-1 text-sm font-semibold text-w-text">Score {health.score}</p>
+          <p className="mt-1 text-sm font-semibold text-w-muted">Risco financeiro: {health.riscoLabel} ({health.risco}%)</p>
           <p className="mt-2 text-sm text-w-muted">{health.motivo}</p>
         </div>
       </section>

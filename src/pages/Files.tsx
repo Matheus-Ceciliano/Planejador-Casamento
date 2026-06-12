@@ -1,6 +1,7 @@
 import { Download, Plus, Trash2 } from 'lucide-react';
 import { FormEvent, useMemo, useState } from 'react';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ActionButton from '../components/ActionButton';
 import DataTable from '../components/DataTable';
 import FileUpload from '../components/FileUpload';
 import FormInput from '../components/FormInput';
@@ -10,6 +11,7 @@ import Modal from '../components/Modal';
 import ResponsiveFilters from '../components/ResponsiveFilters';
 import { useAuth } from '../hooks/useAuth';
 import { useWeddingTable } from '../hooks/useWeddingTable';
+import { useAsyncAction } from '../hooks/useAsyncAction';
 import { FileRecord } from '../types';
 
 const blank = { name: '', category: 'Contratos', file_url: '', notes: '' };
@@ -22,13 +24,16 @@ export default function Files() {
   const [form, setForm] = useState(blank);
   const [category, setCategory] = useState('');
   const [deleting, setDeleting] = useState<FileRecord | null>(null);
+  const { run, loading: saving } = useAsyncAction();
 
   const rows = useMemo(() => files.rows.filter((file) => !category || file.category === category), [category, files.rows]);
   const activeFilterCount = category ? 1 : 0;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    await files.create({ ...form, uploaded_by: user?.id } as Partial<FileRecord>);
+    await run(async () => {
+      await files.create({ ...form, uploaded_by: user?.id } as Partial<FileRecord>);
+    });
     setOpen(false);
     setForm(blank);
   }
@@ -58,7 +63,7 @@ export default function Files() {
         { header: 'Ações', render: (row) => <div className="flex gap-2"><a className="btn-secondary px-3" href={row.file_url} target="_blank"><Download size={15} /></a><button className="btn-secondary px-3" onClick={() => setDeleting(row)}><Trash2 size={15} /></button></div> }
       ]} />
 
-      <Modal open={open} title="Novo arquivo" onClose={() => setOpen(false)}>
+      <Modal open={open} title="Novo arquivo" busy={saving} onClose={() => setOpen(false)}>
         <form className="space-y-4" onSubmit={submit}>
           <div className="grid gap-4 md:grid-cols-2">
             <FormInput label="Nome do arquivo" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
@@ -67,7 +72,9 @@ export default function Files() {
           <FileUpload folder="arquivos" onUploaded={(url) => setForm({ ...form, file_url: url })} />
           {form.file_url && <a className="text-sm text-rosew-500" href={form.file_url} target="_blank">Arquivo enviado</a>}
           <FormTextarea label="Observações" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
-          <button className="btn-primary" disabled={!form.file_url}>Salvar</button>
+          <ActionButton type="submit" className="btn-primary" disabled={!form.file_url} loading={saving} loadingText="Salvando...">
+            Salvar
+          </ActionButton>
         </form>
       </Modal>
 

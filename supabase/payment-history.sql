@@ -25,6 +25,9 @@ create index if not exists payment_history_wedding_id_idx on public.payment_hist
 create index if not exists payment_history_vendor_id_idx on public.payment_history(vendor_id);
 create index if not exists payment_history_budget_item_id_idx on public.payment_history(budget_item_id);
 create index if not exists payment_history_status_idx on public.payment_history(status);
+create unique index if not exists payment_history_payment_id_unique
+  on public.payment_history(payment_id)
+  where payment_id is not null;
 
 drop trigger if exists set_payment_history_updated_at on public.payment_history;
 create trigger set_payment_history_updated_at

@@ -448,7 +448,7 @@ export default function Agenda() {
 
   async function saveItem(event: FormEvent) {
     event.preventDefault();
-    if (!form.title.trim() || !form.date) return;
+    if (saving || !form.title.trim() || !form.date) return;
     setSaving(true);
     setError('');
     try {
@@ -719,7 +719,7 @@ export default function Agenda() {
       )}
 
       {/* Modal */}
-      <Modal open={modalOpen} title={editingItem ? 'Editar item da agenda' : 'Novo item da agenda'} onClose={() => setModalOpen(false)}>
+      <Modal open={modalOpen} title={editingItem ? 'Editar item da agenda' : 'Novo item da agenda'} busy={saving} onClose={() => setModalOpen(false)}>
         <form onSubmit={saveItem} className="space-y-4">
           {error && <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</div>}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

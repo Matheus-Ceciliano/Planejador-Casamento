@@ -5,7 +5,7 @@ import { ReactNode, useId, useState } from 'react';
 const SEARCH_THRESHOLD = 8;
 const EMPTY_OPTION_VALUE = '__app_select_empty__';
 
-export type AppSelectOption = { label: string; value: string };
+export type AppSelectOption = { label: string; value: string; disabled?: boolean };
 
 export type AppSelectProps = {
   label?: string;
@@ -165,6 +165,7 @@ export default function AppSelect({
                   <Select.Item
                     key={`${opt.value || EMPTY_OPTION_VALUE}-${index}`}
                     value={opt.value === '' ? EMPTY_OPTION_VALUE : opt.value}
+                    disabled={opt.disabled}
                     className="radix-select-item group relative flex cursor-pointer select-none items-center gap-2.5 rounded-xl px-3 py-2.5 text-[15px] font-medium leading-5 text-[#1F2937] outline-none transition-colors hover:bg-[#FFF1F5] hover:text-[#E11D48] data-[disabled]:cursor-not-allowed data-[highlighted]:bg-[#FFF1F5] data-[highlighted]:text-[#E11D48] data-[state=checked]:bg-[#FFF1F5] data-[state=checked]:font-semibold data-[state=checked]:text-[#BE123C]"
                   >
                     <Select.ItemText className="min-w-0 flex-1">

@@ -281,7 +281,9 @@ export default function Vendors() {
   const [paymentVendor, setPaymentVendor] = useState<Vendor | null>(null);
   const [paymentPlan, setPaymentPlan] = useState(blankPaymentPlan);
   const [paymentError, setPaymentError] = useState('');
+  const [formSubmitting, setFormSubmitting] = useState(false);
   const syncInFlight = useRef(new Set<string>());
+  const formSubmittingRef = useRef(false);
 
   const categoryOptions = useMemo(() => {
     const custom = customCategories.rows.map((item) => toPrimaryCategory(item.name)).filter(Boolean);
@@ -388,6 +390,10 @@ export default function Vendors() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (formSubmittingRef.current) return;
+    formSubmittingRef.current = true;
+    setFormSubmitting(true);
+    try {
     const payload = {
       ...form,
       category: toPrimaryCategory(form.category),
@@ -409,6 +415,10 @@ export default function Vendors() {
     const saved = editing ? await vendors.update(editing.id, payload as Partial<Vendor>) : await vendors.create(payload as Partial<Vendor>);
     await syncContractedVendor(saved, true);
     setOpen(false);
+    } finally {
+      formSubmittingRef.current = false;
+      setFormSubmitting(false);
+    }
   }
 
   function changeStatus(vendor: Vendor, status: string, forceBudgetCreate = false) {
@@ -433,7 +443,10 @@ export default function Vendors() {
   }
 
   async function confirmPaymentPlan() {
-    if (!paymentVendor) return;
+    if (!paymentVendor || formSubmittingRef.current) return;
+    formSubmittingRef.current = true;
+    setFormSubmitting(true);
+    try {
 
     const total = Number(paymentVendor.contracted_value ?? 0);
     if (total <= 0) {
@@ -483,6 +496,10 @@ export default function Vendors() {
     setPaymentVendor(null);
     setOpen(false);
     setMessage(`${savedVendor.name} contratado. Financeiro e vencimentos foram sincronizados.`);
+    } finally {
+      formSubmittingRef.current = false;
+      setFormSubmitting(false);
+    }
   }
 
   async function addFile(vendor: Vendor, url: string, kind: DocumentKind) {
@@ -670,7 +687,7 @@ export default function Vendors() {
         </section>
       )}
 
-      <Modal open={open} title={editing ? editing.name : 'Novo fornecedor'} onClose={() => setOpen(false)}>
+      <Modal open={open} title={editing ? editing.name : 'Novo fornecedor'} busy={formSubmitting} onClose={() => setOpen(false)}>
         <form className="-m-5 flex max-h-[calc(100dvh-80px)] flex-col overflow-hidden rounded-t-3xl bg-white sm:max-h-[calc(92vh-80px)] sm:rounded-2xl" onSubmit={submit}>
           <div className="flex-1 space-y-4 overflow-y-auto bg-w-surface/40 p-5">
             <section className="rounded-2xl border border-w-border bg-white p-4 shadow-soft">
@@ -781,14 +798,14 @@ export default function Vendors() {
           </div>
           <div className="sticky bottom-0 grid grid-cols-2 gap-2 border-t border-w-border bg-white p-4 sm:flex sm:justify-end">
             {editing && <button type="button" className="btn-secondary text-[#DC2626]" onClick={() => setDeleting(editing)}>Excluir</button>}
-            <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Cancelar</button>
+            <button type="button" className="btn-secondary" onClick={() => setOpen(false)} disabled={formSubmitting}>Cancelar</button>
             {editing && normalizeVendorWorkflowStatus(form.status) !== 'contratado' && <button type="button" className="btn-secondary border-[#BBF7D0] bg-[#F0FDF4] text-[#15803D]" onClick={() => confirmHiring(editing)}><CheckCircle2 size={16} /> Contratar</button>}
-            <button className="btn-primary">Salvar</button>
+            <button className="btn-primary" disabled={formSubmitting}>{formSubmitting ? 'Salvando...' : 'Salvar'}</button>
           </div>
         </form>
       </Modal>
 
-      <Modal open={Boolean(paymentVendor)} title="Definir pagamento do fornecedor" onClose={() => setPaymentVendor(null)}>
+      <Modal open={Boolean(paymentVendor)} title="Definir pagamento do fornecedor" busy={formSubmitting} onClose={() => setPaymentVendor(null)}>
         {paymentVendor && (
           <form className="-m-5 flex max-h-[calc(100dvh-80px)] flex-col overflow-hidden rounded-t-3xl bg-white sm:max-h-[calc(92vh-80px)] sm:rounded-2xl" onSubmit={(event) => { event.preventDefault(); confirmPaymentPlan(); }}>
             <div className="flex-1 space-y-4 overflow-y-auto bg-w-surface/40 p-5">
@@ -820,8 +837,8 @@ export default function Vendors() {
               {paymentError && <div className="rounded-2xl border border-[#FECACA] bg-[#FEF2F2] p-3 text-sm font-semibold text-[#B91C1C]">{paymentError}</div>}
             </div>
             <div className="sticky bottom-0 flex flex-wrap justify-end gap-2 border-t border-w-border bg-white p-4">
-              <button type="button" className="btn-secondary" onClick={() => setPaymentVendor(null)}>Cancelar</button>
-              <button className="btn-primary">Concluir contratação</button>
+              <button type="button" className="btn-secondary" onClick={() => setPaymentVendor(null)} disabled={formSubmitting}>Cancelar</button>
+              <button className="btn-primary" disabled={formSubmitting}>{formSubmitting ? 'Contratando...' : 'Concluir contratação'}</button>
             </div>
           </form>
         )}

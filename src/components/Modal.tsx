@@ -8,9 +8,10 @@ type Props = {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  busy?: boolean;
 };
 
-export default function Modal({ open, title, children, onClose }: Props) {
+export default function Modal({ open, title, children, onClose, busy = false }: Props) {
   useEffect(() => {
     if (!open) return;
     return retainModalLayer();
@@ -30,6 +31,7 @@ export default function Modal({ open, title, children, onClose }: Props) {
           <button
             className="shrink-0 rounded-xl p-2 text-w-muted transition hover:bg-w-surface hover:text-w-text"
             onClick={onClose}
+            disabled={busy}
             aria-label="Fechar"
           >
             <X size={18} />

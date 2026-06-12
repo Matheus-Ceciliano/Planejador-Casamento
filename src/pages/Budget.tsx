@@ -241,6 +241,7 @@ export default function Budget() {
   const [paying, setPaying] = useState<BudgetItem | null>(null);
   const [paymentConfirmOpen, setPaymentConfirmOpen] = useState(false);
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [formSubmitting, setFormSubmitting] = useState(false);
   const [form, setForm] = useState({ ...blank, category: initial === 'Todos' ? 'Buffet' : initial });
   const [paymentForm, setPaymentForm] = useState(paymentBlank);
   const [search, setSearch] = useState('');
@@ -250,6 +251,7 @@ export default function Budget() {
   const [selectedPaymentRecord, setSelectedPaymentRecord] = useState<PaymentRecord | null>(null);
   const [cancelingPaymentRecord, setCancelingPaymentRecord] = useState<PaymentRecord | null>(null);
   const syncInFlight = useRef(new Set<string>());
+  const formSubmittingRef = useRef(false);
 
   const vendorById = useMemo(() => new Map(vendors.rows.map((vendor) => [vendor.id, vendor])), [vendors.rows]);
   const itemById = useMemo(() => new Map(items.rows.map((item) => [item.id, item])), [items.rows]);
@@ -378,6 +380,10 @@ export default function Budget() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (formSubmittingRef.current) return;
+    formSubmittingRef.current = true;
+    setFormSubmitting(true);
+    try {
     const payload = {
       ...form,
       category: toPrimaryCategory(form.category),
@@ -406,6 +412,10 @@ export default function Budget() {
     const saved = editing ? await items.update(editing.id, payload as Partial<BudgetItem>) : await items.create(payload as Partial<BudgetItem>);
     if (saved.vendor_id) clearVendorBudgetAutoCreateSuppression(saved.wedding_id, saved.vendor_id);
     setOpen(false);
+    } finally {
+      formSubmittingRef.current = false;
+      setFormSubmitting(false);
+    }
   }
 
   async function submitPayment(event: FormEvent) {
@@ -798,7 +808,7 @@ export default function Budget() {
         )}
       </Modal>
 
-      <Modal open={open} title={editing ? 'Editar gasto' : 'Novo gasto'} onClose={() => setOpen(false)}>
+      <Modal open={open} title={editing ? 'Editar gasto' : 'Novo gasto'} busy={formSubmitting} onClose={() => setOpen(false)}>
         <form className="-m-5 flex max-h-[calc(92vh-80px)] flex-col" onSubmit={submit}>
           <div className="flex-1 space-y-4 overflow-y-auto p-5">
             <section className="glass rounded-3xl p-4">
@@ -821,8 +831,8 @@ export default function Budget() {
             </div>
           </div>
           <div className="sticky bottom-0 flex justify-end gap-2 border-t border-w-border bg-white p-4">
-            <button type="button" className="btn-secondary" onClick={() => setOpen(false)}>Cancelar</button>
-            <button className="btn-primary">Salvar</button>
+            <button type="button" className="btn-secondary" onClick={() => setOpen(false)} disabled={formSubmitting}>Cancelar</button>
+            <button className="btn-primary" disabled={formSubmitting}>{formSubmitting ? 'Salvando...' : 'Salvar'}</button>
           </div>
         </form>
       </Modal>
@@ -830,6 +840,7 @@ export default function Budget() {
       <Modal
         open={Boolean(paying)}
         title="Registrar pagamento"
+        busy={paymentSubmitting}
         onClose={() => {
           setPaymentConfirmOpen(false);
           setPaying(null);

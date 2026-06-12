@@ -3,6 +3,23 @@ import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useWedding } from './useWedding';
 
+const inFlightOperations = new Map<string, Promise<unknown>>();
+
+function operationKey(table: string, weddingId: string | undefined, action: string, value?: unknown) {
+  return `${table}:${weddingId ?? 'none'}:${action}:${JSON.stringify(value ?? null)}`;
+}
+
+function runOnce<T>(key: string, action: () => Promise<T>) {
+  const current = inFlightOperations.get(key) as Promise<T> | undefined;
+  if (current) return current;
+
+  const promise = action().finally(() => {
+    if (inFlightOperations.get(key) === promise) inFlightOperations.delete(key);
+  });
+  inFlightOperations.set(key, promise);
+  return promise;
+}
+
 export function useWeddingTable<T extends { id: string; wedding_id: string }>(table: string, order = 'created_at') {
   const { wedding } = useWedding();
   const [rows, setRows] = useState<T[]>([]);
@@ -24,17 +41,22 @@ export function useWeddingTable<T extends { id: string; wedding_id: string }>(ta
     [order]
   );
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(() => {
     if (!weddingId) {
       setRows([]);
-      return;
+      return Promise.resolve();
     }
 
-    setLoading(true);
-    const { data, error } = await supabase.from(table).select('*').eq('wedding_id', weddingId).order(order, { ascending: true });
-    setLoading(false);
-    if (error) throw error;
-    setRows((data ?? []) as T[]);
+    return runOnce(operationKey(table, weddingId, 'refresh', order), async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.from(table).select('*').eq('wedding_id', weddingId).order(order, { ascending: true });
+        if (error) throw error;
+        setRows((data ?? []) as T[]);
+      } finally {
+        setLoading(false);
+      }
+    });
   }, [order, table, weddingId]);
 
   const realtimeChannelName = useMemo(() => (weddingId ? `public:${table}:wedding:${weddingId}` : null), [table, weddingId]);
@@ -113,27 +135,33 @@ export function useWeddingTable<T extends { id: string; wedding_id: string }>(ta
     };
   }, [applyRealtimePayload, realtimeChannelName, table, weddingId]);
 
-  async function create(payload: Partial<T>) {
+  function create(payload: Partial<T>) {
     if (!weddingId) throw new Error('Cadastre ou selecione um casamento primeiro.');
-    const { data, error } = await supabase.from(table).insert({ ...payload, wedding_id: weddingId } as any).select().single();
-    if (error) throw error;
-    const created = data as T;
-    setRows((current) => sortRows(current.some((item) => item.id === created.id) ? current : [...current, created]));
-    return created;
+    return runOnce(operationKey(table, weddingId, 'create', payload), async () => {
+      const { data, error } = await supabase.from(table).insert({ ...payload, wedding_id: weddingId } as any).select().single();
+      if (error) throw error;
+      const created = data as T;
+      setRows((current) => sortRows(current.some((item) => item.id === created.id) ? current : [...current, created]));
+      return created;
+    });
   }
 
-  async function update(id: string, payload: Partial<T>) {
-    const { data, error } = await supabase.from(table).update(payload as any).eq('id', id).select().single();
-    if (error) throw error;
-    const updated = data as T;
-    setRows((current) => sortRows(current.map((item) => (item.id === id ? updated : item))));
-    return updated;
+  function update(id: string, payload: Partial<T>) {
+    return runOnce(operationKey(table, weddingId, `update:${id}`, payload), async () => {
+      const { data, error } = await supabase.from(table).update(payload as any).eq('id', id).select().single();
+      if (error) throw error;
+      const updated = data as T;
+      setRows((current) => sortRows(current.map((item) => (item.id === id ? updated : item))));
+      return updated;
+    });
   }
 
-  async function remove(id: string) {
-    const { error } = await supabase.from(table).delete().eq('id', id);
-    if (error) throw error;
-    setRows((current) => current.filter((item) => item.id !== id));
+  function remove(id: string) {
+    return runOnce(operationKey(table, weddingId, `remove:${id}`), async () => {
+      const { error } = await supabase.from(table).delete().eq('id', id);
+      if (error) throw error;
+      setRows((current) => current.filter((item) => item.id !== id));
+    });
   }
 
   return { rows, loading, refresh, create, update, remove };

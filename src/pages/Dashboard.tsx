@@ -358,6 +358,7 @@ export default function Dashboard() {
   }, [vendors.rows]);
 
   const health = calculateFinancialHealth({
+    orcamentoPlanejado: planned,
     totalContratado: contracted,
     totalPago: paid,
     itensFinanceiros: budget.rows,
@@ -750,9 +751,9 @@ export default function Dashboard() {
             <div>
               <div className="mb-2 flex justify-between text-xs text-w-muted">
                 <span>Risco financeiro</span>
-                <strong className="text-w-text">{health.score}%</strong>
+                <strong className="text-w-text">{health.riscoLabel} · {health.risco}%</strong>
               </div>
-              <ProgressBar value={health.score} color={healthColor} />
+              <ProgressBar value={health.risco} color={healthColor} />
             </div>
             <div className="rounded-2xl border border-w-border bg-w-card p-3 text-sm text-w-muted">
               <strong className="block text-w-text">Motivo</strong>

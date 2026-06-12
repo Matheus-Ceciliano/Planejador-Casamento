@@ -27,3 +27,6 @@ export type { AppSwitchProps } from './AppSwitch';
 
 export { default as AppFileUpload } from './AppFileUpload';
 export type { AppFileUploadProps } from './AppFileUpload';
+
+export { default as ActionButton } from '../ActionButton';
+export type { ActionButtonProps } from '../ActionButton';

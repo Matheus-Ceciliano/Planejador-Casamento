@@ -9,6 +9,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import Modal from '../components/Modal';
 import { useWeddingTable } from '../hooks/useWeddingTable';
 import { Guest, GuestGroup } from '../types';
+import { formatFamilyDisplayName } from '../utils/format';
 import { buildWhatsAppChatLink } from '../utils/whatsappService';
 
 const blank = { name: '', side: 'noiva', responsible_name: '', responsible_phone: '', notes: '' };
@@ -86,6 +87,7 @@ export default function Families() {
   const [refusing, setRefusing] = useState<Guest | null>(null);
   const [deletingGroup, setDeletingGroup] = useState<GuestGroup | null>(null);
   const [statusSubmitting, setStatusSubmitting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
 
   const membersByGroup = useMemo(
@@ -101,9 +103,15 @@ export default function Families() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (editing) await groups.update(editing.id, form as Partial<GuestGroup>);
-    else await groups.create(form as Partial<GuestGroup>);
-    setOpen(false);
+    if (saving) return;
+    setSaving(true);
+    try {
+      if (editing) await groups.update(editing.id, form as Partial<GuestGroup>);
+      else await groups.create(form as Partial<GuestGroup>);
+      setOpen(false);
+    } finally {
+      setSaving(false);
+    }
   }
 
   function toggleExpanded(id: string) {
@@ -230,7 +238,7 @@ export default function Families() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1 overflow-hidden pr-1">
                       <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <h2 className="min-w-0 truncate text-xl font-bold leading-6 text-[#2D2A26] sm:text-[22px]">{group.name}</h2>
+                        <h2 className="min-w-0 truncate text-xl font-bold leading-6 text-[#2D2A26] sm:text-[22px]">{formatFamilyDisplayName(group.responsible_name, group.name)}</h2>
                         <span className="shrink-0 rounded-full bg-[#B76E79]/10 px-2 py-0.5 text-[10px] font-bold text-[#B76E79] ring-1 ring-[#B76E79]/15 sm:text-xs">
                           {members.length} {members.length === 1 ? 'membro' : 'membros'}
                         </span>
@@ -347,7 +355,7 @@ export default function Families() {
         <EmptyState icon={Users} title="Nenhuma família cadastrada" text="Crie grupos para filtrar convidados e acompanhar confirmações por família." />
       )}
 
-      <Modal open={open} title={editing ? 'Editar família' : 'Nova família'} onClose={() => setOpen(false)}>
+      <Modal open={open} title={editing ? 'Editar família' : 'Nova família'} busy={saving} onClose={() => setOpen(false)}>
         <form className="space-y-4" onSubmit={submit}>
           <div className="grid gap-4 md:grid-cols-2">
             <FormInput label="Nome da família/grupo" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
@@ -356,7 +364,7 @@ export default function Families() {
             <FormInput label="Telefone do responsável" value={form.responsible_phone} onChange={(e) => setForm({ ...form, responsible_phone: e.target.value })} />
           </div>
           <FormTextarea label="Observações" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-          <button className="btn-primary">Salvar</button>
+          <button className="btn-primary" disabled={saving}>{saving ? 'Salvando...' : 'Salvar'}</button>
         </form>
       </Modal>
 

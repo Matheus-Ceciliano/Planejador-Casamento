@@ -24,18 +24,21 @@ export default function AppFileUpload({
 }: AppFileUploadProps) {
   const { wedding } = useWedding();
   const inputRef = useRef<HTMLInputElement>(null);
+  const uploadingRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState('');
   const [dragging, setDragging] = useState(false);
   const hasError = Boolean(error);
 
   async function handleFile(file?: File) {
-    if (!file || !wedding) return;
+    if (!file || !wedding || uploadingRef.current) return;
+    uploadingRef.current = true;
     setLoading(true);
     setFileName(file.name);
     try {
       onUploaded(await uploadWeddingFile(wedding.id, file, folder));
     } finally {
+      uploadingRef.current = false;
       setLoading(false);
     }
   }
@@ -58,7 +61,7 @@ export default function AppFileUpload({
   // Compact mode: simple button (for backwards compat with FileUpload)
   if (compact) {
     return (
-      <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-medium text-[#1F2937] transition hover:border-[#E11D48] hover:text-[#E11D48]">
+      <label aria-busy={loading} className={`inline-flex h-9 items-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-white px-3 text-sm font-medium text-[#1F2937] transition ${loading ? 'pointer-events-none cursor-wait opacity-60' : 'cursor-pointer hover:border-[#E11D48] hover:text-[#E11D48]'}`}>
         <Upload size={15} />
         {loading ? 'Enviando...' : 'Anexar arquivo'}
         <input
@@ -66,6 +69,7 @@ export default function AppFileUpload({
           type="file"
           className="hidden"
           accept={accept}
+          disabled={loading}
           onChange={(e) => handleFile(e.target.files?.[0])}
         />
       </label>
@@ -95,6 +99,7 @@ export default function AppFileUpload({
           type="file"
           className="hidden"
           accept={accept}
+          disabled={loading}
           onChange={(e) => handleFile(e.target.files?.[0])}
         />
         {loading ? (

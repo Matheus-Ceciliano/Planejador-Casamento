@@ -24,6 +24,15 @@ create table if not exists public.wedding_invites (
 create index if not exists wedding_invites_wedding_id_idx
   on public.wedding_invites (wedding_id);
 
+alter table public.wedding_invites
+  add column if not exists invitee_email text;
+
+create unique index if not exists wedding_invites_active_email_role_unique
+  on public.wedding_invites(wedding_id, lower(invitee_email), role)
+  where invitee_email is not null
+    and used_at is null
+    and is_revoked = false;
+
 alter table public.wedding_invites enable row level security;
 
 create or replace function public.is_wedding_member(target_wedding_id uuid)
@@ -92,7 +101,8 @@ $$;
 create or replace function public.create_wedding_invite(
   target_wedding_id uuid,
   invite_role text,
-  ttl_days integer default 7
+  ttl_days integer default 7,
+  target_email text default null
 )
 returns public.wedding_invites
 language plpgsql
@@ -117,6 +127,7 @@ begin
     wedding_id,
     token,
     role,
+    invitee_email,
     created_by,
     expires_at
   )
@@ -124,6 +135,7 @@ begin
     target_wedding_id,
     encode(extensions.gen_random_bytes(24), 'hex'),
     normalized_role,
+    nullif(lower(trim(target_email)), ''),
     auth.uid(),
     now() + make_interval(days => coalesce(ttl_days, 7))
   )
@@ -275,7 +287,7 @@ begin
 end;
 $$;
 
-grant execute on function public.create_wedding_invite(uuid, text, integer) to authenticated;
+grant execute on function public.create_wedding_invite(uuid, text, integer, text) to authenticated;
 grant execute on function public.revoke_wedding_invite(uuid) to authenticated;
 grant execute on function public.get_wedding_invite_public(text) to anon, authenticated;
 grant execute on function public.accept_wedding_invite(text) to authenticated;

@@ -51,9 +51,12 @@ export type FinancialHealthStatus = 'saudavel' | 'atencao' | 'preocupante' | 'cr
 export type FinancialHealthResult = {
   status: FinancialHealthStatus;
   score: number;
+  risco: number;
+  riscoLabel: 'Baixo' | 'Moderado' | 'Alto' | 'Muito alto' | 'Sem dados';
   label: string;
   motivo: string;
   detalhes: {
+    orcamentoPlanejado: number;
     totalContratado: number;
     totalPago: number;
     totalPendente: number;
@@ -65,11 +68,14 @@ export type FinancialHealthResult = {
     percentualPago: number;
     percentualPendente: number;
     percentualAtrasado: number;
+    percentualOrcamentoUsado: number;
+    fornecedoresSemPagamento: number;
     diasAteProximoVencimento: number | null;
   };
 };
 
 type FinancialHealthInput = {
+  orcamentoPlanejado?: number;
   totalContratado?: number;
   totalPago?: number;
   itensFinanceiros?: BudgetItem[];
@@ -95,7 +101,7 @@ function percentOf(value: number, total: number) {
   return value / total;
 }
 
-function clampRisk(value: number) {
+function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
@@ -104,11 +110,18 @@ function riskContribution(base: number, ratio: number, multiplier: number, cap: 
   return Math.min(cap, base + ratio * multiplier);
 }
 
-function labelForFinancialRisk(score: number) {
-  if (score <= 20) return { status: 'saudavel' as const, label: 'Saudavel' };
-  if (score <= 45) return { status: 'atencao' as const, label: 'Atencao' };
-  if (score <= 70) return { status: 'preocupante' as const, label: 'Preocupante' };
-  return { status: 'critica' as const, label: 'Critico' };
+function labelForFinancialHealth(score: number) {
+  if (score >= 80) return { status: 'saudavel' as const, label: 'Saudável' };
+  if (score >= 60) return { status: 'atencao' as const, label: 'Atenção' };
+  if (score >= 40) return { status: 'preocupante' as const, label: 'Preocupante' };
+  return { status: 'critica' as const, label: 'Crítico' };
+}
+
+function labelForRisk(risk: number): FinancialHealthResult['riscoLabel'] {
+  if (risk <= 20) return 'Baixo';
+  if (risk <= 40) return 'Moderado';
+  if (risk <= 60) return 'Alto';
+  return 'Muito alto';
 }
 
 function buildFinancialDueList(items: BudgetItem[], installments: PaymentInstallment[]) {
@@ -136,6 +149,7 @@ function buildFinancialDueList(items: BudgetItem[], installments: PaymentInstall
 }
 
 export function calculateFinancialHealth({
+  orcamentoPlanejado,
   totalContratado,
   totalPago,
   itensFinanceiros = [],
@@ -143,6 +157,7 @@ export function calculateFinancialHealth({
   fornecedores = [],
   hoje = new Date()
 }: FinancialHealthInput): FinancialHealthResult {
+  const orcamentoPlanejadoReal = Math.max(0, Number(orcamentoPlanejado ?? 0));
   const totalContratadoReal = Math.max(
     0,
     Number(totalContratado ?? itensFinanceiros.reduce((sum, item) => sum + Number(item.contracted_value ?? 0), 0))
@@ -154,14 +169,18 @@ export function calculateFinancialHealth({
   const totalPendente = Math.max(0, totalContratadoReal - totalPagoReal);
   const percentualPago = percentOf(totalPagoReal, totalContratadoReal);
   const percentualPendente = percentOf(totalPendente, totalContratadoReal);
+  const percentualOrcamentoUsado = percentOf(totalContratadoReal, orcamentoPlanejadoReal);
 
   if (totalContratadoReal <= 0) {
     return {
       status: 'sem_dados',
       score: 0,
+      risco: 0,
+      riscoLabel: 'Sem dados',
       label: 'Sem dados',
-      motivo: 'Cadastre valores contratados para calcular a saude financeira.',
+      motivo: 'Cadastre valores contratados para calcular a saúde financeira.',
       detalhes: {
+        orcamentoPlanejado: orcamentoPlanejadoReal,
         totalContratado: 0,
         totalPago: 0,
         totalPendente: 0,
@@ -173,6 +192,8 @@ export function calculateFinancialHealth({
         percentualPago: 0,
         percentualPendente: 0,
         percentualAtrasado: 0,
+        percentualOrcamentoUsado: 0,
+        fornecedoresSemPagamento: 0,
         diasAteProximoVencimento: null
       }
     };
@@ -207,6 +228,12 @@ export function calculateFinancialHealth({
     (sum, vendor) => sum + getPendingValue(vendor.contracted_value, vendor.paid_value),
     0
   );
+  const fornecedoresSemPagamento = fornecedores.filter(
+    (vendor) =>
+      isContractedVendor(vendor) &&
+      Number(vendor.contracted_value ?? 0) > 0 &&
+      Number(vendor.paid_value ?? 0) <= 0
+  );
 
   const percentualAtrasado = percentOf(valorAtrasado, totalContratadoReal);
   const percentualVencendo7 = percentOf(valorVencendoEm7Dias, totalContratadoReal);
@@ -219,35 +246,51 @@ export function calculateFinancialHealth({
 
   let risk = 0;
 
-  // Pendente distante conta como risco leve; urgencia e atraso aumentam o peso.
-  risk += riskContribution(4, percentualPendente, 18, 18);
-  risk += riskContribution(24, percentualAtrasado, 90, 58);
-  risk += riskContribution(12, percentualVencendo7, 55, 34);
-  risk += riskContribution(6, percentualVencendo8a30, 35, 22);
-  risk += riskContribution(3, percentualSemDataLimite, 18, 12);
-  risk += Math.min(8, fornecedoresSemData.length * 2);
+  // Saldo pendente distante e pagamentos futuros normais nao devem derrubar a saude.
+  risk += Math.min(5, percentualPendente * 5);
+  risk += riskContribution(38, percentualAtrasado, 75, 68);
+  risk += riskContribution(14, percentualVencendo7, 45, 32);
+  risk += riskContribution(7, percentualVencendo8a30, 28, 20);
+  risk += riskContribution(4, percentualSemDataLimite, 12, 12);
+  risk += Math.min(5, fornecedoresSemData.length);
+  risk += Math.min(5, fornecedoresSemPagamento.length);
 
-  const score = clampRisk(risk);
-  const classification = labelForFinancialRisk(score);
+  if (orcamentoPlanejadoReal > 0) {
+    if (percentualOrcamentoUsado > 1) {
+      risk += Math.min(30, 15 + (percentualOrcamentoUsado - 1) * 50);
+    } else if (percentualOrcamentoUsado > 0.9) {
+      risk += 5 + (percentualOrcamentoUsado - 0.9) * 50;
+    }
+  }
 
-  let motivo = 'Nao ha valores pendentes relevantes.';
+  const risco = clampScore(risk);
+  const score = clampScore(100 - risco);
+  const classification = labelForFinancialHealth(score);
+  const riscoLabel = labelForRisk(risco);
+
+  let motivo = 'Não há valores pendentes relevantes.';
   if (valorAtrasado > 0) {
-    motivo = `Ha ${formatMoney(valorAtrasado)} em pagamentos atrasados.`;
+    motivo = `Há ${formatMoney(valorAtrasado)} em pagamentos atrasados.`;
   } else if (valorVencendoEm7Dias > 0) {
-    motivo = `Ha ${formatMoney(valorVencendoEm7Dias)} vencendo nos proximos 7 dias.`;
+    motivo = `Há ${formatMoney(valorVencendoEm7Dias)} vencendo nos próximos 7 dias.`;
+  } else if (orcamentoPlanejadoReal > 0 && percentualOrcamentoUsado > 1) {
+    motivo = `O valor contratado ultrapassa o orçamento planejado em ${formatMoney(totalContratadoReal - orcamentoPlanejadoReal)}.`;
   } else if (valorVencendoEm30Dias > 0) {
-    motivo = `Ha ${formatMoney(valorVencendoEm30Dias)} vencendo nos proximos 30 dias.`;
+    motivo = `Há ${formatMoney(valorVencendoEm30Dias)} vencendo nos próximos 30 dias.`;
   } else if (fornecedoresSemData.length > 0) {
     motivo = `${fornecedoresSemData.length} fornecedor${fornecedoresSemData.length > 1 ? 'es' : ''} com valor pendente sem data limite de pagamento.`;
   } else if (totalPendente > 0) {
-    motivo = `Ha ${formatMoney(totalPendente)} pendentes, mas sem vencimentos criticos no curto prazo.`;
+    motivo = `Há ${formatMoney(totalPendente)} pendentes, mas sem pagamentos atrasados ou vencimentos críticos no curto prazo.`;
   }
 
   return {
     ...classification,
     score,
+    risco,
+    riscoLabel,
     motivo,
     detalhes: {
+      orcamentoPlanejado: orcamentoPlanejadoReal,
       totalContratado: totalContratadoReal,
       totalPago: totalPagoReal,
       totalPendente,
@@ -259,6 +302,8 @@ export function calculateFinancialHealth({
       percentualPago,
       percentualPendente,
       percentualAtrasado,
+      percentualOrcamentoUsado,
+      fornecedoresSemPagamento: fornecedoresSemPagamento.length,
       diasAteProximoVencimento: proximoVencimento
     }
   };

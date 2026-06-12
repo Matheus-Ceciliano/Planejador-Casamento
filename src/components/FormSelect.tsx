@@ -13,7 +13,7 @@ import AppSelect from './ui/AppSelect';
 
 type Props = SelectHTMLAttributes<HTMLSelectElement> & {
   label: string;
-  options: { label: string; value: string }[];
+  options: { label: string; value: string; disabled?: boolean }[];
 };
 
 export default function FormSelect({ label, options, onChange, value, disabled, name, className, ...rest }: Props) {

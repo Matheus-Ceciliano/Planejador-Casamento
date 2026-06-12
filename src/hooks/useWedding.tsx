@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Wedding } from '../types';
@@ -20,6 +20,7 @@ export function WeddingProvider({ children }: { children: ReactNode }) {
   const [weddings, setWeddings] = useState<Wedding[]>([]);
   const [wedding, setWedding] = useState<Wedding | null>(null);
   const [loading, setLoading] = useState(true);
+  const savingRef = useRef(false);
 
   const refresh = useCallback(async () => {
     if (!user || !configured) {
@@ -150,6 +151,9 @@ export function WeddingProvider({ children }: { children: ReactNode }) {
         if (next) localStorage.setItem('active_wedding_id', next.id);
       },
       async saveWedding(payload) {
+        if (savingRef.current) throw new Error('Salvamento ja em andamento.');
+        savingRef.current = true;
+        try {
         if (!user) throw new Error('Usuário não autenticado');
         const record = {
           name: payload.name || `${payload.groom_name ?? 'Noivo'} & ${payload.bride_name ?? 'Noiva'}`,
@@ -189,6 +193,9 @@ export function WeddingProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('active_wedding_id', data.id);
         await refresh();
         return data;
+        } finally {
+          savingRef.current = false;
+        }
       }
     }),
     [refresh, user, wedding, weddings]

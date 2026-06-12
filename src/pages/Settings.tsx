@@ -1,14 +1,17 @@
 import { FormEvent, useEffect, useState } from 'react';
 import CurrencyInput from '../components/CurrencyInput';
+import ActionButton from '../components/ActionButton';
 import FileUpload from '../components/FileUpload';
 import FormInput from '../components/FormInput';
 import FormTextarea from '../components/FormTextarea';
 import { useWedding } from '../hooks/useWedding';
+import { useAsyncAction } from '../hooks/useAsyncAction';
 
 type Props = { firstRun?: boolean };
 
 export default function Settings({ firstRun }: Props) {
   const { wedding, saveWedding } = useWedding();
+  const { run, loading: saving } = useAsyncAction();
   const [message, setMessage] = useState('');
   const [form, setForm] = useState({
     name: '',
@@ -44,7 +47,9 @@ export default function Settings({ firstRun }: Props) {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    await saveWedding(form);
+    await run(async () => {
+      await saveWedding(form);
+    });
     setMessage('Configurações salvas.');
   }
 
@@ -76,7 +81,9 @@ export default function Settings({ firstRun }: Props) {
         </div>
         <FormTextarea label="Observações gerais" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
         {message && <p className="text-sm text-event-success">{message}</p>}
-        <button className="btn-primary w-full sm:w-auto">Salvar configurações</button>
+        <ActionButton type="submit" className="btn-primary w-full sm:w-auto" loading={saving} loadingText="Salvando...">
+          Salvar configurações
+        </ActionButton>
       </form>
     </div>
   );

@@ -103,10 +103,14 @@ create table if not exists public.tables (
   wedding_id uuid not null references public.weddings(id) on delete cascade,
   name text not null,
   capacity integer not null default 8 check (capacity > 0),
+  type text not null default 'Outros',
   notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create unique index if not exists tables_wedding_name_unique
+  on public.tables(wedding_id, lower(name));
 
 create table if not exists public.guests (
   id uuid primary key default uuid_generate_v4(),
@@ -185,6 +189,9 @@ create table if not exists public.table_guests (
   updated_at timestamptz not null default now(),
   unique (guest_id)
 );
+
+create unique index if not exists table_guests_wedding_guest_unique
+  on public.table_guests(wedding_id, guest_id);
 
 create table if not exists public.budget_categories (
   id uuid primary key default uuid_generate_v4(),
@@ -307,6 +314,10 @@ create index if not exists payment_history_budget_item_id_idx
 
 create index if not exists payment_history_status_idx
   on public.payment_history(status);
+
+create unique index if not exists payment_history_payment_id_unique
+  on public.payment_history(payment_id)
+  where payment_id is not null;
 
 create table if not exists public.venues (
   id uuid primary key default uuid_generate_v4(),

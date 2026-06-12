@@ -27,6 +27,7 @@ import AppTextarea from '../components/ui/AppTextarea';
 import AppSearchInput from '../components/ui/AppSearchInput';
 import { useWeddingTable } from '../hooks/useWeddingTable';
 import { Guest, GuestGroup } from '../types';
+import { formatFamilyDisplayName } from '../utils/format';
 import { buildWhatsAppChatLink } from '../utils/whatsappService';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
@@ -138,8 +139,7 @@ function familyName(responsible: string) {
 }
 
 function familyDisplayName(group: GuestGroup) {
-  const p = (group.responsible_name ?? '').trim().split(/\s+/).filter(Boolean).slice(0, 2);
-  return p.length ? `Família ${p.join(' ')}` : group.name;
+  return formatFamilyDisplayName(group.responsible_name, group.name);
 }
 
 // ─── Primitive UI (module-level — stable references) ────────────────────────────
@@ -635,6 +635,7 @@ function EditGuestForm({ initial, groups, onSave, onClose }: {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (saving) return;
     setSaving(true);
     try { await onSave(form); }
     finally { setSaving(false); }
@@ -724,6 +725,7 @@ function IndividualGuestForm({ groups, onSave, onClose, onBack }: {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (saving) return;
     setSaving(true);
     try { await onSave(form); }
     finally { setSaving(false); }
@@ -806,7 +808,7 @@ function FamilyForm({ onSave, onClose, onBack }: {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!resp.name.trim()) return;
+    if (saving || !resp.name.trim()) return;
     setSaving(true);
     try { await onSave({ ...resp, origin_group: originGroup }, deps); }
     finally { setSaving(false); }

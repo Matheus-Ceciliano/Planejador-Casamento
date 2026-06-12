@@ -7,6 +7,17 @@ export function formatMoney(value?: number | null) {
   return brl.format(Number(value ?? 0));
 }
 
+export function formatPersonShortName(value?: string | null) {
+  const parts = (value ?? '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return parts[0] ?? '';
+  return `${parts[0]} ${parts[parts.length - 1]}`;
+}
+
+export function formatFamilyDisplayName(responsibleName: string | null | undefined, fallback: string) {
+  const shortName = formatPersonShortName(responsibleName);
+  return shortName ? `Família ${shortName}` : fallback;
+}
+
 export function formatDate(value?: string | null) {
   if (!value) return '-';
   return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(new Date(value));

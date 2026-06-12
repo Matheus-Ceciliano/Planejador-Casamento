@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, HelpCircle, Info, Loader2, Trash2 } from 'lucide-react';
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { retainModalLayer } from '../utils/modalLayer';
 
@@ -16,6 +16,7 @@ type Props = {
   description?: string;
   message?: string;
   confirmLabel?: string;
+  loadingLabel?: string;
   cancelLabel?: string;
   variant?: ConfirmDialogVariant;
   loading?: boolean;
@@ -48,12 +49,24 @@ const variantConfig = {
   }
 };
 
+function defaultLoadingLabel(confirmLabel: string) {
+  const label = confirmLabel.toLocaleLowerCase('pt-BR');
+  if (label.includes('excluir') || label.includes('remover')) return 'Excluindo...';
+  if (label.includes('cancelar') || label.includes('recusar')) return 'Cancelando...';
+  if (label.includes('contratar')) return 'Contratando...';
+  if (label.includes('confirmar')) return 'Confirmando...';
+  if (label.includes('alterar') || label.includes('atualizar')) return 'Atualizando...';
+  if (label.includes('sair')) return 'Saindo...';
+  return 'Processando...';
+}
+
 export default function ConfirmDialog({
   open,
   title = 'Confirmar ação?',
   description,
   message,
   confirmLabel = 'Confirmar',
+  loadingLabel,
   cancelLabel = 'Cancelar',
   variant = 'danger',
   loading = false,
@@ -62,12 +75,29 @@ export default function ConfirmDialog({
   onCancel,
   onConfirm
 }: Props) {
+  const runningRef = useRef(false);
+  const [internalLoading, setInternalLoading] = useState(false);
+  const effectiveLoading = loading || internalLoading;
+
+  async function handleConfirm() {
+    if (runningRef.current || effectiveLoading) return;
+
+    runningRef.current = true;
+    setInternalLoading(true);
+    try {
+      await onConfirm();
+    } finally {
+      runningRef.current = false;
+      setInternalLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (!open) return;
 
     const releaseLayer = retainModalLayer();
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' && !loading) onCancel();
+      if (event.key === 'Escape' && !effectiveLoading) onCancel();
     }
 
     window.addEventListener('keydown', handleKeyDown);
@@ -75,7 +105,7 @@ export default function ConfirmDialog({
       window.removeEventListener('keydown', handleKeyDown);
       releaseLayer();
     };
-  }, [loading, onCancel, open]);
+  }, [effectiveLoading, onCancel, open]);
 
   if (!open) return null;
 
@@ -87,7 +117,7 @@ export default function ConfirmDialog({
     <div
       className="fixed inset-0 z-[9998] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[8px] animate-fade-in"
       onMouseDown={() => {
-        if (!loading) onCancel();
+        if (!effectiveLoading) onCancel();
       }}
       role="dialog"
       aria-modal="true"
@@ -123,17 +153,18 @@ export default function ConfirmDialog({
         {children}
 
         <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button type="button" className="btn-secondary w-full sm:w-auto" onClick={onCancel} disabled={loading}>
+          <button type="button" className="btn-secondary w-full sm:w-auto" onClick={onCancel} disabled={effectiveLoading}>
             {cancelLabel}
           </button>
           <button
             type="button"
             className={`inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl px-4 py-2 text-[15px] font-semibold leading-5 text-white shadow-sm transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 sm:w-auto ${config.button}`}
-            onClick={onConfirm}
-            disabled={loading}
+            onClick={handleConfirm}
+            disabled={effectiveLoading}
+            aria-busy={effectiveLoading}
           >
-            {loading && <Loader2 size={16} className="animate-spin" />}
-            {loading ? 'Aguarde...' : confirmLabel}
+            {effectiveLoading && <Loader2 size={16} className="animate-spin" />}
+            {effectiveLoading ? loadingLabel ?? defaultLoadingLabel(confirmLabel) : confirmLabel}
           </button>
         </div>
       </div>

@@ -317,7 +317,7 @@ export default function Members() {
 
   async function submitInvite(event: FormEvent) {
     event.preventDefault();
-    if (!wedding) return;
+    if (!wedding || inviteSubmitting) return;
     setMessage('');
     setInviteError('');
     setInviteSubmitting(true);
@@ -326,7 +326,8 @@ export default function Members() {
       const { error } = await supabase.rpc('create_wedding_invite', {
         target_wedding_id: wedding.id,
         invite_role: inviteForm.role,
-        ttl_days: inviteForm.ttlDays
+        ttl_days: inviteForm.ttlDays,
+        target_email: inviteForm.email.trim() || null
       });
 
       if (error) {
@@ -497,7 +498,7 @@ export default function Members() {
         </aside>
       </section>
 
-      <Modal open={inviteOpen} title="Convidar membro" onClose={closeInviteModal}>
+      <Modal open={inviteOpen} title="Convidar membro" busy={inviteSubmitting} onClose={closeInviteModal}>
         <form className="space-y-5" onSubmit={submitInvite}>
           {inviteError && (
             <div className="rounded-2xl border border-w-red/20 bg-w-red-lt p-3 text-sm font-semibold text-w-red">
